@@ -12,6 +12,11 @@ klee_add_component(kleeBasic
   KTest.cpp
   Statistics.cpp
 )
+
+
+set(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+
 set(LLVM_COMPONENTS
   support
 )

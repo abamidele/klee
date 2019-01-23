@@ -51,7 +51,7 @@ namespace {
 typedef std::set< ref<Expr> > KeyType;
 
 struct AssignmentLessThan {
-  bool operator()(const Assignment *a, const Assignment *b) const {
+  bool operator()(const Assignment *a, const Assignment *b) {
     return a->bindings < b->bindings;
   }
 };

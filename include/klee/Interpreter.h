@@ -25,10 +25,22 @@ class raw_ostream;
 class raw_fd_ostream;
 }
 
+namespace remill {
+class TraceManager;
+}
+
 namespace klee {
 class ExecutionState;
 class Interpreter;
 class TreeStreamWriter;
+
+class vmill_executor {
+  public:
+    vmill_executor() = default;
+    virtual llvm::Function  *RequestFunc(uint64_t pc, uint64_t idx) = 0;
+    virtual bool DoWrite( uint64_t size , uint64_t address, uint64_t pc, uint64_t value ) = 0;
+    virtual bool DoRead( uint64_t size , uint64_t address, uint64_t pc, void *val ) = 0;
+};
 
 class InterpreterHandler {
 public:
@@ -108,8 +120,12 @@ public:
   setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
             const ModuleOptions &opts) = 0;
 
+  virtual void setLiftedFunctions(std::vector<llvm::Function *> &functions) = 0;
   // supply a tree stream writer which the interpreter will use
   // to record the concrete path (as a stream of '0' and '1' bytes).
+  
+  virtual void setVmillExecutor(vmill_executor *v) = 0;
+
   virtual void setPathWriter(TreeStreamWriter *tsw) = 0;
 
   // supply a tree stream writer which the interpreter will use

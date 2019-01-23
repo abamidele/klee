@@ -49,6 +49,8 @@
 #include <fstream>
 #include <unistd.h>
 
+#include "glog/logging.h"
+
 using namespace klee;
 using namespace llvm;
 

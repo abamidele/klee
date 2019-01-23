@@ -7,6 +7,8 @@
 #
 #===------------------------------------------------------------------------===#
 
+set(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../)
+
 add_library(kleeRuntest SHARED
   intrinsics.c
   # HACK:

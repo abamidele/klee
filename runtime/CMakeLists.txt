@@ -6,6 +6,11 @@
 # License. See LICENSE.TXT for details.
 #
 #===------------------------------------------------------------------------===#
+
+
+
+set(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_subdirectory(Runtest)
 
 if ("${KLEE_RUNTIME_BUILD_TYPE}" MATCHES "Release")
@@ -83,13 +88,15 @@ endif()
 # for building the runtime because it can't handle
 # the source file dependencies properly.
 include(ExternalProject)
-ExternalProject_Add(BuildKLEERuntimes
+ExternalProject_Add(BuildKLEERuntimes 
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH= ../include
   CONFIGURE_COMMAND "${CMAKE_COMMAND}" -E echo "" # Dummy command
   BUILD_COMMAND "${CMAKE_COMMAND}" -E echo "" # Dummy command
   INSTALL_COMMAND "${CMAKE_COMMAND}" -E echo "" # Dummy command
 )
+
 
 set(O0OPT "-O0")
 if (${LLVM_VERSION_MAJOR} GREATER 4)
@@ -103,6 +110,7 @@ endif()
 ExternalProject_Add_Step(BuildKLEERuntimes RuntimeBuild
   # `env` is used here to make sure `MAKEFLAGS` of KLEE's build
   # is not propagated into the bitcode build system.
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH= ../include
   COMMAND ${ENV_BINARY} MAKEFLAGS="" O0OPT=${O0OPT} ${MAKE_BINARY} -f Makefile.cmake.bitcode all
   ALWAYS ${EXTERNAL_PROJECT_BUILD_ALWAYS_ARG}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"

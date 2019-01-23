@@ -15,6 +15,7 @@
 #ifndef KLEE_EXECUTOR_H
 #define KLEE_EXECUTOR_H
 
+
 #include "klee/ExecutionState.h"
 #include "klee/Interpreter.h"
 #include "klee/Internal/Module/Cell.h"
@@ -32,6 +33,9 @@
 #include <set>
 #include <string>
 #include <vector>
+
+#include "remill/BC/Lifter.h"
+#include "glog/logging.h"
 
 struct KTest;
 
@@ -135,7 +139,10 @@ private:
   TreeStreamWriter *pathWriter, *symPathWriter;
   SpecialFunctionHandler *specialFunctionHandler;
   std::vector<TimerInfo*> timers;
+  std::vector<llvm::Function *> lifted_funcs;
   PTree *processTree;
+
+  vmill_executor *vmill_exec;
 
   /// Keeps track of all currently ongoing merges.
   /// An ongoing merge is a set of states which branched from a single state
@@ -256,6 +263,7 @@ private:
 			      const llvm::Constant *c,
 			      unsigned offset);
   void initializeGlobals(ExecutionState &state);
+  void addLiftedFunctionsToModule();
 
   void stepInstruction(ExecutionState &state);
   void updateStates(ExecutionState *current);
@@ -492,6 +500,9 @@ public:
   void setSymbolicPathWriter(TreeStreamWriter *tsw) override {
     symPathWriter = tsw;
   }
+
+  void setLiftedFunctions(std::vector<llvm::Function *> &functions) override;
+  void setVmillExecutor(vmill_executor *v) override;
 
   void setReplayKTest(const struct KTest *out) override {
     assert(!replayPath && "cannot replay both buffer and path");

@@ -125,6 +125,9 @@ namespace klee {
     // FIXME: ihandler should not be here
     void manifest(InterpreterHandler *ih, bool forceSourceOutput);
 
+    void addLiftedFunctionsToModule(std::vector<llvm::Function *> 
+            lifted_funcs);
+
     /// Link the provided modules together as one KLEE module.
     ///
     /// If the entry point is empty, all modules are linked together.

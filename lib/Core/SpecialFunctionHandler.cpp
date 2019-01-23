@@ -6,6 +6,9 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+#include "glog/logging.h"
+#include "CoreStats.h"
+#include "StatsTracker.h"
 
 #include "Memory.h"
 #include "SpecialFunctionHandler.h"
@@ -25,11 +28,28 @@
 #include "klee/SolverCmdLine.h"
 
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Attributes.h"
+#include "llvm-c/Core.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/SwapByteOrder.h"
+
+#include <algorithm>
+#include <cassert>
+#include <climits>
+#include <cstring>
+#include <limits>
+#include <type_traits>
 #include <errno.h>
 #include <sstream>
+#include <iostream>
+
+#include "remill/BC/Util.h"
 
 using namespace llvm;
 using namespace klee;
@@ -138,9 +158,132 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__ubsan_handle_mul_overflow", handleMulOverflow, false),
   add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
 
+
+  // __remill function handling implementations
+
+  add("__vmill_klee_hook", handle__vmill_klee_hook, true),
+  add("__remill_write_memory_64", handle__remill_write_64_hook, true),
+  add("__remill_read_memory_64", handle__remill_read_64_hook, true),
+  add("__remill_read_memory_32", handle__remill_read_32_hook, true),
+  add("__remill_read_memory_8", handle__remill_read_8_hook, true),
+  add("llvm.ctpop.i32", handle__llvm_ctpop, true)
+
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle__remill_read_8_hook( ExecutionState &state, 
+                                      KInstruction *target, 
+                                      std::vector< ref<Expr> > &arguments) {
+    
+  auto read_val = executor.toUnique(state, arguments[1]);
+  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
+  uint8_t val = 0;
+  void *val_ptr = &val;
+  if (executor.vmill_exec->DoRead(1, 0, read_uint, val_ptr)) {
+    LOG(INFO) << "Valid read of 1 bytes at address " << std::hex << read_uint << std:: dec;
+    LOG(INFO) << "val read is " << val;
+  } else {
+    LOG(FATAL) << "Invalid read of 1 bytes at address " << std::hex << read_uint << std:: dec;
+  }
+  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int8));
+}
+
+
+void SpecialFunctionHandler::handle__remill_read_32_hook( ExecutionState &state, 
+                                      KInstruction *target, 
+                                      std::vector< ref<Expr> > &arguments) {
+    
+  auto read_val = executor.toUnique(state, arguments[1]);
+  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
+  uint32_t val = 0;
+  void *val_ptr = &val;
+  if (executor.vmill_exec->DoRead(4, 0, read_uint, val_ptr)) {
+    LOG(INFO) << "Valid read of 4 bytes at address " << std::hex << read_uint << std:: dec;
+    LOG(INFO) << "val read is " << val;
+  } else {
+    LOG(FATAL) << "Invalid read of 4 bytes at address " << std::hex << read_uint << std:: dec;
+  }
+  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handle__remill_read_64_hook( ExecutionState &state, 
+                                      KInstruction *target, 
+                                      std::vector< ref<Expr> > &arguments) {
+    
+  auto read_val = executor.toUnique(state, arguments[1]);
+  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
+  uint64_t val = 0;
+  void *val_ptr = &val;
+  if (executor.vmill_exec->DoRead(8, 0, read_uint, val_ptr)) {
+    LOG(INFO) << "Valid read of 8 bytes at address " << std::hex << read_uint << std:: dec;
+    LOG(INFO) << "val read is " << val;
+  } else {
+    LOG(FATAL) << "Invalid read of 8 bytes at address " << std::hex << read_uint << std:: dec;
+  }
+  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int64));
+}
+
+void SpecialFunctionHandler::handle__llvm_ctpop( ExecutionState &state, 
+                                      KInstruction *target, 
+                                      std::vector< ref<Expr> > &arguments) {
+  auto pc_val = executor.toUnique(state, arguments[0]);
+  auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val) -> getZExtValue();
+
+  auto ctop_val = __builtin_popcount(pc_uint);
+  LOG(INFO) << ctop_val << " : LLVM CTPOP VALUE"; 
+  executor.bindLocal(target, state, ConstantExpr::create(ctop_val, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handle__vmill_klee_hook(ExecutionState &state, 
+                                      KInstruction *target, 
+                                      std::vector< ref<Expr> > &arguments) {
+    auto pc_val = executor.toUnique(state, arguments[0]);
+    auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val) -> getZExtValue();
+
+    auto func = executor.vmill_exec->RequestFunc(pc_uint,0);
+	LOG(INFO) << "function before instrumentation: " << func;
+    if (!executor.kmodule->functionMap.count(func)) {
+		remill::MoveFunctionIntoModule(func, target->inst->getModule());
+		executor.kmodule->manifest(executor.interpreterHandler, StatsTracker::useStatistics());
+		LOG(INFO) << "function after instrumenttion  : " << executor.kmodule->functionMap[func] -> function;
+      // TODO TODO TODO
+      // Lifted new code into the kmodule, re-run klee passes but only on
+      // new functions
+    }
+
+    LOG(INFO) << pc_uint << " pc val at jump";
+
+    auto kfunc = executor.kmodule->functionMap[func];
+    llvm::dbgs() << kfunc << '\n';
+    executor.bindLocal(target, state, Expr::createPointer(reinterpret_cast<std::uint64_t>(func)));
+}
+
+void SpecialFunctionHandler::handle__remill_write_64_hook(ExecutionState &state,
+                                                          KInstruction *target, 
+                                                          std::vector < ref<Expr> > &arguments) {
+  auto address_val = executor.toUnique(state, arguments[0]);
+  auto address_uint = llvm::dyn_cast<ConstantExpr>(address_val) -> getZExtValue();
+  
+  auto pc_val = executor.toUnique(state, arguments[1]);
+  auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val) -> getZExtValue();
+
+  auto value_val = executor.toUnique(state, arguments[2]);
+  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val) -> getZExtValue();
+
+  LOG(INFO) << "mem ptr to : " << address_uint;
+  LOG(INFO) << "writing to address : " << pc_uint;
+  LOG(INFO) << "value written is : " << value_uint;
+
+  if (executor.vmill_exec->DoWrite(8, 0, pc_uint, value_uint)){
+    LOG(INFO) << "Successfully Written to vmill at " << std::hex << pc_uint << std::dec;
+  } else {
+    LOG(FATAL) << "Failed To Write to vmill address space";
+  }
+
+  executor.bindLocal(target, state, Expr::createPointer(address_uint));
+}
+
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {
   return SpecialFunctionHandler::const_iterator(handlerInfo);

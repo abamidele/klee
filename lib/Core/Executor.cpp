@@ -1,5 +1,4 @@
 //===-- Executor.cpp ------------------------------------------------------===//
-//
 //                     The KLEE Symbolic Virtual Machine
 //
 // This file is distributed under the University of Illinois Open Source
@@ -69,6 +68,12 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "remill/BC/Util.h"
+#include "remill/BC/Lifter.h"
+
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
 #include "llvm/Support/CallSite.h"
@@ -400,7 +405,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
     : Interpreter(opts), interpreterHandler(ih), searcher(0),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
-      processTree(0), replayKTest(0), replayPath(0), usingSeeds(0),
+      processTree(0), vmill_exec(0), replayKTest(0), replayPath(0), usingSeeds(0),
       atMemoryLimit(false), inhibitForking(false), haltExecution(false),
       ivcEnabled(false), debugLogBuffer(debugBufferString) {
 
@@ -455,6 +460,25 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
   }
 }
 
+
+void 
+Executor::setLiftedFunctions(std::vector<llvm::Function *> &functions) {
+   lifted_funcs = functions;
+   LOG(INFO) << functions.size();
+}
+
+void
+Executor::setVmillExecutor(vmill_executor *v) {
+  vmill_exec = v;
+}   
+
+void 
+Executor::addLiftedFunctionsToModule(){
+  for (llvm::Function *f: lifted_funcs){
+      remill::MoveFunctionIntoModule(f, kmodule->module.get());
+  }
+}
+
 llvm::Module *
 Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
                     const ModuleOptions &opts) {
@@ -480,6 +504,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
     kmodule->instrument(opts);
   }
 
+
   // 3.) Optimise and prepare for KLEE
 
   // Create a list of functions that should be preserved if used
@@ -496,6 +521,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   preservedFunctions.push_back("memmove");
 
   kmodule->optimiseAndPrepare(opts, preservedFunctions);
+  addLiftedFunctionsToModule();
 
   // 4.) Manifest the module
   kmodule->manifest(interpreterHandler, StatsTracker::useStatistics());
@@ -1113,7 +1139,6 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index,
                            ExecutionState &state) const {
   assert(index < ki->inst->getNumOperands());
   int vnumber = ki->operands[index];
-
   assert(vnumber != -1 &&
          "Invalid operand to eval(), not a value or constant!");
 
@@ -1347,7 +1372,12 @@ void Executor::executeCall(ExecutionState &state,
       // FIXME: It would be nice to check for errors in the usage of this as
       // well.
     default:
-      klee_error("unknown intrinsic: %s", f->getName().data());
+      auto name = std::string(f->getName().data());
+      if (name.compare("llvm.ctpop.i32") == 0){
+        callExternalFunction(state, ki, f, arguments);
+      } else {
+          klee_error("unknown intrinsic: %s", f->getName().data());
+      }
     }
 
     if (InvokeInst *ii = dyn_cast<InvokeInst>(i))
@@ -2226,7 +2256,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::GetElementPtr: {
     KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
     ref<Expr> base = eval(ki, 0, state).value;
-
     for (std::vector< std::pair<unsigned, uint64_t> >::iterator 
            it = kgepi->indices.begin(), ie = kgepi->indices.end(); 
          it != ie; ++it) {
@@ -3729,10 +3758,11 @@ void Executor::runFunctionAsMain(Function *f,
 				 char **argv,
 				 char **envp) {
   std::vector<ref<Expr> > arguments;
-
+  LOG(INFO) << "argv ref created";
   // force deterministic initialization of memory objects
   srand(1);
   srandom(1);
+  argc = 1;
   
   MemoryObject *argvMO = 0;
 
@@ -3741,8 +3771,9 @@ void Executor::runFunctionAsMain(Function *f,
   // (both are terminated by a null). There is also a final terminating
   // null that uclibc seems to expect, possibly the ELF header?
 
-  int envc;
-  for (envc=0; envp[envc]; ++envc) ;
+  int envc = 0;
+  //for (envc=0; envp[envc]; ++envc) ;
+  LOG(INFO) << "indexed into envp";
 
   unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
   KFunction *kf = kmodule->functionMap[f];
@@ -3753,7 +3784,7 @@ void Executor::runFunctionAsMain(Function *f,
     if (++ai!=ae) {
       Instruction *first = &*(f->begin()->begin());
       argvMO =
-          memory->allocate((argc + 1 + envc + 1 + 1) * NumPtrBytes,
+          memory->allocate((argc + 1 + envc + 1 + 1 + 3280) * NumPtrBytes,
                            /*isLocal=*/false, /*isGlobal=*/true,
                            /*allocSite=*/first, /*alignment=*/8);
 
@@ -3773,7 +3804,8 @@ void Executor::runFunctionAsMain(Function *f,
   }
 
   ExecutionState *state = new ExecutionState(kmodule->functionMap[f]);
-  
+  LOG(INFO) << "Created New Execution State from kmodule";
+
   if (pathWriter) 
     state->pathOS = pathWriter->open();
   if (symPathWriter) 
@@ -3797,6 +3829,10 @@ void Executor::runFunctionAsMain(Function *f,
       } else {
         char *s = i<argc ? argv[i] : envp[i-(argc+1)];
         int j, len = strlen(s);
+        errs() << "Function name is " << f->getName();
+        if (i == 0) {
+            j,len = 3280;
+        }
 
         MemoryObject *arg =
             memory->allocate(len + 1, /*isLocal=*/false, /*isGlobal=*/true,
@@ -3812,9 +3848,9 @@ void Executor::runFunctionAsMain(Function *f,
       }
     }
   }
-  
   initializeGlobals(*state);
-
+  LOG(INFO) << "globals initialized from state";
+  
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
   run(*state);

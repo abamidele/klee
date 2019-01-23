@@ -14,6 +14,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <deque>
 
 namespace llvm {
   class Function;
@@ -27,6 +28,9 @@ namespace klee {
   template<typename T> class ref;
   
   class SpecialFunctionHandler {
+  private:
+    //std::deque<ExecutionState&> jump_states;
+  
   public:
     typedef void (SpecialFunctionHandler::*Handler)(ExecutionState &state,
                                                     KInstruction *target, 
@@ -143,6 +147,16 @@ namespace klee {
     HANDLER(handleMulOverflow);
     HANDLER(handleSubOverflow);
     HANDLER(handleDivRemOverflow);
+   
+    //additions for remill lifted code
+    HANDLER(handle__vmill_klee_hook);
+    HANDLER(handle__remill_write_64_hook);
+    HANDLER(handle__llvm_ctpop);
+    HANDLER(handle__remill_read_64_hook);
+    HANDLER(handle__remill_read_32_hook);
+    HANDLER(handle__remill_read_8_hook);
+
+
 #undef HANDLER
   };
 } // End klee namespace

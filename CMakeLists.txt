@@ -35,6 +35,8 @@ if (POLICY CMP0037)
   cmake_policy(SET CMP0037 NEW)
 endif()
 
+set(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 # This overrides the default flags for the different CMAKE_BUILD_TYPEs
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_C
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flags_override.cmake")
