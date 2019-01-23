@@ -1,0 +1,3 @@
+[submodule "tools/vmill"]
+	path = tools/vmill
+	url = git@github.com:trailofbits/vmill.git
