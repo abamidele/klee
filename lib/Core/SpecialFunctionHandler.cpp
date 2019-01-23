@@ -161,18 +161,18 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
   // __remill function handling implementations
 
-  add("__vmill_klee_hook", handle__vmill_klee_hook, true),
-  add("__remill_write_memory_64", handle__remill_write_64_hook, true),
-  add("__remill_read_memory_64", handle__remill_read_64_hook, true),
-  add("__remill_read_memory_32", handle__remill_read_32_hook, true),
-  add("__remill_read_memory_8", handle__remill_read_8_hook, true),
+  add("__vmill_get_lifted_function", handle__vmill_get_lifted_function, true),
+  add("__remill_write_memory_64", handle__remill_write_64, true),
+  add("__remill_read_memory_64", handle__remill_read_64, true),
+  add("__remill_read_memory_32", handle__remill_read_32, true),
+  add("__remill_read_memory_8", handle__remill_read_8, true),
   add("llvm.ctpop.i32", handle__llvm_ctpop, true)
 
 #undef addDNR
 #undef add
 };
 
-void SpecialFunctionHandler::handle__remill_read_8_hook( ExecutionState &state, 
+void SpecialFunctionHandler::handle__remill_read_8( ExecutionState &state, 
                                       KInstruction *target, 
                                       std::vector< ref<Expr> > &arguments) {
     
@@ -190,7 +190,7 @@ void SpecialFunctionHandler::handle__remill_read_8_hook( ExecutionState &state,
 }
 
 
-void SpecialFunctionHandler::handle__remill_read_32_hook( ExecutionState &state, 
+void SpecialFunctionHandler::handle__remill_read_32( ExecutionState &state, 
                                       KInstruction *target, 
                                       std::vector< ref<Expr> > &arguments) {
     
@@ -207,7 +207,7 @@ void SpecialFunctionHandler::handle__remill_read_32_hook( ExecutionState &state,
   executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int32));
 }
 
-void SpecialFunctionHandler::handle__remill_read_64_hook( ExecutionState &state, 
+void SpecialFunctionHandler::handle__remill_read_64( ExecutionState &state, 
                                       KInstruction *target, 
                                       std::vector< ref<Expr> > &arguments) {
     
@@ -235,7 +235,7 @@ void SpecialFunctionHandler::handle__llvm_ctpop( ExecutionState &state,
   executor.bindLocal(target, state, ConstantExpr::create(ctop_val, Expr::Int32));
 }
 
-void SpecialFunctionHandler::handle__vmill_klee_hook(ExecutionState &state, 
+void SpecialFunctionHandler::handle__vmill_get_lifted_function(ExecutionState &state, 
                                       KInstruction *target, 
                                       std::vector< ref<Expr> > &arguments) {
     auto pc_val = executor.toUnique(state, arguments[0]);
@@ -259,7 +259,7 @@ void SpecialFunctionHandler::handle__vmill_klee_hook(ExecutionState &state,
     executor.bindLocal(target, state, Expr::createPointer(reinterpret_cast<std::uint64_t>(func)));
 }
 
-void SpecialFunctionHandler::handle__remill_write_64_hook(ExecutionState &state,
+void SpecialFunctionHandler::handle__remill_write_64(ExecutionState &state,
                                                           KInstruction *target, 
                                                           std::vector < ref<Expr> > &arguments) {
   auto address_val = executor.toUnique(state, arguments[0]);

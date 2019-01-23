@@ -1320,7 +1320,11 @@ void Executor::executeCall(ExecutionState &state,
       // state may be destroyed by this call, cannot touch
       callExternalFunction(state, ki, f, arguments);
       break;
-        
+
+    case Intrinsic::ctpop: {
+      callExternalFunction(state, ki, f, arguments);
+      break;
+    }      
       // va_arg is handled by caller and intrinsic lowering, see comment for
       // ExecutionState::varargs
     case Intrinsic::vastart:  {
@@ -1372,12 +1376,7 @@ void Executor::executeCall(ExecutionState &state,
       // FIXME: It would be nice to check for errors in the usage of this as
       // well.
     default:
-      auto name = std::string(f->getName().data());
-      if (name.compare("llvm.ctpop.i32") == 0){
-        callExternalFunction(state, ki, f, arguments);
-      } else {
-          klee_error("unknown intrinsic: %s", f->getName().data());
-      }
+      klee_error("unknown intrinsic: %s", f->getName().data());
     }
 
     if (InvokeInst *ii = dyn_cast<InvokeInst>(i))

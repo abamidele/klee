@@ -149,12 +149,12 @@ namespace klee {
     HANDLER(handleDivRemOverflow);
    
     //additions for remill lifted code
-    HANDLER(handle__vmill_klee_hook);
-    HANDLER(handle__remill_write_64_hook);
+    HANDLER(handle__vmill_get_lifted_function);
+    HANDLER(handle__remill_write_64);
     HANDLER(handle__llvm_ctpop);
-    HANDLER(handle__remill_read_64_hook);
-    HANDLER(handle__remill_read_32_hook);
-    HANDLER(handle__remill_read_8_hook);
+    HANDLER(handle__remill_read_64);
+    HANDLER(handle__remill_read_32);
+    HANDLER(handle__remill_read_8);
 
 
 #undef HANDLER
