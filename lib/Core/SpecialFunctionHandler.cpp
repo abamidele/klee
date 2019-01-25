@@ -180,7 +180,7 @@ void SpecialFunctionHandler::handle__remill_read_8( ExecutionState &state,
   auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
   uint8_t val = 0;
   void *val_ptr = &val;
-  if (executor.vmill_exec->DoRead(1, 0, read_uint, val_ptr)) {
+  if (executor.DoRead(1, 0, read_uint, val_ptr)) {
     LOG(INFO) << "Valid read of 1 bytes at address " << std::hex << read_uint << std:: dec;
     LOG(INFO) << "val read is " << val;
   } else {
@@ -198,7 +198,7 @@ void SpecialFunctionHandler::handle__remill_read_32( ExecutionState &state,
   auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
   uint32_t val = 0;
   void *val_ptr = &val;
-  if (executor.vmill_exec->DoRead(4, 0, read_uint, val_ptr)) {
+  if (executor.DoRead(4, 0, read_uint, val_ptr)) {
     LOG(INFO) << "Valid read of 4 bytes at address " << std::hex << read_uint << std:: dec;
     LOG(INFO) << "val read is " << val;
   } else {
@@ -215,7 +215,7 @@ void SpecialFunctionHandler::handle__remill_read_64( ExecutionState &state,
   auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val) -> getZExtValue();
   uint64_t val = 0;
   void *val_ptr = &val;
-  if (executor.vmill_exec->DoRead(8, 0, read_uint, val_ptr)) {
+  if (executor.DoRead(8, 0, read_uint, val_ptr)) {
     LOG(INFO) << "Valid read of 8 bytes at address " << std::hex << read_uint << std:: dec;
     LOG(INFO) << "val read is " << val;
   } else {
@@ -241,10 +241,11 @@ void SpecialFunctionHandler::handle__vmill_get_lifted_function(ExecutionState &s
     auto pc_val = executor.toUnique(state, arguments[0]);
     auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val) -> getZExtValue();
 
-    auto func = executor.vmill_exec->RequestFunc(pc_uint,0);
+    auto mem = executor.Memory(0);
+    auto func = executor.GetLiftedFunction(mem, pc_uint);
 	LOG(INFO) << "function before instrumentation: " << func;
     if (!executor.kmodule->functionMap.count(func)) {
-		remill::MoveFunctionIntoModule(func, target->inst->getModule());
+		//remill::MoveFunctionIntoModule(func, target->inst->getModule());
 		executor.kmodule->manifest(executor.interpreterHandler, StatsTracker::useStatistics());
 		LOG(INFO) << "function after instrumenttion  : " << executor.kmodule->functionMap[func] -> function;
       // TODO TODO TODO
@@ -275,12 +276,11 @@ void SpecialFunctionHandler::handle__remill_write_64(ExecutionState &state,
   LOG(INFO) << "writing to address : " << pc_uint;
   LOG(INFO) << "value written is : " << value_uint;
 
-  if (executor.vmill_exec->DoWrite(8, 0, pc_uint, value_uint)){
+  if (executor.DoWrite(8, 0, pc_uint, value_uint)){
     LOG(INFO) << "Successfully Written to vmill at " << std::hex << pc_uint << std::dec;
   } else {
     LOG(FATAL) << "Failed To Write to vmill address space";
   }
-
   executor.bindLocal(target, state, Expr::createPointer(address_uint));
 }
 

@@ -33,6 +33,9 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <deque>
+
+#include "vmill/Program/AddressSpace.h"
 
 #include "remill/BC/Lifter.h"
 #include "glog/logging.h"
@@ -52,6 +55,10 @@ namespace llvm {
   class DataLayout;
   class Twine;
   class Value;
+}
+
+namespace vmill {
+  class AddressSpace;
 }
 
 namespace klee {  
@@ -77,6 +84,19 @@ namespace klee {
   class TimingSolver;
   class TreeStreamWriter;
   class MergeHandler;
+  
+  class TraceManager;
+  class TraceLifter;
+
+  class vTask {
+    public:
+      llvm::Function *first_func;
+      int argc;
+      char *argv[3];
+      char **envp;
+  };
+
+
   template<class T> class ref;
 
 
@@ -142,13 +162,16 @@ private:
   std::vector<llvm::Function *> lifted_funcs;
   PTree *processTree;
 
-  vmill_executor *vmill_exec;
+  TraceManager *trace_manager;
+  std::unique_ptr<TraceLifter> trace_lifter;
 
   /// Keeps track of all currently ongoing merges.
   /// An ongoing merge is a set of states which branched from a single state
   /// which ran into a klee_open_merge(), and not all states in the set have
   /// reached the corresponding klee_close_merge() yet.
   std::vector<MergeHandler *> mergeGroups;
+  std::vector<std::shared_ptr<vmill::AddressSpace>> memories;
+  std::deque<vTask *> tasks;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction
@@ -263,7 +286,6 @@ private:
 			      const llvm::Constant *c,
 			      unsigned offset);
   void initializeGlobals(ExecutionState &state);
-  void addLiftedFunctionsToModule();
 
   void stepInstruction(ExecutionState &state);
   void updateStates(ExecutionState *current);
@@ -501,9 +523,6 @@ public:
     symPathWriter = tsw;
   }
 
-  void setLiftedFunctions(std::vector<llvm::Function *> &functions) override;
-  void setVmillExecutor(vmill_executor *v) override;
-
   void setReplayKTest(const struct KTest *out) override {
     assert(!replayPath && "cannot replay both buffer and path");
     replayKTest = out;
@@ -518,6 +537,22 @@ public:
 
   llvm::Module *setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
                           const ModuleOptions &opts) override;
+
+  vmill::AddressSpace *Memory(uintptr_t index);
+
+  llvm::Function *GetLiftedFunction(vmill::AddressSpace *memory, uint64_t addr);
+  
+  vTask *NextTask(void);
+
+  void AddTask(vTask *task);
+
+  void Run(void) override;
+  void AddInitialTask(const std::string &state, 
+                      const uint64_t pc,
+                      std::shared_ptr<vmill::AddressSpace> memory) override;
+
+  bool DoRead(uint64_t size, uint64_t memory, uint64_t address, void *val);
+  bool DoWrite(uint64_t size, uint64_t memory, uint64_t address, uint64_t value);
 
   void useSeeds(const std::vector<struct KTest *> *seeds) override {
     usingSeeds = seeds;

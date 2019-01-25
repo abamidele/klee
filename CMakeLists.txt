@@ -374,6 +374,25 @@ else()
 endif()
 
 ################################################################################
+# Protobuf support
+################################################################################
+find_package(Protobuf REQUIRED)
+list(APPEND KLEE_COMPONENT_EXTRA_LIBRARIES ${Protobuf_LIBRARIES})
+list(APPEND  KLEE_COMPONENT_EXTRA_INCLUDE_DIRS ${Protobuf_INCLUDE_DIR})
+list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI") 
+# this function can't be told where to store the output files! we have to add the whole binary directory
+# to the include directories (or change it and lose compatibility with the system libraries)
+protobuf_generate_cpp(PROJECT_PROTOBUFSOURCEFILES PROJECT_PROTOBUFHEADERFILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/Core/Program/Snapshot.proto")
+list(APPEND KLEE_COMPONENT_EXTRA_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+list(APPEND KLEE_COMPONENT_EXTRA_INCLUDE_DIRS ${PROJECT_PROTOBUFHEADERFILES})
+
+# disable -Werror on these file since they have been generated
+set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-sho    rten-64-to-32 -Wno-conversion")
+set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-sh    orten-64-to-32 -Wno-conversion")
+################################################################################
+# Protobuf support
+################################################################################
 # TCMalloc support
 ################################################################################
 OPTION(ENABLE_TCMALLOC "Enable TCMalloc support" ON)

@@ -22,6 +22,9 @@
 #include "UserSearcher.h"
 #include "ExecutorTimerInfo.h"
 
+#include "TraceManager.h"
+#include "TraceLifter.h"
+#include "vmill/Program/AddressSpace.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -405,7 +408,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
     : Interpreter(opts), interpreterHandler(ih), searcher(0),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
-      processTree(0), vmill_exec(0), replayKTest(0), replayPath(0), usingSeeds(0),
+      processTree(0), trace_manager(0), trace_lifter(nullptr), replayKTest(0), replayPath(0), usingSeeds(0),
       atMemoryLimit(false), inhibitForking(false), haltExecution(false),
       ivcEnabled(false), debugLogBuffer(debugBufferString) {
 
@@ -461,24 +464,6 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
 }
 
 
-void 
-Executor::setLiftedFunctions(std::vector<llvm::Function *> &functions) {
-   lifted_funcs = functions;
-   LOG(INFO) << functions.size();
-}
-
-void
-Executor::setVmillExecutor(vmill_executor *v) {
-  vmill_exec = v;
-}   
-
-void 
-Executor::addLiftedFunctionsToModule(){
-  for (llvm::Function *f: lifted_funcs){
-      remill::MoveFunctionIntoModule(f, kmodule->module.get());
-  }
-}
-
 llvm::Module *
 Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
                     const ModuleOptions &opts) {
@@ -521,7 +506,6 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   preservedFunctions.push_back("memmove");
 
   kmodule->optimiseAndPrepare(opts, preservedFunctions);
-  addLiftedFunctionsToModule();
 
   // 4.) Manifest the module
   kmodule->manifest(interpreterHandler, StatsTracker::useStatistics());
@@ -539,11 +523,155 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   DataLayout *TD = kmodule->targetData.get();
   Context::initialize(TD->isLittleEndian(),
                       (Expr::Width)TD->getPointerSizeInBits());
+  
+  trace_manager = new TraceManager(*(kmodule->module));
+  trace_lifter = std::unique_ptr<TraceLifter>(new TraceLifter(*(kmodule->module) ,*trace_manager));
 
   return kmodule->module.get();
 }
 
+vmill::AddressSpace *Executor::Memory(uintptr_t index) {
+  auto mem = memories[index].get();
+  LOG(INFO) << "Got AddressSpace at index " << index << '\n';
+  return mem;
+}
+ 
+llvm::Function *Executor::GetLiftedFunction(
+  vmill::AddressSpace *memory, uint64_t addr) {
+  return trace_lifter->GetLiftedFunction(memory, addr);
+}
+
+vTask *Executor::NextTask(void) {
+   if (tasks.empty()) {
+     return nullptr;
+   } else {
+     auto task = tasks.front();
+     tasks.pop_front();
+     return task;
+  }
+}
+
+void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
+                               std::shared_ptr<vmill::AddressSpace> memory) {
+
+  CHECK(memories.empty());
+
+  const auto task_num = memories.size();
+  memories.push_back(memory);
+ 
+  const std::string task_var_name = "__vmill_task_" + std::to_string(task_num);
+  auto task_var = kmodule->module->getGlobalVariable(task_var_name, true);
+   // Lazily create the task variable if it's missing.
+   if (!task_var) {
+     CHECK(task_num)
+         << "Missing task variable " << task_var_name << " in runtime";
+ 
+     // Make sure that task variables are no gaps in the ordering of task
+     // variables.
+     const std::string prev_task_var_name =
+         "__vmill_task_" + std::to_string(task_num - 1);
+     const auto prev_task_var = kmodule->module->getGlobalVariable(
+         prev_task_var_name);
+     CHECK(prev_task_var != nullptr)
+         << "Missing task variable " << prev_task_var_name << " in runtime";
+ 
+     task_var = new llvm::GlobalVariable(
+         *(kmodule->module), prev_task_var->getValueType(), false /* isConstant */,
+         llvm::GlobalValue::ExternalLinkage,
+         llvm::Constant::getNullValue(prev_task_var->getValueType()),
+         task_var_name);
+   }
+ 
+   LOG(INFO) << "BEFORE TASK SET UP";
+ 
+   LOG(INFO) << "State size is " << state.size();
+   auto task = new vTask;
+   setInhibitForking(true); //  inhibits forking; for concrete interpretation
+   task->first_func = kmodule->module -> getFunction("__vmill_entrypoint");
+   CHECK(task->first_func) 
+		<< "vmill entrypoint is not in the bitcode";
+
+   task->argc = 1;
+   char * str = new char[state.size()];
+   for(int i=0; i< state.size();++i) {
+     str[i] = state.c_str()[i];
+   }
+   task->argv[0] = str;
+   task->envp = {}; //{"vmill",}
+ 
+   tasks.push_back(task);
+   
+   LOG(INFO) << "GOT THROUGH INITIAL TASK";
+}
+
+void Executor::Run(void) {
+  while (auto task = NextTask()) {
+    LOG(INFO) << "Interpreting Tasks!";
+	runFunctionAsMain(task->first_func,
+					  task->argc,
+					  task->argv,
+					  task->envp);
+  }
+}
+
+void Executor::AddTask(vTask *task) {
+   tasks.push_back(task);
+}
+
+bool Executor::DoRead(uint64_t size, uint64_t memory, uint64_t address, void *val) {
+  CHECK(memory < memories.size());
+  auto mem = Memory(memory);
+  switch(size) {
+	case 8: {
+	LOG(INFO) << "HIT CASE 8";
+	return mem->TryRead(address, reinterpret_cast<uint64_t *>(val));
+  } case 4:{
+	LOG(INFO) << "HIT CASE 4";
+	return mem->TryRead(address, reinterpret_cast<uint32_t *>(val));
+  } case 2: {
+	LOG(INFO) << "HIT CASE 2";
+	return mem->TryRead(address, reinterpret_cast<uint16_t *>(val));
+  } case 1: {
+	LOG(INFO) << "HIT CASE 1";
+	return mem->TryRead(address, reinterpret_cast<uint8_t *>(val));
+ } default: {
+	LOG(INFO) << "HIT CASE DEFAULT";
+	LOG(INFO) << "Invalid Size To Write: " << size;
+    return false;
+  }
+ }
+}
+
+bool Executor::DoWrite(uint64_t size, uint64_t memory, uint64_t address, uint64_t value) {
+   CHECK(memory < memories.size());
+   auto mem = Memory(memory);
+   switch(size) {
+     case 8:
+       return mem->TryWrite(address, value);
+     case 4:
+       return mem->TryWrite(address, static_cast<uint32_t>(value));
+     case 2:
+       return mem->TryWrite(address, static_cast<uint16_t>(value));
+     case 1:
+       return mem->TryWrite(address, static_cast<uint8_t>(value));
+     default:
+       LOG(INFO) << "Invalid Size To Write: " << size;
+       return false;
+    }
+}
+                                                                                                             
 Executor::~Executor() {
+
+  for (unsigned i = 0; ; i++) {
+    const std::string task_var_name = "__vmill_task_" + std::to_string(i);
+    const auto task_var = kmodule->module->getGlobalVariable(task_var_name);
+    if (!task_var) {
+       break;
+     }
+     task_var->setInitializer(llvm::Constant::getNullValue(
+         task_var->getInitializer()->getType()));
+  }
+ 
   delete memory;
   delete externalDispatcher;
   delete processTree;
@@ -557,7 +685,6 @@ Executor::~Executor() {
 }
 
 /***/
-
 void Executor::initializeGlobalObject(ExecutionState &state, ObjectState *os,
                                       const Constant *c, 
                                       unsigned offset) {
