@@ -11,6 +11,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 
+#include "glog/logging.h"
 #include "Passes.h"
 
 #include "klee/Config/Version.h"
@@ -316,6 +317,9 @@ void KModule::manifest(InterpreterHandler *ih, bool forceSourceOutput) {
 
     for (unsigned i=0; i<kf->numInstructions; ++i) {
       KInstruction *ki = kf->instructions[i];
+      if(!&infos->getInfo(ki->inst)){
+          LOG(INFO) << "zero detected";
+      }
       ki->info = &infos->getInfo(ki->inst);
     }
 

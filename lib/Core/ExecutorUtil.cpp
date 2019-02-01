@@ -9,6 +9,7 @@
 
 #include "Executor.h"
 
+#include "glog/logging.h"
 #include "Context.h"
 
 #include "klee/Expr.h"
@@ -48,17 +49,25 @@ namespace klee {
     }
 
     if (const llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(c)) {
+
       return evalConstantExpr(ce, ki);
     } else {
       if (const ConstantInt *ci = dyn_cast<ConstantInt>(c)) {
+
         return ConstantExpr::alloc(ci->getValue());
       } else if (const ConstantFP *cf = dyn_cast<ConstantFP>(c)) {
+
         return ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt());
       } else if (const GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
+
         return globalAddresses.find(gv)->second;
       } else if (isa<ConstantPointerNull>(c)) {
+
+
         return Expr::createPointer(0);
       } else if (isa<UndefValue>(c) || isa<ConstantAggregateZero>(c)) {
+
+
         if (getWidthForLLVMType(c->getType()) == 0) {
           if (isa<llvm::LandingPadInst>(ki->inst)) {
             klee_warning_once(0, "Using zero size array fix for landingpad instruction filter");
@@ -68,6 +77,8 @@ namespace klee {
         return ConstantExpr::create(0, getWidthForLLVMType(c->getType()));
       } else if (const ConstantDataSequential *cds =
                  dyn_cast<ConstantDataSequential>(c)) {
+
+
         // Handle a vector or array: first element has the smallest address,
         // the last element the highest
         std::vector<ref<Expr> > kids;
@@ -80,6 +91,7 @@ namespace klee {
         ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
         return cast<ConstantExpr>(res);
       } else if (const ConstantStruct *cs = dyn_cast<ConstantStruct>(c)) {
+
         const StructLayout *sl = kmodule->targetData->getStructLayout(cs->getType());
         llvm::SmallVector<ref<Expr>, 4> kids;
         for (unsigned i = cs->getNumOperands(); i != 0; --i) {

@@ -524,8 +524,8 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   Context::initialize(TD->isLittleEndian(),
                       (Expr::Width)TD->getPointerSizeInBits());
   
-  trace_manager = new TraceManager(*(kmodule->module));
-  trace_lifter = std::unique_ptr<TraceLifter>(new TraceLifter(*(kmodule->module) ,*trace_manager));
+  trace_manager = new TraceManager(*kmodule->module);
+  trace_lifter = std::unique_ptr<TraceLifter>(new TraceLifter(*kmodule->module ,*trace_manager));
 
   return kmodule->module.get();
 }
@@ -1266,6 +1266,7 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index,
                            ExecutionState &state) const {
   assert(index < ki->inst->getNumOperands());
   int vnumber = ki->operands[index];
+  LOG(INFO) << "the vnumber is: " << vnumber;
   assert(vnumber != -1 &&
          "Invalid operand to eval(), not a value or constant!");
 
@@ -2944,9 +2945,9 @@ void Executor::bindModuleConstants() {
     for (unsigned i=0; i<kf->numInstructions; ++i)
       bindInstructionConstants(kf->instructions[i]);
   }
-
   kmodule->constantTable =
       std::unique_ptr<Cell[]>(new Cell[kmodule->constants.size()]);
+
   for (unsigned i=0; i<kmodule->constants.size(); ++i) {
     Cell &c = kmodule->constantTable[i];
     c.value = evalConstant(kmodule->constants[i]);

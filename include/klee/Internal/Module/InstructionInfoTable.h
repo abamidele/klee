@@ -47,7 +47,7 @@ namespace klee {
         return *a<*b;
       }
     };
-
+    public:
     std::string dummyString;
     InstructionInfo dummyInfo;
     std::map<const llvm::Instruction*, InstructionInfo> infos;

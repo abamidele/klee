@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-
+#include "glog/logging.h"
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Config/Version.h"
 
@@ -171,7 +171,7 @@ unsigned InstructionInfoTable::getMaxID() const {
 }
 
 const InstructionInfo &
-InstructionInfoTable::getInfo(const Instruction *inst) const {
+InstructionInfoTable::getInfo(const Instruction *inst) const { 
   std::map<const llvm::Instruction*, InstructionInfo>::const_iterator it = 
     infos.find(inst);
   if (it == infos.end())
