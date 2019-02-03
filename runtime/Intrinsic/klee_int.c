@@ -7,8 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <assert.h>
-#include "klee/klee.h"
+extern void klee_make_symbolic(void *, size_t, const char *);
 
 int klee_int(const char *name) {
   int x;

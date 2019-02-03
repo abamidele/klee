@@ -115,7 +115,7 @@ size_t util::GetTotalMallocUsage() {
 
 #else // HAVE_MALLINFO
 
-#warning Cannot get malloc info on this platform
+//#warning "Cannot get malloc info on this platform"
   return 0;
 
 #endif

@@ -7,8 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <assert.h>
-#include "klee/klee.h"
+extern void klee_report_error(const char *, int, const char *, const char *);
+extern void klee_make_symbolic(void *, size_t, const char *);
+extern void klee_assume(uintptr_t);
 
 int klee_range(int start, int end, const char* name) {
   int x;

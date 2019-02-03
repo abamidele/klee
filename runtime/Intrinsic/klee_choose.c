@@ -7,7 +7,8 @@
 //
 //===----------------------------------------------------------------------===*/
 
-#include "klee/klee.h"
+extern void klee_make_symbolic(void *, size_t, const char *);
+extern void klee_silent_exit(int) __attribute__((noreturn));
 
 uintptr_t klee_choose(uintptr_t n) {
   uintptr_t x;

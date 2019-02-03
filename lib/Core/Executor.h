@@ -155,8 +155,12 @@ class Executor : public Interpreter {
   std::vector<TimerInfo*> timers;
   PTree *processTree;
 
-  native::TraceManager *trace_manager;
-  std::unique_ptr<native::TraceLifter> trace_lifter;
+  std::unique_ptr<llvm::Module> semantics_module;
+  llvm::Module *traces_module;
+  std::unique_ptr<native::TraceManager> trace_manager;
+  std::unique_ptr<remill::IntrinsicTable> intrinsics;
+  std::unique_ptr<remill::InstructionLifter> inst_lifter;
+  std::unique_ptr<remill::TraceLifter> trace_lifter;
 
   /// Keeps track of all currently ongoing merges.
   /// An ongoing merge is a set of states which branched from a single state

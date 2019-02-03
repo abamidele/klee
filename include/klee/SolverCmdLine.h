@@ -15,7 +15,7 @@
 #ifndef KLEE_SOLVERCOMMANDLINE_H
 #define KLEE_SOLVERCOMMANDLINE_H
 
-//#include "klee/Config/config.h"
+#include "klee/Config/config.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"

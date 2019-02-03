@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 void *memmove(void *dst, const void *src, size_t count) {
-  char *a = dst;
-  const char *b = src;
+  auto a = (char *) dst;
+  auto b = (const char *) src;
 
   if (src == dst)
     return dst;

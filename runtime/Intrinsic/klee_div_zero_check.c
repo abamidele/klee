@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "klee/klee.h"
+extern void klee_report_error(const char *, int, const char *, const char *);
 
 void klee_div_zero_check(long long z) {
   if (z == 0)

@@ -41,7 +41,8 @@
  */
 int memcmp(const void *s1, const void *s2, size_t n) {
   if (n != 0) {
-    const unsigned char *p1 = s1, *p2 = s2;
+    auto p1 = (const unsigned char *) s1;
+    auto p2 = (const unsigned char *) s2;
 
     do {
       if (*p1++ != *p2++) {

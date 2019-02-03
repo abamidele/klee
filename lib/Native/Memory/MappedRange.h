@@ -24,7 +24,7 @@
 namespace klee {
 namespace native {
 
-enum class CodeVersion : uint64_t;
+using CodeVersion = uint64_t;
 
 // Forward declaration of underlying memory map type.
 class MappedRange;

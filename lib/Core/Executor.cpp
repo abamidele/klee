@@ -25,8 +25,7 @@
 #include "UserSearcher.h"
 #include "ExecutorTimerInfo.h"
 
-#include "Native/TraceManager.h"
-#include "Native/TraceLifter.h"
+#include "Native/Arch/TraceManager.h"
 #include "Native/Memory/AddressSpace.h"
 
 #include "klee/ExecutionState.h"
@@ -82,8 +81,11 @@
 #include <llvm/IR/CallSite.h>
 #endif
 
-#include "remill/BC/Util.h"
+#include "remill/Arch/Arch.h"
+#include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
+#include "remill/BC/Util.h"
+#include "remill/BC/Optimizer.h"
 
 #include <cassert>
 #include <algorithm>
@@ -406,8 +408,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       symPathWriter(0),
       specialFunctionHandler(0),
       processTree(0),
-      trace_manager(0),
-      trace_lifter(nullptr),
+      traces_module(nullptr),
       replayKTest(0),
       replayPath(0),
       replayPosition(0),
@@ -478,16 +479,6 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
 
   kmodule = std::unique_ptr<KModule>(new KModule());
 
-  // Preparing the final module happens in multiple stages
-
-  // Link with KLEE intrinsics library before running any optimizations
-  SmallString<128> LibPath(opts.LibraryDir);
-  llvm::sys::path::append(LibPath, "libkleeRuntimeIntrinsic.bca");
-  std::string error;
-  if (!klee::loadFile(LibPath.str(), modules[0]->getContext(), modules,
-                      error)) {
-    klee_error("Could not load KLEE intrinsic file %s", LibPath.c_str());
-  }
 
   // 1.) Link the modules together
   while (kmodule->link(modules, opts.EntryPoint)) {
@@ -528,21 +519,68 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   Context::initialize(TD->isLittleEndian(),
                       (Expr::Width) TD->getPointerSizeInBits());
 
-  trace_manager = new TraceManager(*kmodule->module);
-  trace_lifter = std::unique_ptr<TraceLifter>(
-      new TraceLifter(*kmodule->module, *trace_manager));
+  traces_module = kmodule->module.get();
+  auto &context = traces_module->getContext();
+  semantics_module.reset(remill::LoadTargetSemantics(&context));
+  intrinsics.reset(new remill::IntrinsicTable(semantics_module));
+  trace_manager.reset(new native::TraceManager(*traces_module));
+  inst_lifter.reset(new remill::InstructionLifter(
+      remill::GetTargetArch(), *intrinsics));
+  trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
 
   return kmodule->module.get();
 }
 
 native::AddressSpace *Executor::Memory(uintptr_t index) {
-  DCHECK_LT(memory, memories.size());
+  DCHECK_LT(index, memories.size());
   return memories[index].get();
 }
 
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
                                             uint64_t addr) {
-  return trace_lifter->GetLiftedFunction(memory, addr);
+  auto func = trace_manager->GetLiftedTraceDefinition(addr);
+  if (func) {
+    CHECK(!func->isDeclaration());
+    return func;
+  }
+
+  // TODO(sai): Eventually remove this in favor of "importing" all lifted
+  //            traces already in `lifted_traces`.
+  const auto trace_name = trace_manager->TraceName(addr);
+  func = traces_module->getFunction(trace_name);
+  if (func) {
+    CHECK(!func->isDeclaration());
+    trace_manager->SetLiftedTraceDefinition(addr, func);
+    return func;
+  }
+
+  std::unordered_map<uint64_t, llvm::Function *> new_lifted_traces;
+
+  trace_manager->memory = memory;
+  trace_lifter->Lift(
+      addr,
+      [&new_lifted_traces] (uint64_t trace_addr, llvm::Function *func) {
+        func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        new_lifted_traces[trace_addr] = func;
+      });
+  trace_manager->memory = nullptr;
+
+  //  assumes remill::TraceLifter has all protected fields and no private fields
+  remill::OptimizationGuide guide = {};
+  guide.slp_vectorize = false;
+  guide.loop_vectorize = false;
+  guide.verify_input = false;
+  guide.eliminate_dead_stores = false;  // Avoids buggy DSE for now.
+
+  LOG(INFO)
+      << "Optimizing lifted traces";
+
+  remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
+
+  for (auto lifted_entry : new_lifted_traces) {
+    remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
+  }
+  return new_lifted_traces[addr];
 }
 
 vTask *Executor::NextTask(void) {
@@ -559,8 +597,6 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
                               std::shared_ptr<native::AddressSpace> memory) {
 
   CHECK(memories.empty());
-
-  const auto task_num = memories.size();
   memories.push_back(memory);
 
   LOG(INFO)
@@ -569,7 +605,7 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
   auto task = new vTask;
   setInhibitForking(true);  //  inhibits forking; for concrete interpretation
   task->first_func = kmodule->module->getFunction("main");
-  CHECK_NOTNULL(task->first_func)
+  CHECK(task->first_func)
       << "vmill entrypoint is not in the bitcode";
 
   task->argc = 1;
@@ -1236,7 +1272,6 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index,
                            ExecutionState &state) const {
   assert(index < ki->inst->getNumOperands());
   int vnumber = ki->operands[index];
-  LOG(INFO)<< "the vnumber is: " << vnumber;
   assert(
       vnumber != -1 && "Invalid operand to eval(), not a value or constant!");
 
@@ -3077,8 +3112,8 @@ void Executor::run(ExecutionState &initialState) {
 
     // XXX total hack, just because I like non uniform better but want
     // seed results to be equally weighted.
-    for (auto &state : states) {
-      state.weight = 1.;
+    for (auto state : states) {
+      state->weight = 1.;
     }
 
     if (OnlySeed) {
@@ -3532,7 +3567,7 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
       bindLocal(target, state, mo->getBaseExpr());
 
       if (reallocFrom) {
-        unsigned count = std::min(reallocFrom->size, os->size);
+        unsigned count = std::min<uint64_t>(reallocFrom->size, os->size);
         for (unsigned i = 0; i < count; i++)
           os->write(i, reallocFrom->read8(i));
         state.addressSpace.unbindObject(reallocFrom->getObject());
@@ -3851,7 +3886,7 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
           } else {
             auto &values = si.assignment.bindings[array];
             values.insert(values.begin(), obj->bytes,
-                          &(obj->bytes[std::min(obj->numBytes, mo->size)]));
+                          &(obj->bytes[std::min<size_t>(obj->numBytes, mo->size)]));
             if (ZeroSeedExtension) {
               for (unsigned i = obj->numBytes; i < mo->size; ++i) {
                 values.push_back('\0');

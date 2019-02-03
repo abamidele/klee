@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-namespace kleemill {
-extern "C" {
 
 inline static addr_t CurrentPC(X86State &state) {
   return state.gpr.rip.aword;
 }
+
+extern "C" {
 
 Memory *__remill_sync_hyper_call(
     X86State &state, Memory *mem, SyncHyperCall::Name call) {
@@ -65,4 +65,3 @@ Memory *__remill_sync_hyper_call(
 }
 
 }  // extern C
-}  // namespace kleemill

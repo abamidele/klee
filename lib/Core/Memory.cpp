@@ -555,7 +555,7 @@ void ObjectState::write(ref<Expr> offset, ref<Expr> value) {
   }
 }
 
-void ObjectState::write(unsigned offset, ref<Expr> value) {
+void ObjectState::write(size_t offset, ref<Expr> value) {
   // Check for writes of constant values.
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(value)) {
     Expr::Width w = CE->getWidth();
@@ -597,7 +597,7 @@ void ObjectState::write(unsigned offset, ref<Expr> value) {
   }
 }
 
-void ObjectState::write16(unsigned offset, uint16_t value) {
+void ObjectState::write16(size_t offset, uint16_t value) {
   unsigned NumBytes = 2;
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
@@ -605,7 +605,7 @@ void ObjectState::write16(unsigned offset, uint16_t value) {
   }
 }
 
-void ObjectState::write32(unsigned offset, uint32_t value) {
+void ObjectState::write32(size_t offset, uint32_t value) {
   unsigned NumBytes = 4;
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
@@ -613,7 +613,7 @@ void ObjectState::write32(unsigned offset, uint32_t value) {
   }
 }
 
-void ObjectState::write64(unsigned offset, uint64_t value) {
+void ObjectState::write64(size_t offset, uint64_t value) {
   unsigned NumBytes = 8;
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);

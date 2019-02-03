@@ -20,12 +20,14 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 
 FindAndSelectClangCompiler()
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
 set(KLEEMILL_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
-    ${GLOBAL_CXXFLAGS} -Werror -Wconversion -pedantic 
+    ${GLOBAL_CXXFLAGS} -pedantic  -Werror -Wno-conversion -Wno-shorten-64-to-32 -Wno-sign-compare -Wno-unused-value
     -Wno-unreachable-code-return 
   )
 endif()
@@ -36,13 +38,32 @@ list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
 
+#
+# protobuf file generation 
+#
+ 
+# this function can't be told where to store the output files! we have to add the whole binary directory
+# to the include directories (or change it and lose compatibility with the system libraries)
+protobuf_generate_cpp(PROJECT_PROTOBUFSOURCEFILES PROJECT_PROTOBUFHEADERFILES
+                      "${KLEEMILL_SOURCE_DIR}/lib/Native/Memory/Snapshot.proto")
+
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${PROJECT_PROTOBUFHEADERFILES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES "${KLEEMILL_SOURCE_DIR}/lib")
 list(APPEND PROJECT_INCLUDEDIRECTORIES "${KLEEMILL_SOURCE_DIR}/include")
+list(APPEND PROJECT_INCLUDEDIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
+
+# disable -Werror on these file since they have been generated
+set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion")
+set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion")
 
 set(KLEEMILL kleemill-${REMILL_LLVM_VERSION})
 
-add_executable(${KLEEMILL}
+list(APPEND PROJECT_DEFINITIONS "KLEEMILL_INSTALL_RUNTIME_DIR=\"${CMAKE_INSTALL_PREFIX}/share/kleemill/${REMILL_LLVM_VERSION}/runtime/\"")
+list(APPEND PROJECT_DEFINITIONS "KLEEMILL_BUILD_RUNTIME_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/runtime/\"")
 
+add_executable(${KLEEMILL}
+  ${PROJECT_PROTOBUFSOURCEFILES}
+  
   lib/Basic/CmdLineOptions.cpp
   lib/Basic/ConstructSolverChain.cpp
   lib/Basic/KTest.cpp
@@ -126,19 +147,22 @@ add_executable(${KLEEMILL}
   lib/Support/ErrorHandling.cpp
   lib/Support/FileHandling.cpp
   lib/Support/MemoryUsage.cpp
-  lib/Support/PrintVersion.cpp
   lib/Support/RNG.cpp
   lib/Support/Time.cpp
   lib/Support/Timer.cpp
   lib/Support/TreeStream.cpp
 
-  lib/Native/TraceManager.cpp
-  lib/Native/TraceLifter.cpp
+  lib/Native/Arch/Arch.cpp
+  lib/Native/Arch/X86/Log.cpp
+  lib/Native/Arch/AArch64/Log.cpp
+  lib/Native/Arch/TraceManager.cpp
+  lib/Native/Execute.cpp
   lib/Native/Memory/AddressSpace.cpp
   lib/Native/Memory/MappedRange.cpp
+  lib/Native/Memory/Snapshot.cpp
   lib/Native/Util/AreaAllocator.cpp
-  lib/Native/Util/ZoneAllocator.cpp)
-
+  lib/Native/Util/ZoneAllocator.cpp
+  lib/Native/Workspace/Workspace.cpp)
 
 # remill
 if(NOT TARGET remill)
@@ -158,12 +182,7 @@ string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
 list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
 list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
 
-set(LLVM_LIBRARIES
-  LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
-  LLVMBitReader LLVMBitWriter LLVMTransformUtils LLVMScalarOpts
-  LLVMLTO
-)
-
+set(LLVM_LIBRARIES LLVMCodeGen LLVMAsmPrinter LLVMRuntimeDyld LLVMExecutionEngine LLVMMCJIT LLVMTarget LLVMX86AsmParser LLVMX86AsmPrinter LLVMX86CodeGen LLVMAArch64AsmParser LLVMAArch64AsmPrinter LLVMAArch64CodeGen)
 list(APPEND PROJECT_LIBRARIES ${LLVM_LIBRARIES})
 list(APPEND PROJECT_DEFINITIONS ${LLVM_DEFINITIONS})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${LLVM_INCLUDE_DIRS})
@@ -181,6 +200,11 @@ list(APPEND PROJECT_LIBRARIES glog::glog)
 find_package(gflags REQUIRED)
 list(APPEND PROJECT_LIBRARIES gflags)
 
+# z3
+find_package(Z3 REQUIRED)
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${Z3_INCLUDE_DIRS})
+list(APPEND PROJECT_LIBRARIES ${Z3_LIBRARIES})
+
 #
 # target settings
 #
@@ -189,3 +213,6 @@ target_link_libraries(${KLEEMILL} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${KLEEMILL} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${KLEEMILL} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${KLEEMILL} PRIVATE ${PROJECT_CXXFLAGS})
+
+add_subdirectory(runtime)
+

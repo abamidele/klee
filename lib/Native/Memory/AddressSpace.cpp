@@ -43,7 +43,7 @@ DEFINE_bool(version_code, false,
 
 namespace klee {
 namespace native {
-
+namespace {
 enum : uint64_t {
   kPageSize = 4096ULL,
   kPageShift = (kPageSize - 1ULL),

@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "klee/klee.h"
+extern void klee_report_error(const char *, int, const char *, const char *);
 
 /* This instrumentation call is used to check for overshifting.
  * If we do try to do x << y or x >> y

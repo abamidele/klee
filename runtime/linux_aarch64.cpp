@@ -37,11 +37,13 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-alignof-expression"
 
+#include "FreeStanding/FreeStanding.cpp"
+#include "Intrinsic/Intrinsics.cpp"
 #include "remill/Arch/Runtime/Intrinsics.h"
 #include "remill/Arch/Runtime/Intrinsics.cpp"
 #include "remill/Arch/AArch64/Runtime/State.h"
-#include "kleemill/Runtime/Task.h"
-#include "kleemill/Runtime/AArch64.cpp"
-#include "kleemill/Runtime/Task.cpp"
+#include "Native/Task.h"
+#include "Native/AArch64.cpp"
+#include "Native/Task.cpp"
 
 #pragma clang diagnostic pop

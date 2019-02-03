@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 void *memcpy(void *destaddr, void const *srcaddr, size_t len) {
-  char *dest = destaddr;
-  char const *src = srcaddr;
+  auto dest = (char *) destaddr;
+  auto src = (char const *) srcaddr;
 
   while (len-- > 0)
     *dest++ = *src++;

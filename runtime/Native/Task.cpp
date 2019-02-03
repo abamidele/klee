@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-#include "kleemill/Runtime/Task.h"
-
-namespace kleemill {
+#include "Task.h"
 
 Task *gCurrent = nullptr;
 
@@ -418,4 +416,3 @@ int main(int argc, char *argv[3], char *envp[]) {
 }
 
 }  // extern C
-}  // namespace kleemill

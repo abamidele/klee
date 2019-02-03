@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef KLEEMILL_RUNTIME_TASKSTATUS_H_
-#define KLEEMILL_RUNTIME_TASKSTATUS_H_
+#pragma once
 
 #include <cstdint>
 
 struct ArchState;
 struct Memory;
-
-namespace kleemill {
-
-class AddressSpace;
 
 typedef Memory * (LiftedFunc)(State &, addr_t, Memory *);
 
@@ -91,6 +86,3 @@ struct Task {
 
 extern Task *gCurrent;
 
-}  // namespace kleemill
-
-#endif  // KLEEMILL_RUNTIME_TASKSTATUS_H_

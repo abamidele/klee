@@ -12,8 +12,6 @@
 
 #include "remill/BC/Version.h"
 
-#define ENABLE_Z3 1
-
 #define LLVM_VERSION_CODE LLVM_VERSION_NUMBER
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 7)
