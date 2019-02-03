@@ -72,7 +72,8 @@ MemoryManager::MemoryManager(ArrayCache *_arrayCache)
       klee_error("Could not allocate memory deterministically");
     }
 
-    klee_message("Deterministic memory allocation starting from %p", newSpace);
+    klee_message("Deterministic memory allocation starting from %p",
+                 reinterpret_cast<void *>(newSpace));
     deterministicSpace = newSpace;
     nextFreeSlot = newSpace;
   }
@@ -155,11 +156,10 @@ MemoryObject *MemoryManager::allocate(uint64_t size, bool isLocal,
 MemoryObject *MemoryManager::allocateFixed(uint64_t address, uint64_t size,
                                            const llvm::Value *allocSite) {
 #ifndef NDEBUG
-  for (objects_ty::iterator it = objects.begin(), ie = objects.end(); it != ie;
-       ++it) {
-    MemoryObject *mo = *it;
-    if (address + size > mo->address && address < mo->address + mo->size)
+  for (auto mo : objects) {
+    if (address + size > mo->address && address < mo->address + mo->size) {
       klee_error("Trying to allocate an overlapping object");
+    }
   }
 #endif
 
@@ -174,12 +174,13 @@ void MemoryManager::deallocate(const MemoryObject *mo) { assert(0); }
 
 void MemoryManager::markFreed(MemoryObject *mo) {
   if (objects.find(mo) != objects.end()) {
-    if (!mo->isFixed && !DeterministicAllocation)
-      free((void *)mo->address);
+    if (!mo->isFixed && !DeterministicAllocation) {
+      free(reinterpret_cast<void *>(mo->address));
+    }
     objects.erase(mo);
   }
 }
 
 size_t MemoryManager::getUsedDeterministicSize() {
-  return nextFreeSlot - deterministicSpace;
+  return static_cast<size_t>(nextFreeSlot - deterministicSpace);
 }

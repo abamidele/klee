@@ -9,13 +9,11 @@
 #ifndef KLEE_INTERPRETER_H
 #define KLEE_INTERPRETER_H
 
-
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
-#include "vmill/Program/AddressSpace.h"
 
 struct KTest;
 
@@ -25,36 +23,34 @@ class LLVMContext;
 class Module;
 class raw_ostream;
 class raw_fd_ostream;
-}
-
-namespace vmill {
-  class AddressSpace;
-}
-
+}  // namespace llvm
 namespace klee {
+namespace native {
+class AddressSpace;
+}  // namespace native
 class ExecutionState;
 class Interpreter;
 class TreeStreamWriter;
 
 class InterpreterHandler {
-public:
+ public:
   InterpreterHandler() {}
   virtual ~InterpreterHandler() {}
 
   virtual llvm::raw_ostream &getInfoStream() const = 0;
 
   virtual std::string getOutputFilename(const std::string &filename) = 0;
-  virtual std::unique_ptr<llvm::raw_fd_ostream> openOutputFile(const std::string &filename) = 0;
+  virtual std::unique_ptr<llvm::raw_fd_ostream> openOutputFile(
+      const std::string &filename) = 0;
 
   virtual void incPathsExplored() = 0;
 
-  virtual void processTestCase(const ExecutionState &state,
-                               const char *err,
+  virtual void processTestCase(const ExecutionState &state, const char *err,
                                const char *suffix) = 0;
 };
 
 class Interpreter {
-public:
+ public:
   /// ModuleOptions - Module level options which can be set when
   /// registering a module with the interpreter.
   struct ModuleOptions {
@@ -67,15 +63,18 @@ public:
     ModuleOptions(const std::string &_LibraryDir,
                   const std::string &_EntryPoint, bool _Optimize,
                   bool _CheckDivZero, bool _CheckOvershift)
-        : LibraryDir(_LibraryDir), EntryPoint(_EntryPoint), Optimize(_Optimize),
-          CheckDivZero(_CheckDivZero), CheckOvershift(_CheckOvershift) {}
+        : LibraryDir(_LibraryDir),
+          EntryPoint(_EntryPoint),
+          Optimize(_Optimize),
+          CheckDivZero(_CheckDivZero),
+          CheckOvershift(_CheckOvershift) {
+    }
   };
 
-  enum LogType
-  {
-	  STP, //.CVC (STP's native language)
-	  KQUERY, //.KQUERY files (kQuery native language)
-	  SMTLIB2 //.SMT2 files (SMTLIB version 2 files)
+  enum LogType {
+    STP,  //.CVC (STP's native language)
+    KQUERY,  //.KQUERY files (kQuery native language)
+    SMTLIB2  //.SMT2 files (SMTLIB version 2 files)
   };
 
   /// InterpreterOptions - Options varying the runtime behavior during
@@ -87,19 +86,20 @@ public:
     unsigned MakeConcreteSymbolic;
 
     InterpreterOptions()
-      : MakeConcreteSymbolic(false)
-    {}
+        : MakeConcreteSymbolic(false) {
+    }
   };
 
-protected:
+ protected:
   const InterpreterOptions interpreterOpts;
 
   Interpreter(const InterpreterOptions &_interpreterOpts)
-    : interpreterOpts(_interpreterOpts)
-  {}
+      : interpreterOpts(_interpreterOpts) {
+  }
 
-public:
-  virtual ~Interpreter() {}
+ public:
+  virtual ~Interpreter() {
+  }
 
   static Interpreter *create(llvm::LLVMContext &ctx,
                              const InterpreterOptions &_interpreterOpts,
@@ -118,10 +118,9 @@ public:
   // to record the concrete path (as a stream of '0' and '1' bytes).
 
   virtual void Run(void) = 0;
-  virtual void AddInitialTask(const std::string &state, 
-                      const uint64_t pc,
-                      std::shared_ptr<vmill::AddressSpace> memory) = 0;
-  
+  virtual void AddInitialTask(const std::string &state, const uint64_t pc,
+                              std::shared_ptr<native::AddressSpace> memory) = 0;
+
   virtual void setPathWriter(TreeStreamWriter *tsw) = 0;
 
   // supply a tree stream writer which the interpreter will use
@@ -141,9 +140,7 @@ public:
   // for the search. use null to reset.
   virtual void useSeeds(const std::vector<struct KTest *> *seeds) = 0;
 
-  virtual void runFunctionAsMain(llvm::Function *f,
-                                 int argc,
-                                 char **argv,
+  virtual void runFunctionAsMain(llvm::Function *f, int argc, char **argv,
                                  char **envp) = 0;
 
   /*** Runtime options ***/
@@ -160,20 +157,18 @@ public:
 
   virtual unsigned getSymbolicPathStreamID(const ExecutionState &state) = 0;
 
-  virtual void getConstraintLog(const ExecutionState &state,
-                                std::string &res,
+  virtual void getConstraintLog(const ExecutionState &state, std::string &res,
                                 LogType logFormat = STP) = 0;
 
-  virtual bool getSymbolicSolution(const ExecutionState &state,
-                                   std::vector<
-                                   std::pair<std::string,
-                                   std::vector<unsigned char> > >
-                                   &res) = 0;
+  virtual bool getSymbolicSolution(
+      const ExecutionState &state,
+      std::vector<std::pair<std::string, std::vector<unsigned char> > > &res) = 0;
 
-  virtual void getCoveredLines(const ExecutionState &state,
-                               std::map<const std::string*, std::set<unsigned> > &res) = 0;
+  virtual void getCoveredLines(
+      const ExecutionState &state,
+      std::map<const std::string*, std::set<unsigned> > &res) = 0;
 };
 
-} // End klee namespace
+}  // End klee namespace
 
 #endif

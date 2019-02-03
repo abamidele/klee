@@ -10,10 +10,11 @@
 #ifndef KLEE_CONFIG_VERSION_H
 #define KLEE_CONFIG_VERSION_H
 
-#include "klee/Config/config.h"
+#include "remill/BC/Version.h"
 
-#define LLVM_VERSION(major, minor) (((major) << 8) | (minor))
-#define LLVM_VERSION_CODE LLVM_VERSION(LLVM_VERSION_MAJOR, LLVM_VERSION_MINOR)
+#define ENABLE_Z3 1
+
+#define LLVM_VERSION_CODE LLVM_VERSION_NUMBER
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 7)
 #  define KLEE_LLVM_GEP_TYPE(x) (x),
@@ -24,7 +25,7 @@
 #if LLVM_VERSION_CODE >= LLVM_VERSION(4, 0)
 #  define KLEE_LLVM_CL_VAL_END
 #else
-#  define KLEE_LLVM_CL_VAL_END , clEnumValEnd
+#  define KLEE_LLVM_CL_VAL_END , llvm::cl::clEnumValEnd
 #endif
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)

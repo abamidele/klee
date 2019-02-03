@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-#include "glog/logging.h"
+
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Config/Version.h"
 

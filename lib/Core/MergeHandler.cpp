@@ -42,7 +42,7 @@ double MergeHandler::getMean() {
 }
 
 unsigned MergeHandler::getInstructionDistance(ExecutionState *es){
-  return es->steppedInstructions - openInstruction;
+  return static_cast<unsigned>(es->steppedInstructions - openInstruction);
 }
 
 ExecutionState *MergeHandler::getPrioritizeState(){

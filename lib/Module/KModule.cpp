@@ -7,11 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <glog/logging.h>
+
 #define DEBUG_TYPE "KModule"
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 
-#include "glog/logging.h"
 #include "Passes.h"
 
 #include "klee/Config/Version.h"

@@ -18,8 +18,7 @@ StatisticManager::StatisticManager()
     globalStats(0),
     indexedStats(0),
     contextStats(0),
-    index(0) {
-}
+    index(0) {}
 
 StatisticManager::~StatisticManager() {
   delete[] globalStats;
@@ -34,16 +33,18 @@ void StatisticManager::useIndexedStats(unsigned totalIndices) {
 
 void StatisticManager::registerStatistic(Statistic &s) {
   delete[] globalStats;
-  s.id = stats.size();
+  s.id = static_cast<unsigned>(stats.size());
   stats.push_back(&s);
   globalStats = new uint64_t[stats.size()];
   memset(globalStats, 0, sizeof(*globalStats)*stats.size());
 }
 
 int StatisticManager::getStatisticID(const std::string &name) const {
-  for (unsigned i=0; i<stats.size(); i++)
-    if (stats[i]->getName() == name)
-      return i;
+  for (unsigned i=0; i < stats.size(); i++) {
+    if (stats[i]->getName() == name) {
+      return static_cast<int>(i);
+    }
+  }
   return -1;
 }
 
