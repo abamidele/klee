@@ -64,14 +64,14 @@ cl::opt<bool> TrackInstructionTime(
         "Enable tracking of time for individual instructions (default=off)"));
 
 cl::opt<bool> OutputStats(
-    "output-stats", cl::init(true),
-    cl::desc("Write running stats trace file (default=on)"));
+    "output-stats", cl::init(false),
+    cl::desc("Write running stats trace file (default=off)"));
 
 cl::opt<bool> OutputIStats(
     "output-istats",
-    cl::init(true),
+    cl::init(false),
     cl::desc(
-        "Write instruction level statistics in callgrind format (default=on)"));
+        "Write instruction level statistics in callgrind format (default=off)"));
 
 cl::opt<std::string> StatsWriteInterval(
     "stats-write-interval", cl::init("1s"),
