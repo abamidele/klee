@@ -7,8 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef KLEE_STATSTRACKER_H
-#define KLEE_STATSTRACKER_H
+#pragma once
 
 #include "CallPathManager.h"
 #include "klee/Internal/System/Time.h"
@@ -17,80 +16,79 @@
 #include <set>
 
 namespace llvm {
-  class BranchInst;
-  class Function;
-  class Instruction;
-  class raw_fd_ostream;
-}
+class BranchInst;
+class Function;
+class Instruction;
+class raw_fd_ostream;
+}  // namespace llvm
 
 namespace klee {
-  class ExecutionState;
-  class Executor;
-  class InstructionInfoTable;
-  class InterpreterHandler;
-  struct KInstruction;
-  struct StackFrame;
 
-  class StatsTracker {
-    friend class WriteStatsTimer;
-    friend class WriteIStatsTimer;
+class ExecutionState;
+class Executor;
+class InstructionInfoTable;
+class InterpreterHandler;
+struct KInstruction;
+struct StackFrame;
 
-    Executor &executor;
-    std::string objectFilename;
+class StatsTracker {
+  friend class WriteStatsTimer;
+  friend class WriteIStatsTimer;
 
-    std::unique_ptr<llvm::raw_fd_ostream> statsFile, istatsFile;
-    time::Point startWallTime;
+  Executor &executor;
+  std::string objectFilename;
 
-    unsigned numBranches;
-    unsigned fullBranches, partialBranches;
+  std::unique_ptr<llvm::raw_fd_ostream> statsFile, istatsFile;
+  time::Point startWallTime;
 
-    CallPathManager callPathManager;
+  unsigned numBranches;
+  unsigned fullBranches, partialBranches;
 
-    bool updateMinDistToUncovered;
+  CallPathManager callPathManager;
 
-  public:
-    static bool useStatistics();
-    static bool useIStats();
+  bool updateMinDistToUncovered;
 
-  private:
-    void updateStateStatistics(uint64_t addend);
-    void writeStatsHeader();
-    void writeStatsLine();
-    void writeIStats();
+ public:
+  static bool useStatistics();
+  static bool useIStats();
 
-  public:
-    StatsTracker(Executor &_executor, std::string _objectFilename,
-                 bool _updateMinDistToUncovered);
-    ~StatsTracker() = default;
+ private:
+  void updateStateStatistics(uint64_t addend);
+  void writeStatsHeader();
+  void writeStatsLine();
+  void writeIStats();
 
-    // called after a new StackFrame has been pushed (for callpath tracing)
-    void framePushed(ExecutionState &es, StackFrame *parentFrame);
+ public:
+  StatsTracker(Executor &_executor, std::string _objectFilename,
+               bool _updateMinDistToUncovered);
+  ~StatsTracker() = default;
 
-    // called after a StackFrame has been popped
-    void framePopped(ExecutionState &es);
+  // called after a new StackFrame has been pushed (for callpath tracing)
+  void framePushed(ExecutionState &es, StackFrame *parentFrame);
 
-    // called when some side of a branch has been visited. it is
-    // imperative that this be called when the statistics index is at
-    // the index for the branch itself.
-    void markBranchVisited(ExecutionState *visitedTrue,
-                           ExecutionState *visitedFalse);
+  // called after a StackFrame has been popped
+  void framePopped(ExecutionState &es);
 
-    // called when execution is done and stats files should be flushed
-    void done();
+  // called when some side of a branch has been visited. it is
+  // imperative that this be called when the statistics index is at
+  // the index for the branch itself.
+  void markBranchVisited(ExecutionState *visitedTrue,
+                         ExecutionState *visitedFalse);
 
-    // process stats for a single instruction step, es is the state
-    // about to be stepped
-    void stepInstruction(ExecutionState &es);
+  // called when execution is done and stats files should be flushed
+  void done();
 
-    /// Return duration since execution start.
-    time::Span elapsed();
+  // process stats for a single instruction step, es is the state
+  // about to be stepped
+  void stepInstruction(ExecutionState &es);
 
-    void computeReachableUncovered();
-  };
+  /// Return duration since execution start.
+  time::Span elapsed();
 
-  uint64_t computeMinDistToUncovered(const KInstruction *ki,
-                                     uint64_t minDistAtRA);
+  void computeReachableUncovered();
+};
 
-}
+uint64_t computeMinDistToUncovered(const KInstruction *ki,
+                                   uint64_t minDistAtRA);
 
-#endif
+}  // namespace klee

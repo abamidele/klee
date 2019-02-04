@@ -43,16 +43,20 @@ class StatisticManager {
  private:
   bool enabled;
   std::vector<Statistic*> stats;
-  std::unique_ptr<uint64_t[]> globalStats;
-  std::unique_ptr<uint64_t[]> indexedStats;
+  std::vector<uint64_t> globalStats;
+  uint64_t *indexedStats;
+  bool indexedStatsEnabled;
+  size_t prevTotalIndices;
   StatisticRecord *contextStats;
   unsigned index;
 
  public:
+
   StatisticManager();
   ~StatisticManager() = default;
 
-  void useIndexedStats(unsigned totalIndices);
+  void useIndexedStats(void);
+  void growIndexedStats(size_t totalIndices);
 
   StatisticRecord *getContext();
   void setContext(StatisticRecord *sr); /* null to reset */
@@ -85,13 +89,16 @@ extern StatisticManager *theStatisticManager;
 
 inline void StatisticManager::incrementStatistic(Statistic &s,
                                                  uint64_t addend) {
-  if (enabled) {
-    globalStats[s.id] += addend;
-    if (indexedStats) {
-      indexedStats[index * stats.size() + s.id] += addend;
-      if (contextStats)
-        contextStats->data[s.id] += addend;
-    }
+  if (!enabled) {
+    return;
+  }
+  globalStats[s.id] += addend;
+  if (!indexedStats) {
+    return;
+  }
+  indexedStats[index * stats.size() + s.id] += addend;
+  if (contextStats) {
+    contextStats->data[s.id] += addend;
   }
 }
 
