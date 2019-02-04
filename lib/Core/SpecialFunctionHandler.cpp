@@ -159,10 +159,15 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
     // __remill function handling implementations
 
-    add("__kleemill_get_lifted_function", handle__kleemill_get_lifted_function, true),
+        add("__kleemill_get_lifted_function",
+            handle__kleemill_get_lifted_function, true),
     add("__remill_write_memory_64", handle__remill_write_64, true),
+    add("__remill_write_memory_32", handle__remill_write_64, true),
+    add("__remill_write_memory_16", handle__remill_write_64, true),
+    add("__remill_write_memory_8", handle__remill_write_64, true),
     add("__remill_read_memory_64", handle__remill_read_64, true),
     add("__remill_read_memory_32", handle__remill_read_32, true),
+    add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true)
 
@@ -174,51 +179,79 @@ void SpecialFunctionHandler::handle__remill_read_8(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
 
-  auto read_val = executor.toUnique(state, arguments[1]);
-  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val)->getZExtValue();
-  uint8_t val = 0;
-  void *val_ptr = &val;
-  if (executor.DoRead(1, 0, read_uint, val_ptr)) {
-    LOG(INFO)<< "Valid read of 1 bytes at address " << std::hex << read_uint << std:: dec;
-    LOG(INFO) << "val read is " << val;
-  } else {
-    LOG(FATAL) << "Invalid read of 1 bytes at address " << std::hex << read_uint << std:: dec;
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+  uint8_t value_uint = ~static_cast<uint8_t>(0);
+  if (!mem->TryRead(addr_uint, &value_uint)) {
+    LOG(ERROR)
+        << "Failed 1-byte read from address 0x" << addr_uint
+        << " in address space " << mem_uint;
   }
-  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int8));
+  executor.bindLocal(
+      target, state, ConstantExpr::create(value_uint, Expr::Int8));
+}
+
+void SpecialFunctionHandler::handle__remill_read_16(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+  uint16_t value_uint = ~static_cast<uint16_t>(0);
+  if (!mem->TryRead(addr_uint, &value_uint)) {
+    LOG(ERROR)
+        << "Failed 2-byte read from address 0x" << addr_uint
+        << " in address space " << mem_uint;
+  }
+  executor.bindLocal(
+      target, state, ConstantExpr::create(value_uint, Expr::Int16));
 }
 
 void SpecialFunctionHandler::handle__remill_read_32(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
 
-  auto read_val = executor.toUnique(state, arguments[1]);
-  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val)->getZExtValue();
-  uint32_t val = 0;
-  void *val_ptr = &val;
-  if (executor.DoRead(4, 0, read_uint, val_ptr)) {
-    LOG(INFO)<< "Valid read of 4 bytes at address " << std::hex << read_uint << std:: dec;
-    LOG(INFO) << "val read is " << val;
-  } else {
-    LOG(FATAL) << "Invalid read of 4 bytes at address " << std::hex << read_uint << std:: dec;
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+  uint32_t value_uint = ~static_cast<uint32_t>(0);
+  if (!mem->TryRead(addr_uint, &value_uint)) {
+    LOG(ERROR)
+        << "Failed 4-byte read from address 0x" << addr_uint
+        << " in address space " << mem_uint;
   }
-  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int32));
+  executor.bindLocal(
+      target, state, ConstantExpr::create(value_uint, Expr::Int32));
 }
 
 void SpecialFunctionHandler::handle__remill_read_64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto read_val = executor.toUnique(state, arguments[1]);
-  auto read_uint = llvm::dyn_cast<ConstantExpr>(read_val)->getZExtValue();
-  uint64_t val = 0;
-  void *val_ptr = &val;
-  if (executor.DoRead(8, 0, read_uint, val_ptr)) {
-    LOG(INFO)<< "Valid read of 8 bytes at address " << std::hex << read_uint << std:: dec;
-    LOG(INFO) << "val read is " << val;
-  } else {
-    LOG(FATAL) << "Invalid read of 8 bytes at address " << std::hex << read_uint << std:: dec;
+  auto mem = executor.Memory(mem_uint);
+  uint64_t value_uint = ~static_cast<uint64_t>(0);
+  if (!mem->TryRead(addr_uint, &value_uint)) {
+    LOG(ERROR)
+        << "Failed 8-byte read from address 0x" << addr_uint
+        << " in address space " << mem_uint;
   }
-  executor.bindLocal(target, state, ConstantExpr::create(val, Expr::Int64));
+  executor.bindLocal(
+      target, state, ConstantExpr::create(value_uint, Expr::Int64));
 }
 
 void SpecialFunctionHandler::handle__llvm_ctpop(
@@ -236,127 +269,103 @@ void SpecialFunctionHandler::handle__llvm_ctpop(
 void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
-  auto pc_val = executor.toUnique(state, arguments[0]);
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+
+  auto pc_val = executor.toUnique(state, arguments[1]);
   auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val)->getZExtValue();
 
-  auto mem = executor.Memory(0);
+  auto mem = executor.Memory(mem_uint);
   auto func = executor.GetLiftedFunction(mem, pc_uint);
 
-//  std::vector<Cell> cells;
-//  for (unsigned i = 0; i < executor.kmodule->constants.size(); ++i) {
-//    Cell &c = executor.kmodule->constantTable[i];
-//    cells.push_back(c);
-//  }
-//
-//  if (!executor.kmodule->functionMap.count(func)) {
-//    auto old_size = executor.kmodule->constants.size();
-//    executor.kmodule->manifest(executor.interpreterHandler,
-//                               StatsTracker::useStatistics());
-//    auto new_size = executor.kmodule->constants.size();
-//    for (Module::const_global_iterator i = executor.kmodule->module
-//        ->global_begin(), e = executor.kmodule->module->global_end(); i != e;
-//        ++i) {
-//      const GlobalVariable *v = &*i;
-//
-//      if (executor.globalAddresses.find(v) == executor.globalAddresses.end()) {
-//        LOG(INFO)<< "NEGATIVE CASE HIT";
-//        size_t globalObjectAlignment = executor.getAllocationAlignment(v);
-//        Type *ty = i->getType()->getElementType();
-//        uint64_t size = 0;
-//        if (ty->isSized()) {
-//          size = executor.kmodule->targetData->getTypeStoreSize(ty);
-//        } else {
-//          klee_warning("Type for %.*s is not sized", (int)i->getName().size(),
-//              i->getName().data());
-//        }
-//
-//        MemoryObject *mo = executor.memory->allocate(size,false,
-//            true,v,
-//            globalObjectAlignment);
-//        (void) executor.bindObjectInState(state, mo, false);
-//        executor.globalObjects.insert(std::make_pair(v, mo));
-//        executor.globalAddresses.insert(std::make_pair(v, mo->getBaseExpr()));
-//      }
-//    }
-//    for (Module::iterator i = executor.kmodule->module->begin(), ie = executor
-//        .kmodule->module->end(); i != ie; ++i) {
-//      Function *f = &*i;
-//      ref<ConstantExpr> addr(0);
-//      if (!executor.globalAddresses.count(f)) {
-//        LOG(INFO)<< f->getName().str();
-//        if (f->hasExternalWeakLinkage() &&
-//            !executor.externalDispatcher->resolveSymbol(f->getName())) {
-//          addr = Expr::createPointer(0);
-//        } else {
-//          addr = Expr::createPointer(reinterpret_cast<std::uint64_t>(f));
-//          executor.legalFunctions.insert(reinterpret_cast<std::uint64_t>(f));
-//        }
-//        executor.globalAddresses.insert(std::make_pair(f, addr));
-//      }
-//    }
-//
-//    KFunction *kf = executor.kmodule->functionMap[func];
-//    auto newTable = std::unique_ptr<Cell[]>(
-//        new Cell[executor.kmodule->constants.size()]);
-//    for (auto i = 0; i < old_size; ++i) {
-//      newTable[i] = executor.kmodule->constantTable[i];
-//    }
-//
-//    executor.kmodule->constantTable.swap(newTable);
-//
-//    for (unsigned i = 0; i < kf->numInstructions; ++i) {
-//      executor.bindInstructionConstants(kf->instructions[i]);
-//    }
-//    for (unsigned i = 0; i < new_size; ++i) {
-//      Cell &c = executor.kmodule->constantTable[i];
-//      c.value = executor.evalConstant(executor.kmodule->constants[i]);
-//      if (i < 89) {
-//        LOG(INFO)<< (c.value == cells[i].value) << " " << i;
-//      } else {
-//        c.value->dump();
-//      }
-//      //c.value->dump();
-//      //cells[i].value->dump();
-//    }
-//    LOG(INFO)<< "cell are: " << cells.size();
-//
-//    // TODO TODO TODO
-//    // Lifted new code into the kmodule, re-run klee passes but only on
-//    // new functions
-//    remill::StoreModuleIRToFile(executor.kmodule->module.get(), "mod.bc");
-//  }
-
   LOG(INFO)
-      << "Indirect branch lookup " << std::hex << pc_uint << std::dec;
+      << "Indirect branch lookup " << std::hex << pc_uint << std::dec
+      << " in address space " << mem_uint;
 
-  executor.bindLocal(
-      target, state,
-      Expr::createPointer(reinterpret_cast<uintptr_t>(func)));
+  executor.bindLocal(target, state,
+                     Expr::createPointer(reinterpret_cast<uintptr_t>(func)));
 }
 
 void SpecialFunctionHandler::handle__remill_write_64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
-  auto address_val = executor.toUnique(state, arguments[0]);
-  auto address_uint = llvm::dyn_cast<ConstantExpr>(address_val)->getZExtValue();
-
-  auto pc_val = executor.toUnique(state, arguments[1]);
-  auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val)->getZExtValue();
-
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
   auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-
-  LOG(INFO)<< "mem ptr to : " << std::hex << address_uint << std::dec;
-  LOG(INFO)<< "writing to address : " << std::hex << pc_uint << std::dec;
-  LOG(INFO)<< "value written is : " << value_uint;
-
-  if (executor.DoWrite(8, 0, pc_uint, value_uint)) {
-    LOG(INFO)<< "Successfully Written to vmill at " << std::hex << pc_uint << std::dec;
+  auto mem = executor.Memory(mem_uint);
+  if (mem->TryWrite(addr_uint, value_uint)) {
+    executor.bindLocal(target, state, mem_val);
   } else {
-    LOG(FATAL) << "Failed To Write to vmill address space";
+    LOG(ERROR)
+        << "Failed 8-byte write of 0x" << std::hex << value_uint
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
+    executor.bindLocal(target, state, Expr::createPointer(0));
   }
-  executor.bindLocal(target, state, Expr::createPointer(address_uint));
 }
+
+void SpecialFunctionHandler::handle__remill_write_32(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+  auto value_val = executor.toUnique(state, arguments[2]);
+  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+  auto mem = executor.Memory(mem_uint);
+  if (mem->TryWrite(addr_uint, static_cast<uint32_t>(value_uint))) {
+    executor.bindLocal(target, state, mem_val);
+  } else {
+    LOG(ERROR)
+        << "Failed 4-byte write of 0x" << std::hex << value_uint
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
+    executor.bindLocal(target, state, Expr::createPointer(0));
+  }
+}
+
+void SpecialFunctionHandler::handle__remill_write_16(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+  auto value_val = executor.toUnique(state, arguments[2]);
+  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+  auto mem = executor.Memory(mem_uint);
+  if (mem->TryWrite(addr_uint, static_cast<uint16_t>(value_uint))) {
+    executor.bindLocal(target, state, mem_val);
+  } else {
+    LOG(ERROR)
+        << "Failed 2-byte write of 0x" << std::hex << value_uint
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
+    executor.bindLocal(target, state, Expr::createPointer(0));
+  }
+}
+
+void SpecialFunctionHandler::handle__remill_write_8(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+  auto value_val = executor.toUnique(state, arguments[2]);
+  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+  auto mem = executor.Memory(mem_uint);
+  if (mem->TryWrite(addr_uint, static_cast<uint8_t>(value_uint))) {
+    executor.bindLocal(target, state, mem_val);
+  } else {
+    LOG(ERROR)
+        << "Failed 1-byte write of 0x" << std::hex << value_uint
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
+    executor.bindLocal(target, state, Expr::createPointer(0));
+  }
+}
+
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {
   return SpecialFunctionHandler::const_iterator(handlerInfo);
@@ -387,12 +396,12 @@ SpecialFunctionHandler::SpecialFunctionHandler(Executor &_executor)
 }
 
 void SpecialFunctionHandler::prepare(
-    std::vector<const char *> &preservedFunctions) {
+    llvm::Module *mod, std::vector<const char *> &preservedFunctions) {
   unsigned N = size();
 
   for (unsigned i = 0; i < N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
-    Function *f = executor.kmodule->module->getFunction(hi.name);
+    Function *f = mod->getFunction(hi.name);
 
     // No need to create if the function doesn't exist, since it cannot
     // be called in that case.
@@ -411,12 +420,12 @@ void SpecialFunctionHandler::prepare(
   }
 }
 
-void SpecialFunctionHandler::bind() {
+void SpecialFunctionHandler::bind(llvm::Module *mod) {
   unsigned N = sizeof(handlerInfo) / sizeof(handlerInfo[0]);
 
   for (unsigned i = 0; i < N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
-    Function *f = executor.kmodule->module->getFunction(hi.name);
+    Function *f = mod->getFunction(hi.name);
 
     if (f && (!hi.doNotOverride || f->isDeclaration()))
       handlers[f] = std::make_pair(hi.handler, hi.hasReturnValue);

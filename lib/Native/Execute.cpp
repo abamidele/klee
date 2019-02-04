@@ -66,11 +66,11 @@
 DECLARE_string(os);
 DECLARE_string(arch);
 
-class VmillHandler : public klee::InterpreterHandler {
+class NativeHandler : public klee::InterpreterHandler {
  public:
-  VmillHandler(void);
+  NativeHandler(void);
 
-  virtual ~VmillHandler(void) = default;
+  virtual ~NativeHandler(void) = default;
 
   void setInterpreter(klee::Interpreter *i);
 
@@ -102,7 +102,7 @@ class VmillHandler : public klee::InterpreterHandler {
   std::unique_ptr<llvm::raw_ostream> info_file;
 };
 
-VmillHandler::VmillHandler()  //int argc, char **argv)
+NativeHandler::NativeHandler(void)
     : klee::InterpreterHandler(),
       interpreter(0),
       paths_explored(0) {
@@ -110,17 +110,17 @@ VmillHandler::VmillHandler()  //int argc, char **argv)
   info_file = openOutputFile("info");
 }
 
-void VmillHandler::setInterpreter(klee::Interpreter *i) {
+void NativeHandler::setInterpreter(klee::Interpreter *i) {
   interpreter = i;
 }
 
-std::string VmillHandler::getOutputFilename(const std::string &filename) {
+std::string NativeHandler::getOutputFilename(const std::string &filename) {
   llvm::SmallString<128> path("./");
   llvm::sys::path::append(path, filename);
   return path.str();
 }
 
-std::unique_ptr<llvm::raw_fd_ostream> VmillHandler::openOutputFile(
+std::unique_ptr<llvm::raw_fd_ostream> NativeHandler::openOutputFile(
     const std::string &filename) {
   std::string Error;
   std::string path = getOutputFilename(filename);
@@ -135,7 +135,7 @@ std::unique_ptr<llvm::raw_fd_ostream> VmillHandler::openOutputFile(
   return f;
 }
 
-void VmillHandler::processTestCase(const klee::ExecutionState &state,
+void NativeHandler::processTestCase(const klee::ExecutionState &state,
                                    const char *err, const char *suffix) {
   return;
 }
@@ -174,7 +174,6 @@ int main(int argc, char **argv, char **envp) {
   // Take in the OS and arch names from the snapshot.
   FLAGS_os = snapshot->os();
   FLAGS_arch = snapshot->arch();
-
   FLAGS_logtostderr = true;
 
   //Make sure that we support the snapshotted arch/os combination.
@@ -190,19 +189,16 @@ int main(int argc, char **argv, char **envp) {
       "",
       "main"  /* Entrypoint */,
       true  /* Optimize */,
-      false  /* Check div by zero */,
-      false  /* Check overshift */);
-
-
+      true  /* Check div by zero */,
+      true  /* Check overshift */);
 
   klee::Interpreter::InterpreterOptions interp_options;
   interp_options.MakeConcreteSymbolic = false;
 
-  VmillHandler *handler = new VmillHandler();  //  delete later
-  LOG(INFO)<< "Handler has been created";
-
+  std::unique_ptr<NativeHandler> handler(new NativeHandler());
   std::unique_ptr<klee::Interpreter> executor(
-      klee::Interpreter::create(context, interp_options, handler));
+      klee::Interpreter::create(context, interp_options, handler.get()));
+
   handler->setInterpreter(executor.get());
   executor->setModule(loaded_modules, module_options);
 

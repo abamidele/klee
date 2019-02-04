@@ -27,6 +27,7 @@
 
 #include "Native/Arch/TraceManager.h"
 #include "Native/Memory/AddressSpace.h"
+#include "Native/Util/AreaAllocator.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -419,6 +420,11 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       ivcEnabled(false),
       debugLogBuffer(debugBufferString) {
 
+  // Start with a "fake" address space on the top, so that if we ever have
+  // an issue with a memory access, then we can just fall back onto memory 0.
+  memories.push_back(std::make_shared<native::AddressSpace>());
+  memories[0]->Kill();
+
   const time::Span maxCoreSolverTime(MaxCoreSolverTime);
   maxInstructionTime = time::Span(MaxInstructionTime);
   coreSolverTimeout =
@@ -474,39 +480,44 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
 
 llvm::Module *
 Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
-                    const ModuleOptions &opts) {
+                    const ModuleOptions &opts_) {
   assert(!kmodule && !modules.empty() && "can only register one module");  // XXX gross
 
+  opts = opts_;
   kmodule = std::unique_ptr<KModule>(new KModule());
 
 
   // 1.) Link the modules together
   while (kmodule->link(modules, opts.EntryPoint)) {
     // 2.) Apply different instrumentation
-    kmodule->instrument(opts);
+    kmodule->instrument(kmodule->module.get(), opts);
   }
 
   // 3.) Optimise and prepare for KLEE
 
-  // Create a list of functions that should be preserved if used
-  std::vector<const char *> preservedFunctions;
+  // Create a list of functions that should be preserved if used.
+  if (preservedFunctions.empty()) {
+    // Preserve the free-standing library calls
+    preservedFunctions.push_back("memset");
+    preservedFunctions.push_back("memcpy");
+    preservedFunctions.push_back("memcmp");
+    preservedFunctions.push_back("memmove");
+
+    preservedFunctions.push_back(opts.EntryPoint.c_str());
+  }
+
+  traces_module = kmodule->module.get();
+
   specialFunctionHandler = new SpecialFunctionHandler(*this);
-  specialFunctionHandler->prepare(preservedFunctions);
+  specialFunctionHandler->prepare(traces_module, preservedFunctions);
 
-  preservedFunctions.push_back(opts.EntryPoint.c_str());
-
-  // Preserve the free-standing library calls
-  preservedFunctions.push_back("memset");
-  preservedFunctions.push_back("memcpy");
-  preservedFunctions.push_back("memcmp");
-  preservedFunctions.push_back("memmove");
-
-  kmodule->optimiseAndPrepare(opts, preservedFunctions);
+  kmodule->optimiseAndPrepare(traces_module, opts, preservedFunctions);
 
   // 4.) Manifest the module
-  kmodule->manifest(interpreterHandler, StatsTracker::useStatistics());
+  kmodule->manifest(traces_module, interpreterHandler,
+                    StatsTracker::useStatistics());
 
-  specialFunctionHandler->bind();
+  specialFunctionHandler->bind(traces_module);
 
   if (StatsTracker::useStatistics() || userSearcherRequiresMD2U()) {
     statsTracker = new StatsTracker(
@@ -519,8 +530,9 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   Context::initialize(TD->isLittleEndian(),
                       (Expr::Width) TD->getPointerSizeInBits());
 
-  traces_module = kmodule->module.get();
+  // Initialize the native instruction trace lifter stuff.
   auto &context = traces_module->getContext();
+  holding_module.reset(new llvm::Module("", context));
   semantics_module.reset(remill::LoadTargetSemantics(&context));
   intrinsics.reset(new remill::IntrinsicTable(semantics_module));
   trace_manager.reset(new native::TraceManager(*traces_module));
@@ -570,7 +582,7 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   guide.slp_vectorize = false;
   guide.loop_vectorize = false;
   guide.verify_input = false;
-  guide.eliminate_dead_stores = false;  // Avoids buggy DSE for now.
+  guide.eliminate_dead_stores = true;
 
   LOG(INFO)
       << "Optimizing lifted traces";
@@ -578,8 +590,29 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
   for (auto lifted_entry : new_lifted_traces) {
+    remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
+  }
+
+  kmodule->instrument(holding_module.get(), opts);
+  specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
+  kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
+  kmodule->manifest(holding_module.get(), interpreterHandler,
+                    StatsTracker::useStatistics());
+  specialFunctionHandler->bind(holding_module.get());
+
+  for (auto lifted_entry : new_lifted_traces) {
+    auto addr_expr = Expr::createPointer(
+        reinterpret_cast<uintptr_t>(lifted_entry.second));
+    legalFunctions.insert(reinterpret_cast<std::uint64_t>(lifted_entry.second));
+    globalAddresses.insert(std::make_pair(lifted_entry.second, addr_expr));
+  }
+
+  bindModuleConstants(holding_module.get());
+
+  for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
   }
+
   return new_lifted_traces[addr];
 }
 
@@ -595,8 +628,8 @@ vTask *Executor::NextTask(void) {
 
 void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
                               std::shared_ptr<native::AddressSpace> memory) {
-
-  CHECK(memories.empty());
+  CHECK(!memories.empty());
+  const uintptr_t mem_id = memories.size();
   memories.push_back(memory);
 
   LOG(INFO)
@@ -608,11 +641,17 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
   CHECK(task->first_func)
       << "vmill entrypoint is not in the bitcode";
 
-  task->argc = 1;
-  auto str = new char[state.size()];
-  memcpy(str, state.data(), state.size());
-  task->argv[0] = str;
-  task->envp = {};  //{"vmill",}
+  auto state_str = new char[state.size()];
+  auto mem_str = new char[sizeof(void *)];
+
+  memcpy(state_str, state.data(), state.size());
+  memcpy(mem_str, &mem_id, sizeof(mem_id));
+
+  task->argv.emplace_back("klee-exec");
+  task->argv.push_back(state);
+  task->argv.emplace_back();
+  task->argv.back().assign(reinterpret_cast<const char *>(&mem_id),
+                           sizeof(mem_id));
 
   tasks.push_back(task);
 
@@ -622,9 +661,10 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
 
 void Executor::Run(void) {
   while (auto task = NextTask()) {
-    LOG(INFO)<< "Interpreting Tasks!";
-    runFunctionAsMain(task->first_func,
-        task->argc,
+    LOG(INFO)
+        << "Interpreting Tasks!";
+    runFunctionAsMain(
+        task->first_func,
         task->argv,
         task->envp);
   }
@@ -632,39 +672,6 @@ void Executor::Run(void) {
 
 void Executor::AddTask(vTask *task) {
   tasks.push_back(task);
-}
-
-bool Executor::DoRead(uint64_t size, uint64_t memory, uint64_t address,
-                      void *val) {
-  const auto mem = Memory(memory);
-  switch (size) {
-    case 8: return mem->TryRead(address, reinterpret_cast<uint64_t *>(val));
-    case 4: return mem->TryRead(address, reinterpret_cast<uint32_t *>(val));
-    case 2: return mem->TryRead(address, reinterpret_cast<uint16_t *>(val));
-    case 1: return mem->TryRead(address, reinterpret_cast<uint8_t *>(val));
-    default:
-      LOG(ERROR)
-          << "Invalid read of size " << size << " from 0x" << std::hex
-          << address << std::dec;
-      return false;
-  }
-}
-
-bool Executor::DoWrite(uint64_t size, uint64_t memory, uint64_t address,
-                       uint64_t value) {
-
-  const auto mem = Memory(memory);
-  switch (size) {
-    case 8: return mem->TryWrite(address, value);
-    case 4: return mem->TryWrite(address, static_cast<uint32_t>(value));
-    case 2: return mem->TryWrite(address, static_cast<uint16_t>(value));
-    case 1: return mem->TryWrite(address, static_cast<uint8_t>(value));
-    default:
-      LOG(ERROR)
-          << "Invalid write of size " << size << " to 0x" << std::hex
-          << address << std::dec;
-      return false;
-  }
 }
 
 Executor::~Executor() {
@@ -1736,6 +1743,7 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+//  i->dump();
   switch (i->getOpcode()) {
     // Control flow
     case Instruction::Ret: {
@@ -2986,19 +2994,44 @@ void Executor::bindInstructionConstants(KInstruction *KI) {
   }
 }
 
-void Executor::bindModuleConstants() {
-  for (auto &kfp : kmodule->functions) {
-    KFunction *kf = kfp.get();
-    for (unsigned i = 0; i < kf->numInstructions; ++i)
-      bindInstructionConstants(kf->instructions[i]);
-  }
-  kmodule->constantTable = std::unique_ptr<Cell[]>(
-      new Cell[kmodule->constants.size()]);
+static native::AreaAllocator gConstantsAllocator(
+    native::kAreaRW, native::kAreaConstantTable);
 
-  for (unsigned i = 0; i < kmodule->constants.size(); ++i) {
+void Executor::bindModuleConstants(llvm::Module *mod) {
+  const auto old_num_constants = kmodule->numConstants;
+  for (auto &func : *mod) {
+    auto kf_it = kmodule->functionMap.find(&func);
+    if (kf_it == kmodule->functionMap.end()) {
+      continue;
+    }
+    auto kf = kf_it->second;
+    for (unsigned i = 0; i < kf->numInstructions; ++i) {
+      bindInstructionConstants(kf->instructions[i]);
+    }
+  }
+
+  const auto new_num_constants = kmodule->constants.size();
+  const auto needed_constants = new_num_constants - old_num_constants;
+  const auto needed_bytes = needed_constants * sizeof(Cell);
+
+  LOG(INFO)
+      << "Adding " << needed_constants << " constant cells beyond "
+      << old_num_constants << " previous ones";
+
+  if (!kmodule->constantTable) {
+    kmodule->constantTable = reinterpret_cast<Cell *>(
+        gConstantsAllocator.Allocate(needed_bytes));
+  } else {
+    gConstantsAllocator.Allocate(needed_constants);
+  }
+
+  for (auto i = old_num_constants; i < kmodule->constants.size(); ++i) {
     Cell &c = kmodule->constantTable[i];
     c.value = evalConstant(kmodule->constants[i]);
   }
+
+  CHECK_EQ(new_num_constants, kmodule->constants.size());
+  kmodule->numConstants = new_num_constants;
 }
 
 void Executor::checkMemoryUsage() {
@@ -3047,7 +3080,7 @@ void Executor::doDumpStates() {
 }
 
 void Executor::run(ExecutionState &initialState) {
-  bindModuleConstants();
+  bindModuleConstants(kmodule->module.get());
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.
@@ -3076,13 +3109,14 @@ void Executor::run(ExecutionState &initialState) {
       if (it == seedMap.end())
         it = seedMap.begin();
       lastState = it->first;
-      unsigned numSeeds = it->second.size();
       ExecutionState &state = *lastState;
       KInstruction *ki = state.pc;
       stepInstruction(state);
 
       executeInstruction(state, ki);
-      processTimers(&state, maxInstructionTime * numSeeds);
+      // TODO(pag,sae): Re-enable eventually.
+//      unsigned numSeeds = it->second.size();
+//      processTimers(&state, maxInstructionTime * numSeeds);
       updateStates(&state);
 
       if ((stats::instructions % 1000) == 0) {
@@ -3131,11 +3165,11 @@ void Executor::run(ExecutionState &initialState) {
     ExecutionState &state = searcher->selectState();
     KInstruction *ki = state.pc;
     stepInstruction(state);
-
     executeInstruction(state, ki);
-    processTimers(&state, maxInstructionTime);
 
-    checkMemoryUsage();
+    // TODO(pag,sae): Eventually re-enable.
+//    processTimers(&state, maxInstructionTime);
+//    checkMemoryUsage();
 
     updateStates(&state);
   }
@@ -3364,8 +3398,9 @@ void Executor::terminateStateOnError(ExecutionState &state,
 
   terminateState(state);
 
-  if (shouldExitOn(termReason))
+  if (shouldExitOn(termReason)) {
     haltExecution = true;
+  }
 }
 
 // XXX shoot me
@@ -3914,14 +3949,14 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
 
 /***/
 
-void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
-                                 char **envp) {
+void Executor::runFunctionAsMain(Function *f,
+                                 const std::vector<std::string> &argv,
+                                 const std::vector<std::string> &envp) {
   std::vector<ref<Expr> > arguments;
   LOG(INFO)<< "argv ref created";
   // force deterministic initialization of memory objects
   srand(1);
   srandom(1);
-  argc = 1;
 
   MemoryObject *argvMO = 0;
 
@@ -3930,9 +3965,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   // (both are terminated by a null). There is also a final terminating
   // null that uclibc seems to expect, possibly the ELF header?
 
-  int envc = 0;
   //for (envc=0; envp[envc]; ++envc) ;
   LOG(INFO)<< "indexed into envp";
+
+  const auto argc = argv.size();
+  const auto envc = envp.size();
 
   unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
   KFunction *kf = kmodule->functionMap[f];
@@ -3986,22 +4023,20 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         // Write NULL pointer
         argvOS->write(i * NumPtrBytes, Expr::createPointer(0));
       } else {
-        char *s = i < argc ? argv[i] : envp[i - (argc + 1)];
-        int j, len = strlen(s);
-        errs() << "Function name is " << f->getName();
-        if (i == 0) {
-          j, len = 3280;
-        }
+        const auto &s = i < argc ? argv[i] : envp[i - (argc + 1)];
+        const auto len = s.size();
 
         MemoryObject *arg = memory->allocate(len + 1, /*isLocal=*/false, /*isGlobal=*/
                                              true,
                                              /*allocSite=*/state->pc->inst, /*alignment=*/
                                              8);
-        if (!arg)
+        if (!arg) {
           klee_error("Could not allocate memory for function arguments");
+        }
         ObjectState *os = bindObjectInState(*state, arg, false);
-        for (j = 0; j < len + 1; j++)
+        for (size_t j = 0; j < len + 1; j++) {
           os->write8(j, s[j]);
+        }
 
         // Write pointer to newly allocated and initialised argv/envp c-string
         argvOS->write(i * NumPtrBytes, arg->getBaseExpr());

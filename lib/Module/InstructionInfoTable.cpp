@@ -7,6 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <glog/logging.h>
+
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Config/Version.h"
 
@@ -44,16 +46,18 @@ using namespace llvm;
 using namespace klee;
 
 class InstructionToLineAnnotator : public llvm::AssemblyAnnotationWriter {
-public:
+ public:
   void emitInstructionAnnot(const Instruction *i,
                             llvm::formatted_raw_ostream &os) {
     os << "%%%";
     os << (uintptr_t) i;
   }
 };
-        
-static void buildInstructionToLineMap(Module *m,
-                                      std::map<const Instruction*, unsigned> &out) {  
+
+static void buildInstructionToLineMap(
+    Module *m,
+    std::map<const Instruction*, unsigned> &out,
+    unsigned &line) {
   InstructionToLineAnnotator a;
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -61,15 +65,14 @@ static void buildInstructionToLineMap(Module *m,
   os.flush();
   const char *s;
 
-  unsigned line = 1;
-  for (s=str.c_str(); *s; s++) {
-    if (*s=='\n') {
+  for (s = str.c_str(); *s; s++) {
+    if (*s == '\n') {
       line++;
-      if (s[1]=='%' && s[2]=='%' && s[3]=='%') {
+      if (s[1] == '%' && s[2] == '%' && s[3] == '%') {
         s += 4;
         char *end;
         unsigned long long value = strtoull(s, &end, 10);
-        if (end!=s) {
+        if (end != s) {
           out.insert(std::make_pair((const Instruction*) value, line));
         }
         s = end;
@@ -90,7 +93,7 @@ static std::string getDSPIPath(const DILocation &Loc) {
   }
 }
 
-bool InstructionInfoTable::getInstructionDebugInfo(const llvm::Instruction *I, 
+bool InstructionInfoTable::getInstructionDebugInfo(const llvm::Instruction *I,
                                                    const std::string *&File,
                                                    unsigned &Line) {
   if (MDNode *N = I->getMetadata("dbg")) {
@@ -109,14 +112,14 @@ bool InstructionInfoTable::getInstructionDebugInfo(const llvm::Instruction *I,
   return false;
 }
 
-InstructionInfoTable::InstructionInfoTable(Module *m) 
-  : dummyString(""), dummyInfo(0, dummyString, 0, 0) {
-  unsigned id = 0;
+void InstructionInfoTable::AddModule(llvm::Module *m) {
+  auto id = static_cast<unsigned>(infos.size());
+  CHECK_EQ(id, infos.size());
   std::map<const Instruction*, unsigned> lineTable;
-  buildInstructionToLineMap(m, lineTable);
+  buildInstructionToLineMap(m, lineTable, line);
 
-  for (Module::iterator fnIt = m->begin(), fn_ie = m->end(); 
-       fnIt != fn_ie; ++fnIt) {
+  for (Module::iterator fnIt = m->begin(), fn_ie = m->end(); fnIt != fn_ie;
+      ++fnIt) {
     Function *fn = &*fnIt;
 
     // We want to ensure that as all instructions have source information, if
@@ -127,38 +130,44 @@ InstructionInfoTable::InstructionInfoTable(Module *m)
     const std::string *initialFile = &dummyString;
     unsigned initialLine = 0;
     for (inst_iterator it = inst_begin(fn), ie = inst_end(fn); it != ie; ++it) {
-      if (getInstructionDebugInfo(&*it, initialFile, initialLine))
+      if (getInstructionDebugInfo(&*it, initialFile, initialLine)) {
         break;
+      }
     }
 
     const std::string *file = initialFile;
     unsigned line = initialLine;
-    for (inst_iterator it = inst_begin(fn), ie = inst_end(fn); it != ie;
-        ++it) {
+    for (inst_iterator it = inst_begin(fn), ie = inst_end(fn); it != ie; ++it) {
       Instruction *instr = &*it;
       unsigned assemblyLine = lineTable[instr];
 
       // Update our source level debug information.
       getInstructionDebugInfo(instr, file, line);
 
-      infos.insert(std::make_pair(instr,
-                                  InstructionInfo(id++, *file, line,
-                                                  assemblyLine)));
+      infos.insert(
+          std::make_pair(instr,
+                         InstructionInfo(id++, *file, line, assemblyLine)));
     }
   }
 }
 
+InstructionInfoTable::InstructionInfoTable(Module *m)
+    : line(1),
+      dummyString(""),
+      dummyInfo(0, dummyString, 0, 0) {
+  AddModule(m);
+}
+
 InstructionInfoTable::~InstructionInfoTable() {
-  for (std::set<const std::string *, ltstr>::iterator
-         it = internedStrings.begin(), ie = internedStrings.end();
-       it != ie; ++it)
-    delete *it;
+  for (auto str : internedStrings) {
+    delete str;
+  }
 }
 
 const std::string *InstructionInfoTable::internString(std::string s) {
-  std::set<const std::string *, ltstr>::iterator it = internedStrings.find(&s);
-  if (it==internedStrings.end()) {
-    std::string *interned = new std::string(s);
+  auto it = internedStrings.find(&s);
+  if (it == internedStrings.end()) {
+    auto interned = new std::string(s);
     internedStrings.insert(interned);
     return interned;
   } else {
@@ -171,12 +180,12 @@ unsigned InstructionInfoTable::getMaxID() const {
 }
 
 const InstructionInfo &
-InstructionInfoTable::getInfo(const Instruction *inst) const { 
-  std::map<const llvm::Instruction*, InstructionInfo>::const_iterator it = 
-    infos.find(inst);
-  if (it == infos.end())
+InstructionInfoTable::getInfo(const Instruction *inst) const {
+  auto it = infos.find(inst);
+  if (it == infos.end()) {
     llvm::report_fatal_error("invalid instruction, not present in "
                              "initial module!");
+  }
   return it->second;
 }
 

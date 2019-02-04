@@ -64,13 +64,13 @@ namespace {
 
   cl::opt<bool>
   OutputStats("output-stats",
-              cl::init(true),
-	      cl::desc("Write running stats trace file (default=on)"));
+              cl::init(false),
+	      cl::desc("Write running stats trace file (default=off)"));
 
   cl::opt<bool>
   OutputIStats("output-istats",
-	       cl::init(true),
-               cl::desc("Write instruction level statistics in callgrind format (default=on)"));
+	       cl::init(false),
+               cl::desc("Write instruction level statistics in callgrind format (default=off)"));
 
   cl::opt<std::string>
   StatsWriteInterval("stats-write-interval",
@@ -100,8 +100,8 @@ namespace {
   
   cl::opt<bool>
   UseCallPaths("use-call-paths",
-	       cl::init(true),
-               cl::desc("Enable calltree tracking for instruction level statistics (default=on)"));
+	       cl::init(false),
+               cl::desc("Enable calltree tracking for instruction level statistics (default=off)"));
   
 }
 
@@ -217,7 +217,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     }
   }
 
-  if (OutputIStats)
+  if (OutputIStats || userSearcherRequiresMD2U())
     theStatisticManager->useIndexedStats(km->infos->getMaxID());
 
   for (auto &kfp : km->functions) {

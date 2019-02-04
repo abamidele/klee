@@ -34,7 +34,7 @@ enum AreaPreferences : uint64_t {
   kAreaBase = 0ULL,
 #endif
   kAreaAddressSpace     = 0x20000000000ULL + kAreaBase,
-  kAreaRuntimeHeap      = 0x40000000000ULL + kAreaBase,
+  kAreaConstantTable      = 0x40000000000ULL + kAreaBase,
 };
 
 enum : size_t {

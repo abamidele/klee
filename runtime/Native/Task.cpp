@@ -20,7 +20,7 @@ Task *gCurrent = nullptr;
 
 extern "C" {
 
-LiftedFunc *__kleemill_get_lifted_function(addr_t pc);
+LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
 
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
@@ -28,7 +28,7 @@ Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtCallTarget;
     task.last_pc = pc;
-    task.continuation = __kleemill_get_lifted_function(pc);
+    task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
   return task.continuation(state, task.last_pc, memory);
 }
@@ -39,7 +39,7 @@ Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtReturnTarget;
     task.last_pc = pc;
-    task.continuation = __kleemill_get_lifted_function(pc);
+    task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
   return task.continuation(state, task.last_pc, memory);
 }
@@ -50,7 +50,7 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtJumpTarget;
     task.last_pc = pc;
-    task.continuation = __kleemill_get_lifted_function(pc);
+    task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
   return task.continuation(state, task.last_pc, memory);
 }
@@ -64,7 +64,6 @@ static Memory *AtUnhandledSyscall(State &state, addr_t ret_addr, Memory *memory)
   puts("Unhandled syscall; unwinding\n");
   return memory;
 }
-
 
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
@@ -400,19 +399,27 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr, uint64_t &value) 
 }
 
 int main(int argc, char *argv[3], char *envp[]) {
-  assert(argc == 1);
+  if (argc != 3) {
+    return EXIT_FAILURE;
+  } else if (strcmp("klee-exec", argv[0])) {
+    return EXIT_FAILURE;
+  }
+
   Memory *memory = nullptr;
   Task task;
   gCurrent = &task;
-  memcpy(&(task.state), argv[0], sizeof(task.state));
+
+  memcpy(&(task.state), argv[1], sizeof(task.state));
+  memcpy(&memory, argv[2], sizeof(memory));
+
   task.time_stamp_counter = 0;
   task.location = kTaskStoppedAtSnapshotEntryPoint;
   task.last_pc = CurrentPC(task.state);
-  task.continuation = __kleemill_get_lifted_function(task.last_pc);
+  task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
 
   memory = task.continuation(task.state, task.last_pc, memory);
 
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 }  // extern C

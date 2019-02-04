@@ -88,9 +88,8 @@ class TraceLifter;
 class vTask {
  public:
   llvm::Function *first_func;
-  int argc;
-  char *argv[3];
-  char **envp;
+  std::vector<std::string> argv;
+  std::vector<std::string> envp;
 };
 
 template<class T> class ref;
@@ -141,6 +140,9 @@ class Executor : public Interpreter {
 
   class TimerInfo;
 
+  std::vector<const char *> preservedFunctions;
+  ModuleOptions opts;
+
   std::unique_ptr<KModule> kmodule;
   InterpreterHandler *interpreterHandler;
   Searcher *searcher;
@@ -157,6 +159,7 @@ class Executor : public Interpreter {
 
   std::unique_ptr<llvm::Module> semantics_module;
   llvm::Module *traces_module;
+  std::unique_ptr<llvm::Module> holding_module;
   std::unique_ptr<native::TraceManager> trace_manager;
   std::unique_ptr<remill::IntrinsicTable> intrinsics;
   std::unique_ptr<remill::InstructionLifter> inst_lifter;
@@ -458,7 +461,7 @@ class Executor : public Interpreter {
   }
 
   /// bindModuleConstants - Initialize the module constant table.
-  void bindModuleConstants();
+  void bindModuleConstants(llvm::Module *mod);
 
   template<typename TypeIt>
   void computeOffsets(KGEPInstruction *kgepi, TypeIt ib, TypeIt ie);
@@ -529,15 +532,13 @@ class Executor : public Interpreter {
   void AddInitialTask(const std::string &state, const uint64_t pc,
                       std::shared_ptr<native::AddressSpace> memory) override;
 
-  bool DoRead(uint64_t size, uint64_t memory, uint64_t address, void *val);
-  bool DoWrite(uint64_t size, uint64_t memory, uint64_t address,
-               uint64_t value);
-
   void useSeeds(const std::vector<struct KTest *> *seeds) override {
     usingSeeds = seeds;
   }
 
-  void runFunctionAsMain(llvm::Function *f, int argc, char **argv, char **envp)
+  void runFunctionAsMain(
+      llvm::Function *f, const std::vector<std::string> &argv,
+      const std::vector<std::string> &envp)
       override;
 
   /*** Runtime options ***/

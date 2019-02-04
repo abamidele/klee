@@ -72,7 +72,7 @@ namespace {
   cl::opt<bool>
   OutputSource("output-source",
                cl::desc("Write the assembly for the final transformed source"),
-               cl::init(true));
+               cl::init(false));
 
   cl::opt<bool>
   OutputModule("output-module",
@@ -153,8 +153,18 @@ static Function *getStubFunctionForCtorList(Module *m,
 }
 
 static void
+warnIfStaticConstructorsAndDestructors(Module *m) {
+
+  GlobalVariable *ctors = m->getNamedGlobal("llvm.global_ctors");
+  GlobalVariable *dtors = m->getNamedGlobal("llvm.global_dtors");
+  LOG_IF(ERROR, ctors || dtors)
+      << "Lifted module has static constructors/destructors";
+}
+
+static void
 injectStaticConstructorsAndDestructors(Module *m,
                                        llvm::StringRef entryFunction) {
+
   GlobalVariable *ctors = m->getNamedGlobal("llvm.global_ctors");
   GlobalVariable *dtors = m->getNamedGlobal("llvm.global_dtors");
 
@@ -187,8 +197,8 @@ injectStaticConstructorsAndDestructors(Module *m,
   }
 }
 
-void KModule::addInternalFunction(const char* functionName){
-  Function* internalFunction = module->getFunction(functionName);
+void KModule::addInternalFunction(llvm::Module *mod, const char* functionName){
+  Function* internalFunction = mod->getFunction(functionName);
   if (!internalFunction) {
     KLEE_DEBUG(klee_warning(
         "Failed to add internal function %s. Not found.", functionName));
@@ -215,7 +225,8 @@ bool KModule::link(std::vector<std::unique_ptr<llvm::Module>> &modules,
   return modules.size() != numRemainingModules;
 }
 
-void KModule::instrument(const Interpreter::ModuleOptions &opts) {
+void KModule::instrument(llvm::Module *mod,
+                         const Interpreter::ModuleOptions &opts) {
   // Inject checks prior to optimization... we also perform the
   // invariant transformations that we will end up doing later so that
   // optimize is seeing what is as close as possible to the final
@@ -233,29 +244,52 @@ void KModule::instrument(const Interpreter::ModuleOptions &opts) {
 
   // This pass will replace atomic instructions with non-atomic operations
   pm.add(createLowerAtomicPass());
-  if (opts.CheckDivZero) pm.add(new DivCheckPass());
-  if (opts.CheckOvershift) pm.add(new OvershiftCheckPass());
+  if (opts.CheckDivZero) {
+    pm.add(new DivCheckPass());
+  }
+  if (opts.CheckOvershift) {
+    pm.add(new OvershiftCheckPass());
+  }
 
   pm.add(new IntrinsicCleanerPass(*targetData));
-  pm.run(*module);
+  pm.run(*mod);
 }
 
+KModule::~KModule(void) {}
+KModule::KModule(void)
+    : constantTable(nullptr),
+      numConstants(0) {}
+
 void KModule::optimiseAndPrepare(
+    llvm::Module *mod,
     const Interpreter::ModuleOptions &opts,
     llvm::ArrayRef<const char *> preservedFunctions) {
-  if (opts.Optimize)
-    Optimize(module.get(), preservedFunctions);
+
+  // We don't optimize the lifted modules because they are already aggressively
+  // optimized.
+  if (mod == module.get()) {
+    if (opts.Optimize) {
+      Optimize(mod, preservedFunctions);
+    }
+  }
 
   // Add internal functions which are not used to check if instructions
   // have been already visited
-  if (opts.CheckDivZero)
-    addInternalFunction("klee_div_zero_check");
-  if (opts.CheckOvershift)
-    addInternalFunction("klee_overshift_check");
+  if (opts.CheckDivZero) {
+    addInternalFunction(mod, "klee_div_zero_check");
+  }
+
+  if (opts.CheckOvershift) {
+    addInternalFunction(mod, "klee_overshift_check");
+  }
 
   // Needs to happen after linking (since ctors/dtors can be modified)
   // and optimization (since global optimization can rewrite lists).
-  injectStaticConstructorsAndDestructors(module.get(), opts.EntryPoint);
+  if (mod == module.get()) {
+    injectStaticConstructorsAndDestructors(mod, opts.EntryPoint);
+  } else {
+    warnIfStaticConstructorsAndDestructors(mod);
+  }
 
   // Finally, run the passes that maintain invariants we expect during
   // interpretation. We run the intrinsic cleaner just in case we
@@ -265,17 +299,21 @@ void KModule::optimiseAndPrepare(
   LegacyLLVMPassManagerTy pm3;
   pm3.add(createCFGSimplificationPass());
   switch(SwitchType) {
-  case eSwitchTypeInternal: break;
-  case eSwitchTypeSimple: pm3.add(new LowerSwitchPass()); break;
-  case eSwitchTypeLLVM:  pm3.add(createLowerSwitchPass()); break;
-  default: klee_error("invalid --switch-type");
+    case eSwitchTypeInternal:
+      break;
+    case eSwitchTypeSimple:
+      pm3.add(new LowerSwitchPass()); break;
+    case eSwitchTypeLLVM:
+      pm3.add(createLowerSwitchPass()); break;
+    default:
+      klee_error("invalid --switch-type");
   }
   InstructionOperandTypeCheckPass *operandTypeCheckPass =
       new InstructionOperandTypeCheckPass();
   pm3.add(new IntrinsicCleanerPass(*targetData));
   pm3.add(new PhiCleanerPass());
   pm3.add(operandTypeCheckPass);
-  pm3.run(*module);
+  pm3.run(*mod);
 
   // Enforce the operand type invariants that the Executor expects.  This
   // implicitly depends on the "Scalarizer" pass to be run in order to succeed
@@ -285,7 +323,7 @@ void KModule::optimiseAndPrepare(
   }
 }
 
-void KModule::manifest(InterpreterHandler *ih, bool forceSourceOutput) {
+void KModule::manifest(llvm::Module *mod, InterpreterHandler *ih, bool forceSourceOutput) {
   if (OutputSource || forceSourceOutput) {
     std::unique_ptr<llvm::raw_fd_ostream> os(ih->openOutputFile("assembly.ll"));
     assert(os && !os->has_error() && "unable to open source output");
@@ -303,23 +341,45 @@ void KModule::manifest(InterpreterHandler *ih, bool forceSourceOutput) {
 
   /* Build shadow structures */
 
-  infos = std::unique_ptr<InstructionInfoTable>(
-      new InstructionInfoTable(module.get()));
+  if (!infos) {
+    CHECK_EQ(mod, module.get());
+    infos = std::unique_ptr<InstructionInfoTable>(
+        new InstructionInfoTable(mod));
+
+  } else {
+    infos->AddModule(mod);
+  }
 
   std::vector<Function *> declarations;
 
-  for (auto &Function : *module) {
+  for (auto &Function : *mod) {
     if (Function.isDeclaration()) {
-      declarations.push_back(&Function);
+
+      // Declaration in the main module.
+      if (mod == module.get()) {
+        declarations.push_back(&Function);
+
+      // Declaration in the secondary module (e.g. JIT-lifted), which may have
+      // a chance of linking against the main module.
+      } else {
+        auto real_func = module->getFunction(Function.getName());
+        auto real_kf_it = functionMap.find(real_func);
+        if (real_kf_it != functionMap.end()) {
+          functionMap.insert(std::make_pair(&Function, real_kf_it->second));
+
+        } else {
+          declarations.push_back(&Function);
+        }
+      }
       continue;
     }
 
-    auto kf = std::unique_ptr<KFunction>(new KFunction(&Function, this));
+    std::unique_ptr<KFunction> kf(new KFunction(&Function, this));
 
     for (unsigned i=0; i<kf->numInstructions; ++i) {
       KInstruction *ki = kf->instructions[i];
       if(!&infos->getInfo(ki->inst)){
-          LOG(INFO) << "zero detected";
+        LOG(INFO) << "zero detected";
       }
       ki->info = &infos->getInfo(ki->inst);
     }
@@ -331,13 +391,15 @@ void KModule::manifest(InterpreterHandler *ih, bool forceSourceOutput) {
   /* Compute various interesting properties */
 
   for (auto &kf : functions) {
-    if (functionEscapes(kf->function))
+    if (functionEscapes(kf->function)) {
       escapingFunctions.insert(kf->function);
+    }
   }
 
   for (auto &declaration : declarations) {
-    if (functionEscapes(declaration))
+    if (functionEscapes(declaration)) {
       escapingFunctions.insert(declaration);
+    }
   }
 
   if (DebugPrintEscapingFunctions && !escapingFunctions.empty()) {
@@ -353,8 +415,9 @@ void KModule::manifest(InterpreterHandler *ih, bool forceSourceOutput) {
 
 KConstant* KModule::getKConstant(const Constant *c) {
   auto it = constantMap.find(c);
-  if (it != constantMap.end())
+  if (it != constantMap.end()) {
     return it->second.get();
+  }
   return NULL;
 }
 
@@ -362,7 +425,8 @@ unsigned KModule::getConstantID(Constant *c, KInstruction* ki) {
   if (KConstant *kc = getKConstant(c))
     return kc->id;  
 
-  unsigned id = constants.size();
+  auto id = static_cast<unsigned>(constants.size());
+  DCHECK_EQ(id, constants.size());
   auto kc = std::unique_ptr<KConstant>(new KConstant(c, id, ki));
   constantMap.insert(std::make_pair(c, std::move(kc)));
   constants.push_back(c);

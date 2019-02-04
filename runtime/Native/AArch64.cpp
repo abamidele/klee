@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-extern "C" {
-
 inline static addr_t CurrentPC(AArch64State &state) {
   return state.gpr.pc.aword;
 }
+
+extern "C" {
 
 Memory *__remill_sync_hyper_call(AArch64State &, Memory *, SyncHyperCall::Name) {
   abort();

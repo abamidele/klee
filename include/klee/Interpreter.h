@@ -60,6 +60,11 @@ class Interpreter {
     bool CheckDivZero;
     bool CheckOvershift;
 
+    inline ModuleOptions(void)
+        : Optimize(true),
+          CheckDivZero(false),
+          CheckOvershift(false) {}
+
     ModuleOptions(const std::string &_LibraryDir,
                   const std::string &_EntryPoint, bool _Optimize,
                   bool _CheckDivZero, bool _CheckOvershift)
@@ -140,8 +145,9 @@ class Interpreter {
   // for the search. use null to reset.
   virtual void useSeeds(const std::vector<struct KTest *> *seeds) = 0;
 
-  virtual void runFunctionAsMain(llvm::Function *f, int argc, char **argv,
-                                 char **envp) = 0;
+  virtual void runFunctionAsMain(
+      llvm::Function *f, const std::vector<std::string> &argv,
+      const std::vector<std::string> &envp) = 0;
 
   /*** Runtime options ***/
 

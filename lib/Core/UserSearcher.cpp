@@ -73,11 +73,18 @@ void klee::initializeSearchOptions() {
 }
 
 bool klee::userSearcherRequiresMD2U() {
-  return (std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_MD2U) != CoreSearch.end() ||
+  static bool is_checked = false;
+  static bool ret = false;
+  if (is_checked) {
+    return ret;
+  }
+  is_checked = true;
+  ret = (std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_MD2U) != CoreSearch.end() ||
 	  std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_CovNew) != CoreSearch.end() ||
 	  std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_ICnt) != CoreSearch.end() ||
 	  std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_CPICnt) != CoreSearch.end() ||
 	  std::find(CoreSearch.begin(), CoreSearch.end(), Searcher::NURS_QC) != CoreSearch.end());
+  return ret;
 }
 
 

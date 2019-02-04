@@ -264,34 +264,34 @@ static void LoadAddressSpaceFromSnapshot(
     const char *path = nullptr;
     switch (page.kind()) {
       case snapshot::kLinuxStackPageRange:
-      path = "[stack]";
-      break;
+        path = "[stack]";
+        break;
       case snapshot::kLinuxHeapPageRange:
-      path = "[heap]";
-      break;
+        path = "[heap]";
+        break;
       case snapshot::kLinuxVVarPageRange:
-      path = "[vvar]";
-      break;
+        path = "[vvar]";
+        break;
       case snapshot::kLinuxVDSOPageRange:
-      path = "[vdso]";
-      break;
+        path = "[vdso]";
+        break;
       case snapshot::kLinuxVSysCallPageRange:
-      path = "[vsyscall]";
-      break;
+        path = "[vsyscall]";
+        break;
       case snapshot::kFileBackedPageRange:
-      if (page.has_file_path()) {
-        path = page.file_path().c_str();
-      } else {
-        LOG(ERROR)
-        << "Page map with base " << std::hex << page.base() << " and limit "
-        << page.limit() << " in address space " << std::dec
-        << orig_addr_space.id() << " is file-backed, but does not have "
-        << "a file path.";
-      }
-      break;
+        if (page.has_file_path()) {
+          path = page.file_path().c_str();
+        } else {
+          LOG(ERROR)
+          << "Page map with base " << std::hex << page.base() << " and limit "
+          << page.limit() << " in address space " << std::dec
+          << orig_addr_space.id() << " is file-backed, but does not have "
+          << "a file path.";
+        }
+        break;
       case snapshot::kAnonymousPageRange:
       case snapshot::kAnonymousZeroRange:
-      break;
+        break;
     }
 
     auto base = static_cast<uint64_t>(page.base());
@@ -300,11 +300,10 @@ static void LoadAddressSpaceFromSnapshot(
     auto offset = static_cast<uint64_t>(
         page.has_file_offset() ? page.file_offset() : 0L);
     emu_addr_space->AddMap(base, size, path, offset);
-    if (snapshot::kAnonymousZeroRange == page.kind()) {
-
-    } else {
+    if (snapshot::kAnonymousZeroRange != page.kind()) {
       LoadPageRangeFromFile(emu_addr_space.get(), page);
     }
+
     emu_addr_space->SetPermissions(base, size, page.can_read(),
         page.can_write(), page.can_exec());
   }
@@ -315,7 +314,9 @@ static void LoadAddressSpaceFromSnapshot(
 void Workspace::LoadSnapshotIntoExecutor(const ProgramSnapshotPtr &snapshot,
                                          klee::Interpreter *executor) {
 
-  LOG(INFO)<<"Loading address space information from snapshot";
+  LOG(INFO)
+      << "Loading address space information from snapshot";
+
   AddressSpaceIdToMemoryMap address_space_ids;
   for (const auto &address_space : snapshot->address_spaces()) {
     LoadAddressSpaceFromSnapshot(address_space_ids, address_space);
@@ -325,17 +326,17 @@ void Workspace::LoadSnapshotIntoExecutor(const ProgramSnapshotPtr &snapshot,
   for (const auto &task : snapshot->tasks()) {
     int64_t addr_space_id = task.address_space_id();
     CHECK(address_space_ids.count(addr_space_id))
-    << "Invalid address space id " << std::dec << addr_space_id
-    << " for task";
+        << "Invalid address space id " << std::dec << addr_space_id
+        << " for task";
 
     auto memory = address_space_ids[addr_space_id];
     auto pc = static_cast<uint64_t>(task.pc());
 
     LOG(INFO)
-    << "Adding task starting execution at " << std::hex << pc
-    << " in address space " << std::dec << addr_space_id;
+        << "Adding task starting execution at " << std::hex << pc
+        << " in address space " << std::dec << addr_space_id;
 
-    executor -> AddInitialTask(task.state(), pc, memory);
+    executor->AddInitialTask(task.state(), pc, memory);
   }
 }
 
