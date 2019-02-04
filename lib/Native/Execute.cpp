@@ -196,15 +196,17 @@ int main(int argc, char **argv, char **envp) {
   interp_options.MakeConcreteSymbolic = false;
 
   std::unique_ptr<NativeHandler> handler(new NativeHandler());
-  std::unique_ptr<klee::Interpreter> executor(
-      klee::Interpreter::create(context, interp_options, handler.get()));
+  auto executor =
+      klee::Interpreter::create(context, interp_options, handler.get());
 
-  handler->setInterpreter(executor.get());
+  handler->setInterpreter(executor);
   executor->setModule(loaded_modules, module_options);
 
-  klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor.get());
+  klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
 
   executor->Run();
+
+  // TODO(pag,sae): Freeing the `executor` causes a segfault.
 
   google::ShutdownGoogleLogging();
   google::ShutDownCommandLineFlags();

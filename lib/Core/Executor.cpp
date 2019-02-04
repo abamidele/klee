@@ -3114,9 +3114,9 @@ void Executor::run(ExecutionState &initialState) {
       stepInstruction(state);
 
       executeInstruction(state, ki);
-      // TODO(pag,sae): Re-enable eventually.
-//      unsigned numSeeds = it->second.size();
-//      processTimers(&state, maxInstructionTime * numSeeds);
+
+      unsigned numSeeds = it->second.size();
+      processTimers(&state, maxInstructionTime * numSeeds);
       updateStates(&state);
 
       if ((stats::instructions % 1000) == 0) {
@@ -3166,11 +3166,8 @@ void Executor::run(ExecutionState &initialState) {
     KInstruction *ki = state.pc;
     stepInstruction(state);
     executeInstruction(state, ki);
-
-    // TODO(pag,sae): Eventually re-enable.
-//    processTimers(&state, maxInstructionTime);
-//    checkMemoryUsage();
-
+    processTimers(&state, maxInstructionTime);
+    checkMemoryUsage();
     updateStates(&state);
   }
 
