@@ -61,9 +61,9 @@ set(KLEEMILL klee-exec-${REMILL_LLVM_VERSION})
 list(APPEND PROJECT_DEFINITIONS "KLEEMILL_INSTALL_RUNTIME_DIR=\"${CMAKE_INSTALL_PREFIX}/share/kleemill/${REMILL_LLVM_VERSION}/runtime/\"")
 list(APPEND PROJECT_DEFINITIONS "KLEEMILL_BUILD_RUNTIME_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/runtime/\"")
 
-add_executable(${KLEEMILL}
+
+add_library(${PROJECT_NAME} STATIC
   ${PROJECT_PROTOBUFSOURCEFILES}
-  
   lib/Basic/CmdLineOptions.cpp
   lib/Basic/ConstructSolverChain.cpp
   lib/Basic/KTest.cpp
@@ -156,13 +156,14 @@ add_executable(${KLEEMILL}
   lib/Native/Arch/X86/Log.cpp
   lib/Native/Arch/AArch64/Log.cpp
   lib/Native/Arch/TraceManager.cpp
-  lib/Native/Execute.cpp
   lib/Native/Memory/AddressSpace.cpp
   lib/Native/Memory/MappedRange.cpp
   lib/Native/Memory/Snapshot.cpp
   lib/Native/Util/AreaAllocator.cpp
   lib/Native/Util/ZoneAllocator.cpp
-  lib/Native/Workspace/Workspace.cpp)
+  lib/Native/Workspace/Workspace.cpp
+)
+
 
 # remill
 if(NOT TARGET remill)
@@ -209,10 +210,36 @@ list(APPEND PROJECT_LIBRARIES ${Z3_LIBRARIES})
 # target settings
 #
 
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_DEFINITIONS})
+target_compile_options(${PROJECT_NAME} PRIVATE ${PROJECT_CXXFLAGS})
+
+list(APPEND PROJECT_LIBRARIES ${PROJECT_NAME})
+
+add_executable(${KLEEMILL}
+  lib/Native/Execute.cpp
+)
+
 target_link_libraries(${KLEEMILL} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${KLEEMILL} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${KLEEMILL} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${KLEEMILL} PRIVATE ${PROJECT_CXXFLAGS})
 
+
 add_subdirectory(runtime)
 
+if(NOT APPLE)
+  set(KLEEMILL_SNAPSHOT kleemill-snapshot-${REMILL_LLVM_VERSION})
+ 
+  add_executable(${KLEEMILL_SNAPSHOT}
+    lib/Native/Snapshot.cpp
+    lib/Native/Arch/X86/Snapshot.cpp
+    lib/Native/Arch/AArch64/Snapshot.cpp
+  )
+
+  target_link_libraries(${KLEEMILL_SNAPSHOT} PRIVATE ${PROJECT_LIBRARIES})
+  target_include_directories(${KLEEMILL_SNAPSHOT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
+  target_compile_definitions(${KLEEMILL_SNAPSHOT} PUBLIC ${PROJECT_DEFINITIONS})
+  target_compile_options(${KLEEMILL_SNAPSHOT} PRIVATE ${PROJECT_CXXFLAGS})
+endif()
