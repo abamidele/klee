@@ -607,6 +607,10 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
     globalAddresses.insert(std::make_pair(lifted_entry.second, addr_expr));
   }
 
+  if (theStatisticManager) {
+    theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
+  }
+
   bindModuleConstants(holding_module.get());
 
   for (auto lifted_entry : new_lifted_traces) {

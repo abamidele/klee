@@ -11,25 +11,49 @@
 
 #include <vector>
 
+#include "Native/Util/AreaAllocator.h"
+
 using namespace klee;
+
+namespace {
+
+static native::AreaAllocator gIndexedStatsAllocator(
+    native::kAreaRW, native::kIndexedStatsTable);
+
+}  // namespace
 
 StatisticManager::StatisticManager()
   : enabled(true),
-    globalStats(nullptr),
+    globalStats(),
     indexedStats(nullptr),
+    indexedStatsEnabled(false),
+    prevTotalIndices(0),
     contextStats(nullptr),
     index(0) {}
 
-void StatisticManager::useIndexedStats(unsigned totalIndices) {  
-  indexedStats.reset(new uint64_t[totalIndices * stats.size()]);
-  memset(indexedStats.get(), 0, sizeof(indexedStats[0]) * totalIndices * stats.size());
+void StatisticManager::useIndexedStats(void) {
+  indexedStatsEnabled = true;
+}
+
+void StatisticManager::growIndexedStats(size_t totalIndices) {
+  if (!indexedStatsEnabled) {
+    return;
+  }
+  if (!indexedStats) {
+    indexedStats = reinterpret_cast<uint64_t *>(gIndexedStatsAllocator.Allocate(
+        totalIndices * stats.size() * sizeof(uint64_t)));
+  } else {
+    auto num_needed = totalIndices - prevTotalIndices;
+    gIndexedStatsAllocator.Allocate(
+        num_needed * stats.size() * sizeof(uint64_t));
+  }
+  prevTotalIndices = totalIndices;
 }
 
 void StatisticManager::registerStatistic(Statistic &s) {
   s.id = static_cast<unsigned>(stats.size());
   stats.push_back(&s);
-  globalStats.reset(new uint64_t[stats.size()]);
-  memset(globalStats.get(), 0, sizeof(globalStats[0])*stats.size());
+  globalStats.resize(stats.size());
 }
 
 int StatisticManager::getStatisticID(const std::string &name) const {
@@ -48,7 +72,7 @@ Statistic *StatisticManager::getStatisticByName(const std::string &name) const {
   return 0;
 }
 
-StatisticManager *klee::theStatisticManager = 0;
+StatisticManager *klee::theStatisticManager = nullptr;
 
 static StatisticManager &getStatisticManager() {
   static StatisticManager sm;
