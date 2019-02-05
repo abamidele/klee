@@ -159,7 +159,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
     // __remill function handling implementations
 
-        add("__kleemill_get_lifted_function",
+    add("__kleemill_get_lifted_function",
             handle__kleemill_get_lifted_function, true),
     add("__remill_write_memory_64", handle__remill_write_64, true),
     add("__remill_write_memory_32", handle__remill_write_64, true),
@@ -169,7 +169,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_read_memory_32", handle__remill_read_32, true),
     add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_memory_8", handle__remill_read_8, true),
-    add("llvm.ctpop.i32", handle__llvm_ctpop, true)
+    add("llvm.ctpop.i32", handle__llvm_ctpop, true),
 
 #undef addDNR
 #undef add

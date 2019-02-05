@@ -45,5 +45,6 @@
 #include "Native/Task.h"
 #include "Native/AArch64.cpp"
 #include "Native/Task.cpp"
+#include "klee-libc/klee-libc.h"
 
 #pragma clang diagnostic pop
