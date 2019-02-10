@@ -161,15 +161,24 @@ class SpecialFunctionHandler {
 
   //additions for remill lifted code
   HANDLER(handle__kleemill_get_lifted_function);
+  HANDLER(handle__kleemill_can_write_byte);
+  HANDLER(handle__kleemill_can_read_byte);
+  HANDLER(handle__kleemill_free_memory);
+  HANDLER(handle__kleemill_protect_memory);
+  HANDLER(handle__kleemill_allocate_memory);
+  HANDLER(handle__kleemill_is_mapped_address);
+  HANDLER(handle__kleemill_find_unmapped_address);
+ 
   HANDLER(handle__remill_write_64);
   HANDLER(handle__remill_write_32);
   HANDLER(handle__remill_write_16);
   HANDLER(handle__remill_write_8);
-  HANDLER(handle__llvm_ctpop);
   HANDLER(handle__remill_read_64);
   HANDLER(handle__remill_read_32);
   HANDLER(handle__remill_read_16);
   HANDLER(handle__remill_read_8);
+  
+  HANDLER(handle__llvm_ctpop);
 
 #undef HANDLER
 };

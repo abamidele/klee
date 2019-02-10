@@ -20,7 +20,69 @@ Task *gCurrent = nullptr;
 
 extern "C" {
 
+// kleemill functions are implemented and handled through klee's special function handler
+
 LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
+
+bool __kleemill_can_write_byte(Memory *memory, addr_t addr);
+
+bool __kleemill_can_read_byte(Memory *memory, addr_t addr);
+
+Memory *__kleemill_free_memory(Memory *memory, 
+        addr_t where, addr_t size);
+
+Memory *__kleemill_allocate_memory(
+    Memory *memory, addr_t where, addr_t size, 
+    const char *name, uint64_t offset);
+
+Memory *__kleemill_protect_memory(
+    Memory *memory, addr_t where, addr_t size, bool can_read, 
+    bool can_write, bool can_exec);
+
+bool kleemill_is_mapped_address(Memory * memory, addr_t where);
+
+addr_t kleemill_find_unmapped_address(
+    Memory *memory, uint64_t base, uint64_t limit, uint64_t size);
+
+
+ __attribute__((format(printf, 1, 2)))
+void __kleemill_strace(const char *format, ...) {
+  if (auto fp = stdout) {
+    va_list args;
+    va_start(args, format);
+    vfprintf(fp, format, args);
+    va_end(args);
+   }
+}
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+#if 1
+# define STRACE_SYSCALL_NUM(nr) \
+    do { \
+      __kleemill_strace( \
+          ANSI_COLOR_YELLOW "%p %p %3" PRIuADDR ":" ANSI_COLOR_RESET, \
+          nr); \
+    } while (false)
+
+# define STRACE_ERROR(syscall, fmt, ...) \
+    __kleemill_strace(ANSI_COLOR_RED #syscall ":" fmt ANSI_COLOR_RESET "\n", \
+                   ##__VA_ARGS__)
+
+# define STRACE_SUCCESS(syscall, fmt, ...) \
+    __kleemill_strace(ANSI_COLOR_GREEN #syscall ":" fmt ANSI_COLOR_RESET "\n", \
+                   ##__VA_ARGS__)
+#else
+# define STRACE_SYSCALL_NUM(...)
+# define STRACE_ERROR(...)
+# define STRACE_SUCCESS(...)
+#endif
 
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
@@ -84,28 +146,6 @@ Memory * __remill_error(State &state, addr_t pc, Memory *memory) {
   }
   return task.continuation(state, task.last_pc, memory);
 }
-
-Memory *__remill_async_hyper_call(State &state, addr_t ret_addr, Memory *memory) {
-  auto &task = reinterpret_cast<Task &>(state);
-  if (CanContinue(task.location)) {
-    task.time_stamp_counter += 10000;
-    task.continuation = AtUnhandledSyscall;
-    task.location = kTaskStoppedBeforeUnhandledHyperCall;
-    task.last_pc = CurrentPC(state);
-
-    switch (state.hyper_call) {
-      case AsyncHyperCall::kInvalid:
-      case AsyncHyperCall::kInvalidInstruction:
-        task.location = kTaskStoppedAtError;
-        break;
-      default:
-        task.location = kTaskStoppedBeforeUnhandledHyperCall;
-        break;
-    }
-  }
-  return task.continuation(state, task.last_pc, memory);
-}
-
 uint8_t __remill_undefined_8(void) {
   return 0;
 }

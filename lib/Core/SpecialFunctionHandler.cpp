@@ -160,7 +160,22 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     // __remill function handling implementations
 
     add("__kleemill_get_lifted_function",
-            handle__kleemill_get_lifted_function, true),
+      handle__kleemill_get_lifted_function, true),
+    add("__kleemill_can_write_byte", 
+      handle__kleemill_can_write_byte, true),
+    add("__kleemill_can_read_byte",
+      handle__kleemill_can_read_byte, true),
+    add("__kleemill_free_memory", 
+      handle__kleemill_free_memory, true),
+    add("__kleemill_allocate_memory", 
+      handle__kleemill_allocate_memory, true),
+    add("__kleemill_protect_memory", 
+      handle__kleemill_protect_memory, true),
+    add("__kleemill_is_mapped_address",
+      handle__kleemill_is_mapped_address, true),
+    add("__kleemill_find_unmapped_address", 
+      handle__kleemill_find_unmapped_address, true),
+    
     add("__remill_write_memory_64", handle__remill_write_64, true),
     add("__remill_write_memory_32", handle__remill_write_64, true),
     add("__remill_write_memory_16", handle__remill_write_64, true),
@@ -174,6 +189,162 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 #undef addDNR
 #undef add
     };
+
+void SpecialFunctionHandler::handle__kleemill_can_read_byte(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  uint8_t can_read = mem->CanRead(addr_uint); 
+
+  executor.bindLocal(
+      target, state, ConstantExpr::create(can_read, Expr::Int8));
+}
+
+void SpecialFunctionHandler::handle__kleemill_can_write_byte(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  
+  auto addr_val = executor.toUnique(state, arguments[1]);
+  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  uint8_t can_write = mem->CanWrite(addr_uint); 
+
+  executor.bindLocal(
+      target, state, ConstantExpr::create(can_write, Expr::Int8));
+}
+
+void SpecialFunctionHandler::handle__kleemill_free_memory(
+    ExecutionState &state, KInstruction *target, 
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  
+  auto where_val = executor.toUnique(state, arguments[1]);
+  auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)
+      ->getZExtValue();
+
+  auto size_val = executor.toUnique(state, arguments[2]);
+  auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  mem->RemoveMap(where_uint, size_uint);
+
+  executor.bindLocal( target, state, mem_val );
+}
+
+void SpecialFunctionHandler::handle__kleemill_allocate_memory(
+    ExecutionState &state, KInstruction *target, 
+    std::vector<ref<Expr> > &arguments) {
+  
+}
+
+void SpecialFunctionHandler::handle__kleemill_protect_memory(
+    ExecutionState &state, KInstruction *target, 
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)
+      ->getZExtValue();
+
+  auto where_val = executor.toUnique(state, arguments[1]);
+  auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)
+      ->getZExtValue();
+  
+  auto size_val = executor.toUnique(state, arguments[2]);
+  auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)
+      ->getZExtValue();
+
+  auto can_read_val = executor.toUnique(state, arguments[3]);
+  auto can_read_uint = llvm::dyn_cast<ConstantExpr>(can_read_val)
+      ->getZExtValue();
+
+  auto can_write_val = executor.toUnique(state, arguments[4]);
+  auto can_write_uint = llvm::dyn_cast<ConstantExpr>(can_write_val) 
+      ->getZExtValue();
+
+  auto can_exec_val = executor.toUnique(state, arguments[5]);
+  auto can_exec_uint = llvm::dyn_cast<ConstantExpr>(can_exec_val) 
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  mem->SetPermissions(where_uint,
+                      size_uint, 
+                      static_cast<bool>(can_read_uint), 
+                      static_cast<bool>(can_write_uint), 
+                      static_cast<bool>(can_exec_uint));
+  executor.bindLocal(target, state, mem_val);
+}
+
+
+void SpecialFunctionHandler::handle__kleemill_is_mapped_address(
+    ExecutionState &state, KInstruction *target, 
+    std::vector<ref<Expr> > &arguments) {
+
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  
+  auto where_val = executor.toUnique(state, arguments[1]);
+  auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  uint8_t is_mapped = mem->IsMapped(where_uint); 
+
+  executor.bindLocal(
+      target, state, ConstantExpr::create(is_mapped, Expr::Int8));
+}
+
+void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
+    ExecutionState &state, KInstruction *target, 
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)
+      ->getZExtValue();
+
+  auto base_val = executor.toUnique(state, arguments[1]);
+  auto base_uint = llvm::dyn_cast<ConstantExpr>(base_val)
+      ->getZExtValue();
+  
+  auto limit_val = executor.toUnique(state, arguments[2]);
+  auto limit_uint = llvm::dyn_cast<ConstantExpr>(limit_val)
+      ->getZExtValue();
+
+  auto size_val = executor.toUnique(state, arguments[3]);
+  auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+
+  uint64_t hole = 0;
+  if (mem->FindHole(base_uint, limit_uint, size_uint, &hole)) {
+    executor.bindLocal(
+      target, state, ConstantExpr::create(hole, Expr::Int64));
+  } else {
+    executor.bindLocal(
+      target, state, ConstantExpr::create(0 , Expr::Int64));
+  }
+}
 
 void SpecialFunctionHandler::handle__remill_read_8(
     ExecutionState &state, KInstruction *target,

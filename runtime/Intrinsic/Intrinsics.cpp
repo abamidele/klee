@@ -22,4 +22,95 @@ extern "C" {
 #include "klee_overshift_check.c"
 #include "klee_range.c"
 
+__attribute__((format(printf, 1, 2)))
+extern void __kleemill_strace(const char *format, ...);
+
+// Returns true if the memory at address `addr` is readable.
+[[gnu::used, gnu::const]]
+extern bool __kleemill_can_read_byte(Memory *memory, addr_t addr);
+
+// Returns true if the memory at address `addr` is writable.
+[[gnu::used, gnu::const]]
+extern bool __kleemill_can_write_byte(Memory *memory, addr_t addr);
+
+extern Memory *__kleemill_allocate_memory(Memory *memory, addr_t where,
+                                       addr_t size, const char *name,
+                                       uint64_t offset);
+
+extern Memory *__kleemill_free_memory(Memory *memory, addr_t where, addr_t size);
+
+extern Memory *__kleemill_protect_memory(Memory *memory, addr_t where,
+                                      addr_t size, bool can_read,
+                                      bool can_write, bool can_exec);
+
+extern bool __kleemill_is_mapped_address(Memory *memory, addr_t where);
+
+// Finds some unmapped memory.
+addr_t __kleemill_find_unmapped_address(Memory *memory, addr_t base,
+                                     addr_t limit, addr_t size);
+
 }  // extern C
+
+size_t NumReadableBytes(Memory *memory, addr_t addr, size_t size);
+size_t NumWritableBytes(Memory *memory, addr_t addr, size_t size);
+
+inline static bool CanReadMemory(Memory *memory, addr_t addr, size_t size) {
+  return size == NumReadableBytes(memory, addr, size);
+}
+
+inline static bool CanWriteMemory(Memory *memory, addr_t addr, size_t size) {
+  return size == NumWritableBytes(memory, addr, size);
+}
+
+Memory *CopyToMemory(Memory *memory, addr_t addr,
+                     const void *data, size_t size);
+
+void CopyFromMemory(Memory *memory, void *data, addr_t addr, size_t size);
+
+template <typename T>
+inline static T ReadMemory(Memory *memory, addr_t addr) {
+  T val{};
+  CopyFromMemory(memory, &val, addr, sizeof(T));
+  return val;
+}
+
+template <typename T>
+inline static bool TryReadMemory(Memory *memory, addr_t addr, T *val) {
+  if (CanReadMemory(memory, addr, sizeof(T))) {
+    CopyFromMemory(memory, val, addr, sizeof(T));
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// You don't want to be using this function, it doesn't make sense to copy a
+// pointer into an emulated address space.
+template <typename T>
+inline static bool TryWriteMemory(Memory *&, addr_t, const T *) {
+  abort();
+}
+
+template <typename T>
+inline static bool TryWriteMemory(Memory *&memory, addr_t addr, const T &val) {
+  if (CanWriteMemory(memory, addr, sizeof(T))) {
+    memory = CopyToMemory(memory, addr, &val, sizeof(T));
+    return true;
+  } else {
+    return false;
+  }
+}
+
+size_t CopyStringFromMemory(Memory *memory, addr_t addr,
+                            char *val, size_t max_len);
+
+size_t CopyStringToMemory(Memory *memory, addr_t addr, const char *val,
+                          size_t len);
+
+inline static addr_t AlignToPage(addr_t addr) {
+  return addr & ~4095UL;
+}
+
+inline static addr_t AlignToNextPage(addr_t addr) {
+  return (addr + 4095UL) & ~4095UL;
+}
