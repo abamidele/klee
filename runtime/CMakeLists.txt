@@ -25,7 +25,7 @@ function(add_runtime_helper os arch address_bit_size)
     add_runtime(${target_name}
         SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${target_name}.cpp
         ADDRESS_SIZE ${address_bit_size}
-        INCLUDEDIRECTORIES ${REMILL_SOURCE_DIR} ${KLEE_TOOLS_SOURCE_DIR}
+        INCLUDEDIRECTORIES ${REMILL_SOURCE_DIR} ${KLEEMILL_SOURCE_DIR} "${KLEEMILL_SOURCE_DIR}/include"
         INSTALLDESTINATION "share/kleemill/${REMILL_LLVM_VERSION}/runtime")
 endfunction()
 
