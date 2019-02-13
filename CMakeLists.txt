@@ -230,7 +230,7 @@ target_compile_options(${KLEEMILL} PRIVATE ${PROJECT_CXXFLAGS})
 add_subdirectory(runtime)
 
 if(NOT APPLE)
-  set(KLEEMILL_SNAPSHOT kleemill-snapshot-${REMILL_LLVM_VERSION})
+  set(KLEEMILL_SNAPSHOT klee-snapshot-${REMILL_LLVM_VERSION})
  
   add_executable(${KLEEMILL_SNAPSHOT}
     lib/Native/Snapshot.cpp
