@@ -408,22 +408,22 @@ static void RunUntilBreakpoint(pid_t pid) {
   ptrace(PTRACE_POKETEXT, pid, FLAGS_breakpoint, old_text_word);
 }
 
-static uint64_t GetMaxStackSize(void) {
-  static uint64_t max_stack_size = 0;
-  if (!max_stack_size) {
-    struct rlimit limit;
-    getrlimit(RLIMIT_STACK, &limit);
-    LOG(INFO)
-        << "Current stack size limit is " << std::dec << limit.rlim_cur;
-
-    uint64_t our_max = 16ULL << 20ULL;
-    max_stack_size = std::max<uint64_t>(limit.rlim_cur, our_max);
-    LOG(INFO)
-        << "New stack size limit is " << std::dec << max_stack_size;
-  }
-
-  return max_stack_size;
-}
+//static uint64_t GetMaxStackSize(void) {
+//  static uint64_t max_stack_size = 0;
+//  if (!max_stack_size) {
+//    struct rlimit limit;
+//    getrlimit(RLIMIT_STACK, &limit);
+//    LOG(INFO)
+//        << "Current stack size limit is " << std::dec << limit.rlim_cur;
+//
+//    uint64_t our_max = 16ULL << 20ULL;
+//    max_stack_size = std::max<uint64_t>(limit.rlim_cur, our_max);
+//    LOG(INFO)
+//        << "New stack size limit is " << std::dec << max_stack_size;
+//  }
+//
+//  return max_stack_size;
+//}
 
 // Gets the list of all thread IDs for this process.
 static std::vector<pid_t> GetTIDs(pid_t pid) {
