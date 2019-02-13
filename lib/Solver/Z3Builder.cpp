@@ -43,15 +43,20 @@ template <> void Z3NodeHandle<Z3_ast>::dump() {
                << "\n";
 }
 
+template <typename A, typename B, typename C>
+inline static A GetZ3Error(A (*func)(B, C), B b, C c) {
+  return func(b, c);
+}
+
+template <typename A, typename B, typename C>
+inline static A GetZ3Error(A (*func)(B), B b, C c) {
+  return func(b);
+}
+
 void custom_z3_error_handler(Z3_context ctx, Z3_error_code ec) {
-  ::Z3_string errorMsg =
-#ifdef HAVE_Z3_GET_ERROR_MSG_NEEDS_CONTEXT
-      // Z3 > 4.4.1
-      Z3_get_error_msg(ctx, ec);
-#else
-      // Z3 4.4.1
-      Z3_get_error_msg(ec);
-#endif
+
+  auto errorMsg = GetZ3Error(Z3_get_error_msg, ctx, ec);
+
   // FIXME: This is kind of a hack. The value comes from the enum
   // Z3_CANCELED_MSG but this isn't currently exposed by Z3's C API
   if (strcmp(errorMsg, "canceled") == 0) {
