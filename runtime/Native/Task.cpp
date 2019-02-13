@@ -14,81 +14,22 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "Task.h"
 
 Task *gCurrent = nullptr;
 
 extern "C" {
 
-// kleemill functions are implemented and handled through klee's special function handler
-
 LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
-
-bool __kleemill_can_write_byte(Memory *memory, addr_t addr);
-
-bool __kleemill_can_read_byte(Memory *memory, addr_t addr);
-
-Memory *__kleemill_free_memory(Memory *memory, 
-        addr_t where, addr_t size);
-
-Memory *__kleemill_allocate_memory(
-    Memory *memory, addr_t where, addr_t size, 
-    const char *name, uint64_t offset);
-
-Memory *__kleemill_protect_memory(
-    Memory *memory, addr_t where, addr_t size, bool can_read, 
-    bool can_write, bool can_exec);
-
-bool kleemill_is_mapped_address(Memory * memory, addr_t where);
-
-addr_t kleemill_find_unmapped_address(
-    Memory *memory, uint64_t base, uint64_t limit, uint64_t size);
-
-
- __attribute__((format(printf, 1, 2)))
-void __kleemill_strace(const char *format, ...) {
-  if (auto fp = stdout) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(fp, format, args);
-    va_end(args);
-   }
-}
-
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
-
-#if 1
-# define STRACE_SYSCALL_NUM(nr) \
-    do { \
-      __kleemill_strace( \
-          ANSI_COLOR_YELLOW "%p %p %3" PRIuADDR ":" ANSI_COLOR_RESET, \
-          nr); \
-    } while (false)
-
-# define STRACE_ERROR(syscall, fmt, ...) \
-    __kleemill_strace(ANSI_COLOR_RED #syscall ":" fmt ANSI_COLOR_RESET "\n", \
-                   ##__VA_ARGS__)
-
-# define STRACE_SUCCESS(syscall, fmt, ...) \
-    __kleemill_strace(ANSI_COLOR_GREEN #syscall ":" fmt ANSI_COLOR_RESET "\n", \
-                   ##__VA_ARGS__)
-#else
-# define STRACE_SYSCALL_NUM(...)
-# define STRACE_ERROR(...)
-# define STRACE_SUCCESS(...)
-#endif
 
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtCallTarget;
+    task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
@@ -100,6 +41,7 @@ Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtReturnTarget;
+    task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
@@ -111,27 +53,36 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtJumpTarget;
+    task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
   }
   return task.continuation(state, task.last_pc, memory);
 }
 
-static Memory *AtError(State &state, addr_t ret_addr, Memory *memory) {
+Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
+  auto task = reinterpret_cast<Task &>(state);
+  task.status = kTaskStatusError;
+  task.location = kTaskStoppedAtError;
   puts("Error; unwinding\n");
   return memory;
 }
 
-static Memory *AtUnhandledSyscall(State &state, addr_t ret_addr, Memory *memory) {
-  puts("Unhandled syscall; unwinding\n");
+Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
+                                          Memory *memory) {
+  auto task = reinterpret_cast<Task &>(state);
+  task.status = kTaskStatusError;
+  task.location = kTaskStoppedAtError;
+  puts("Unhandled hypercall; unwinding\n");
   return memory;
 }
 
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
+    task.status = kTaskStatusError;
     task.location = kTaskStoppedAtError;
-    task.continuation = AtError;
+    task.continuation = __kleemill_at_error;
     task.last_pc = pc;
   }
   return task.continuation(state, task.last_pc, memory);
@@ -140,12 +91,14 @@ Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
 Memory * __remill_error(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
+    task.status = kTaskStatusError;
     task.location = kTaskStoppedAtError;
-    task.continuation = AtError;
+    task.continuation = __kleemill_at_error;
     task.last_pc = pc;
   }
   return task.continuation(state, task.last_pc, memory);
 }
+
 uint8_t __remill_undefined_8(void) {
   return 0;
 }
@@ -211,8 +164,9 @@ Memory *__remill_compare_exchange_memory_8(Memory *memory, addr_t addr,
   return memory;
 }
 
-Memory *__remill_compare_exchange_memory_16(Memory *memory , addr_t addr,
-                                            uint16_t &expected, uint16_t desired) {
+Memory *__remill_compare_exchange_memory_16(Memory *memory, addr_t addr,
+                                            uint16_t &expected,
+                                            uint16_t desired) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_16(memory, addr);
   if (current == expected) {
@@ -223,7 +177,8 @@ Memory *__remill_compare_exchange_memory_16(Memory *memory , addr_t addr,
 }
 
 Memory *__remill_compare_exchange_memory_32(Memory *memory, addr_t addr,
-                                            uint32_t &expected, uint32_t desired) {
+                                            uint32_t &expected,
+                                            uint32_t desired) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_32(memory, addr);
   if (current == expected) {
@@ -234,7 +189,8 @@ Memory *__remill_compare_exchange_memory_32(Memory *memory, addr_t addr,
 }
 
 Memory *__remill_compare_exchange_memory_64(Memory *memory, addr_t addr,
-                                            uint64_t &expected, uint64_t desired) {
+                                            uint64_t &expected,
+                                            uint64_t desired) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_64(memory, addr);
   if (current == expected) {
@@ -245,14 +201,18 @@ Memory *__remill_compare_exchange_memory_64(Memory *memory, addr_t addr,
 }
 
 Memory *__remill_compare_exchange_memory_128(Memory *memory, addr_t addr,
-                                             uint128_t &expected, uint128_t &desired) {
+                                             uint128_t &expected,
+                                             uint128_t &desired) {
   gCurrent->time_stamp_counter += 400;
   const auto lo = __remill_read_memory_64(memory, addr);
   const auto hi = __remill_read_memory_64(memory, addr + 8);
-  const auto current = static_cast<uint128_t>(lo) | (static_cast<uint128_t>(hi) << 64);
+  const auto current = static_cast<uint128_t>(lo)
+      | (static_cast<uint128_t>(hi) << 64);
   if (current == expected) {
-    memory = __remill_write_memory_64(memory, addr, static_cast<uint64_t>(desired));
-    memory = __remill_write_memory_64(memory, addr + 8, static_cast<uint64_t>(desired >> 64));
+    memory = __remill_write_memory_64(memory, addr,
+                                      static_cast<uint64_t>(desired));
+    memory = __remill_write_memory_64(memory, addr + 8,
+                                      static_cast<uint64_t>(desired >> 64));
   }
   expected = current;
   return memory;
@@ -267,7 +227,8 @@ Memory *__remill_fetch_and_add_8(Memory *memory, addr_t addr, uint8_t &value) {
   return memory;
 }
 
-Memory *__remill_fetch_and_add_16(Memory *memory, addr_t addr, uint16_t &value) {
+Memory *__remill_fetch_and_add_16(Memory *memory, addr_t addr,
+                                  uint16_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_16(memory, addr);
   const uint16_t next = current + value;
@@ -276,7 +237,8 @@ Memory *__remill_fetch_and_add_16(Memory *memory, addr_t addr, uint16_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_add_32(Memory *memory, addr_t addr, uint32_t &value) {
+Memory *__remill_fetch_and_add_32(Memory *memory, addr_t addr,
+                                  uint32_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_32(memory, addr);
   const uint32_t next = current + value;
@@ -285,7 +247,8 @@ Memory *__remill_fetch_and_add_32(Memory *memory, addr_t addr, uint32_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_add_64(Memory *memory, addr_t addr, uint64_t &value) {
+Memory *__remill_fetch_and_add_64(Memory *memory, addr_t addr,
+                                  uint64_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_64(memory, addr);
   const uint64_t next = current + value;
@@ -303,7 +266,8 @@ Memory *__remill_fetch_and_sub_8(Memory *memory, addr_t addr, uint8_t &value) {
   return memory;
 }
 
-Memory *__remill_fetch_and_sub_16(Memory *memory, addr_t addr, uint16_t &value) {
+Memory *__remill_fetch_and_sub_16(Memory *memory, addr_t addr,
+                                  uint16_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_16(memory, addr);
   const uint16_t next = current - value;
@@ -312,7 +276,8 @@ Memory *__remill_fetch_and_sub_16(Memory *memory, addr_t addr, uint16_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_sub_32(Memory *memory, addr_t addr, uint32_t &value) {
+Memory *__remill_fetch_and_sub_32(Memory *memory, addr_t addr,
+                                  uint32_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_32(memory, addr);
   const uint32_t next = current - value;
@@ -321,7 +286,8 @@ Memory *__remill_fetch_and_sub_32(Memory *memory, addr_t addr, uint32_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_sub_64(Memory *memory, addr_t addr, uint64_t &value) {
+Memory *__remill_fetch_and_sub_64(Memory *memory, addr_t addr,
+                                  uint64_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_64(memory, addr);
   const uint64_t next = current - value;
@@ -339,7 +305,8 @@ Memory *__remill_fetch_and_and_8(Memory *memory, addr_t addr, uint8_t &value) {
   return memory;
 }
 
-Memory *__remill_fetch_and_and_16(Memory *memory, addr_t addr, uint16_t &value) {
+Memory *__remill_fetch_and_and_16(Memory *memory, addr_t addr,
+                                  uint16_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_16(memory, addr);
   const uint16_t next = current & value;
@@ -348,7 +315,8 @@ Memory *__remill_fetch_and_and_16(Memory *memory, addr_t addr, uint16_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_and_32(Memory *memory, addr_t addr, uint32_t &value) {
+Memory *__remill_fetch_and_and_32(Memory *memory, addr_t addr,
+                                  uint32_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_32(memory, addr);
   const uint32_t next = current & value;
@@ -357,7 +325,8 @@ Memory *__remill_fetch_and_and_32(Memory *memory, addr_t addr, uint32_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_and_64(Memory *memory, addr_t addr, uint64_t &value) {
+Memory *__remill_fetch_and_and_64(Memory *memory, addr_t addr,
+                                  uint64_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_64(memory, addr);
   const uint64_t next = current & value;
@@ -411,7 +380,8 @@ Memory *__remill_fetch_and_xor_8(Memory *memory, addr_t addr, uint8_t &value) {
   return memory;
 }
 
-Memory *__remill_fetch_and_xor_16(Memory *memory, addr_t addr, uint16_t &value) {
+Memory *__remill_fetch_and_xor_16(Memory *memory, addr_t addr,
+                                  uint16_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_16(memory, addr);
   const uint16_t next = current ^ value;
@@ -420,7 +390,8 @@ Memory *__remill_fetch_and_xor_16(Memory *memory, addr_t addr, uint16_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_xor_32(Memory *memory, addr_t addr, uint32_t &value) {
+Memory *__remill_fetch_and_xor_32(Memory *memory, addr_t addr,
+                                  uint32_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_32(memory, addr);
   const uint32_t next = current ^ value;
@@ -429,7 +400,8 @@ Memory *__remill_fetch_and_xor_32(Memory *memory, addr_t addr, uint32_t &value) 
   return memory;
 }
 
-Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr, uint64_t &value) {
+Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
+                                  uint64_t &value) {
   gCurrent->time_stamp_counter += 400;
   const auto current = __remill_read_memory_64(memory, addr);
   const uint64_t next = current ^ value;
@@ -437,6 +409,9 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr, uint64_t &value) 
   value = current;
   return memory;
 }
+
+extern "C" linux_task *__kleemill_create_task(State *state,
+                                              Memory *memory);
 
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -448,20 +423,13 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_init();
 
   Memory *memory = nullptr;
-  Task task;
-  gCurrent = &task;
-
-  memcpy(&(task.state), argv[1], sizeof(task.state));
   memcpy(&memory, argv[2], sizeof(memory));
 
-  task.time_stamp_counter = 0;
-  task.status = kTaskStatusRunnable;
-  task.location = kTaskStoppedAtSnapshotEntryPoint;
-  task.last_pc = CurrentPC(task.state);
-  task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
+  State *state = reinterpret_cast<State *>(argv[1]);
+  Task *task = __kleemill_create_task(state, memory);
+  gCurrent = task;
 
-  __kleemill_create_task(task.state);
-  __kleemill_resume(memory);
+  __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;
 }

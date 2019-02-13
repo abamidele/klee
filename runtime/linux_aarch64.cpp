@@ -37,21 +37,22 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-alignof-expression"
 
-#include "FreeStanding/FreeStanding.cpp"
+#include "runtime/FreeStanding/FreeStanding.cpp"
+
 #include "remill/Arch/Runtime/Intrinsics.h"
 #include "remill/Arch/Runtime/Intrinsics.cpp"
 #include "remill/Arch/AArch64/Runtime/State.h"
 
-#include "klee-libc/klee-libc.h"
-#include "Intrinsic/Intrinsics.cpp"
+#include "runtime/klee-libc/klee-libc.h"
+#include "runtime/Intrinsic/Intrinsics.cpp"
 
-#include "Native/Intrinsics.h"
-#include "Native/Memory.cpp"
-#include "Native/SystemCalls/Linux/Run.h"
-#include "Native/Task.h"
-#include "Native/SystemCalls/Linux/Run.cpp"
-#include "Native/AArch64.cpp"
-#include "Native/SystemCalls/Linux/SystemCallABI.h"
-#include "Native/SystemCalls/Linux/AArch64.cpp"
+#include "runtime/Native/Intrinsics.h"
+#include "runtime/Native/Memory.cpp"
+#include <runtime/Native/OS/Linux/Run.h>
+#include <runtime/Native/Task.h>
+#include <runtime/Native/OS/Linux/SystemCallABI.h>
+#include <runtime/Native/OS/Linux/Arch/AArch64.cpp>
+#include <runtime/Native/OS/Linux/Run.cpp>
+#include <runtime/Native/Task.cpp>
 
 #pragma clang diagnostic pop

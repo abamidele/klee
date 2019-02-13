@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef VMILL_RUNTIME_SYSTEMCALLABI_H_
-#define VMILL_RUNTIME_SYSTEMCALLABI_H_
+#pragma once
 
 #include "remill/Arch/Runtime/Types.h"
 
@@ -27,12 +26,12 @@ struct State;
 
 // Generic wrapper around accessing arguments passed into a system call, and
 // setting the return value from the system call.
+template<typename DerivedABI>
 class SystemCallABI {
  public:
   inline SystemCallABI(void)
-      : completed(false) {}
-
-  virtual ~SystemCallABI(void) = default;
+      : completed(false) {
+  }
 
   //virtual addr_t GetPC(const State *state) const = 0;
   //virtual void SetPC(State *state, addr_t new_pc) const = 0;
@@ -46,9 +45,8 @@ class SystemCallABI {
   //virtual addr_t GetReturnAddress(Memory *memory, State *state,
   //                                addr_t ret_addr) const = 0;
 
-  template <typename T1>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1) const {
+  template<typename T1>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1) const {
     if (!CanReadArgs(memory, state, 1)) {
       return false;
     }
@@ -56,9 +54,9 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T1, typename T2>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1, T2 *arg2) const {
+  template<typename T1, typename T2>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1,
+                         T2 *arg2) const {
     if (!CanReadArgs(memory, state, 2)) {
       return false;
     }
@@ -67,9 +65,9 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T1, typename T2, typename T3>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1, T2 *arg2, T3 *arg3) const {
+  template<typename T1, typename T2, typename T3>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1, T2 *arg2,
+                         T3 *arg3) const {
     if (!CanReadArgs(memory, state, 2)) {
       return false;
     }
@@ -79,9 +77,9 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T1, typename T2, typename T3, typename T4>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1, T2 *arg2, T3 *arg3, T4 *arg4) const {
+  template<typename T1, typename T2, typename T3, typename T4>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1, T2 *arg2,
+                         T3 *arg3, T4 *arg4) const {
     if (!CanReadArgs(memory, state, 2)) {
       return false;
     }
@@ -92,10 +90,9 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T1, typename T2, typename T3, typename T4, typename T5>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1, T2 *arg2, T3 *arg3, T4 *arg4,
-                         T5 *arg5) const {
+  template<typename T1, typename T2, typename T3, typename T4, typename T5>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1, T2 *arg2,
+                         T3 *arg3, T4 *arg4, T5 *arg5) const {
     if (!CanReadArgs(memory, state, 2)) {
       return false;
     }
@@ -107,11 +104,10 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T1, typename T2, typename T3, typename T4,
-            typename T5, typename T6>
-  inline bool TryGetArgs(Memory *memory, State *state,
-                         T1 *arg1, T2 *arg2, T3 *arg3, T4 *arg4,
-                         T5 *arg5, T6 *arg6) const {
+  template<typename T1, typename T2, typename T3, typename T4, typename T5,
+      typename T6>
+  inline bool TryGetArgs(Memory *memory, State *state, T1 *arg1, T2 *arg2,
+                         T3 *arg3, T4 *arg4, T5 *arg5, T6 *arg6) const {
     if (!CanReadArgs(memory, state, 2)) {
       return false;
     }
@@ -124,31 +120,41 @@ class SystemCallABI {
     return true;
   }
 
-  template <typename T>
+  template<typename T>
   inline Memory *SetReturn(Memory *memory, State *state, T val) const {
     completed = true;
-    return DoSetReturn(
-        memory, state, static_cast<addr_t>(static_cast<long>(val)));
+    return DoSetReturn(memory, state,
+                       static_cast<addr_t>(static_cast<long>(val)));
   }
 
-  virtual addr_t GetSystemCallNum(Memory *memory, State *state) const = 0;
+  inline addr_t GetSystemCallNum(Memory *memory, State *state) const {
+    return reinterpret_cast<const DerivedABI *>(this)->GetSystemCallNum(memory,
+                                                                        state);
+  }
 
  protected:
-  template <typename T, int i>
+  template<typename T, int i>
   inline T GetArg(Memory *memory, State *state) const {
-    return static_cast<T>(GetArg(memory, state, i));
+    return static_cast<T>(reinterpret_cast<const DerivedABI *>(this)->GetArg(
+        memory, state, i));
   }
 
-  virtual Memory *DoSetReturn(Memory *, State *, addr_t) const = 0;
+  Memory *DoSetReturn(Memory *memory, State *state, addr_t addr) const {
+    return reinterpret_cast<const DerivedABI *>(this)->DoSetReturn(memory,
+                                                                   state, addr);
+  }
 
-  virtual bool CanReadArgs(Memory *memory, State *state,
-                           int num_args) const = 0;
+  bool CanReadArgs(Memory *memory, State *state, int num_args) const {
+    return reinterpret_cast<const DerivedABI *>(this)->CanReadArgs(memory,
+                                                                   state,
+                                                                   num_args);
+  }
 
-  virtual addr_t GetArg(Memory *&memory, State *state, int i) const = 0;
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
+    return reinterpret_cast<const DerivedABI *>(this)->GetArg(memory, state, i);
+  }
 
   mutable bool completed;
 };
 
 #pragma clang diagnostic pop
-
-#endif  // VMILL_RUNTIME_SYSTEMCALLABI_H_

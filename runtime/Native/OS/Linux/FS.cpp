@@ -34,11 +34,11 @@ namespace {
 // Impossible flags to simultaneously handle for `*at` related syscalls
 // (e.g. `openat`, `fstatat`, etc.).
 static constexpr int gAtFollowNoFollow = AT_SYMLINK_FOLLOW |
-                                         AT_SYMLINK_NOFOLLOW;
+AT_SYMLINK_NOFOLLOW;
 
 // Emulate an `access` system call.
-static Memory *SysAccess(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysAccess(Memory *memory, State *state, const ABI &syscall) {
   addr_t path = 0;
   int type = 0;
   if (!syscall.TryGetArgs(memory, state, &path, &type)) {
@@ -53,9 +53,9 @@ static Memory *SysAccess(Memory *memory, State *state,
     STRACE_ERROR(access, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(access, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
@@ -73,8 +73,8 @@ static Memory *SysAccess(Memory *memory, State *state,
 }
 
 // Emulate an `faccessat` system call.
-static Memory *SysFAccessAt(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysFAccessAt(Memory *memory, State *state, const ABI &syscall) {
   int dirfd = 0;
   addr_t path = 0;
   int mode = 0;
@@ -91,9 +91,9 @@ static Memory *SysFAccessAt(Memory *memory, State *state,
     STRACE_ERROR(faccessat, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(faccessat, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
@@ -112,8 +112,8 @@ static Memory *SysFAccessAt(Memory *memory, State *state,
 }
 
 // Emulate an `lseek` system call.
-static Memory *SysLseek(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysLseek(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
   addr_t offset = 0;
   int whence = 0;
@@ -128,7 +128,7 @@ static Memory *SysLseek(Memory *memory, State *state,
   if (static_cast<off64_t>(-1) == new_offset64) {
     auto err = errno;
     STRACE_ERROR(lseek, "fd=%d, offset=%" PRId64 ", whence=%d: %s",
-                 fd, offset64, whence, strerror(err));
+        fd, offset64, whence, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
@@ -139,8 +139,8 @@ static Memory *SysLseek(Memory *memory, State *state,
 }
 
 // Emulate an `llseek` system call.
-static Memory *SysLlseek(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysLlseek(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
   addr_t offset_high = 0;
   addr_t offset_low = 0;
@@ -162,7 +162,7 @@ static Memory *SysLlseek(Memory *memory, State *state,
   if (static_cast<off64_t>(-1) == new_offset64) {
     auto err = errno;
     STRACE_ERROR(llseek, "fd=%d, offset=%" PRId64", whence=%d: %s",
-                 fd, offset64, whence, strerror(err));
+        fd, offset64, whence, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
@@ -190,7 +190,7 @@ static void SetInodeNumber(const struct stat &info, linux32_stat64 *info32) {
   info32->st_ino = info.st_ino;
 }
 
-template <typename T>
+template<typename T>
 void CopyStat(const struct stat &info, T *info32) {
   SetInodeNumber(info, info32);
 
@@ -201,8 +201,8 @@ void CopyStat(const struct stat &info, T *info32) {
   info32->st_gid = static_cast<decltype(info32->st_gid)>(info.st_gid);
   info32->st_rdev = static_cast<decltype(info32->st_rdev)>(info.st_rdev);
   info32->st_size = static_cast<decltype(info32->st_size)>(info.st_size);
-  info32->st_blksize = static_cast<decltype(info32->st_blksize)>(
-      info.st_blksize);
+  info32->st_blksize =
+      static_cast<decltype(info32->st_blksize)>(info.st_blksize);
   info32->st_blocks = static_cast<decltype(info32->st_blocks)>(info.st_blocks);
 
   using sec_t = decltype(info32->st_ctim.tv_sec);
@@ -231,9 +231,8 @@ void CopyStat(const struct stat &info, T *info32) {
 }
 
 // Emulate a `stat` system call.
-template <typename T>
-static Memory *SysStat(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+template<typename T, typename ABI>
+static Memory *SysStat(Memory *memory, State *state, const ABI &syscall) {
   addr_t path = 0;
   addr_t buf = 0;
   if (!syscall.TryGetArgs(memory, state, &path, &buf)) {
@@ -252,22 +251,22 @@ static Memory *SysStat(Memory *memory, State *state,
     STRACE_ERROR(stat, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(stat, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  struct stat info = {};
+  struct stat info = { };
   if (::stat(gPath, &info)) {
     auto err = errno;
     STRACE_ERROR(stat, "Can't stat path %s: %s", gPath, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  T info32 = {};
+  T info32 = { };
   CopyStat(info, &info32);
 
   if (TryWriteMemory(memory, buf, info32)) {
@@ -357,9 +356,8 @@ static char *GetPathAt(int fd, char *path, int flags) {
 }
 
 // Emulate a `fstatat` system call.
-template <typename T>
-static Memory *SysFStatAt(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+template<typename T, typename ABI>
+static Memory *SysFStatAt(Memory *memory, State *state, const ABI &syscall) {
   int fd = 0;
   addr_t path = 0;
   addr_t buf = 0;
@@ -385,9 +383,9 @@ static Memory *SysFStatAt(Memory *memory, State *state,
     STRACE_ERROR(fstatat, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(fstatat, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
@@ -399,15 +397,15 @@ static Memory *SysFStatAt(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -EBADFD);
   }
 
-  struct stat info = {};
+  struct stat info = { };
   if (::stat(final_path, &info)) {
     auto err = errno;
-    STRACE_ERROR(fstatat, "Can't stat path %s (final=%s): %s",
-                 gPath, final_path, strerror(err));
+    STRACE_ERROR(fstatat, "Can't stat path %s (final=%s): %s", gPath,
+                 final_path, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  T info_compat = {};
+  T info_compat = { };
   CopyStat(info, &info_compat);
 
   if (TryWriteMemory(memory, buf, info_compat)) {
@@ -420,9 +418,8 @@ static Memory *SysFStatAt(Memory *memory, State *state,
 }
 
 // Emulate an `lstat` system call.
-template <typename T>
-static Memory *SysLstat(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+template<typename T, typename ABI>
+static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
   addr_t path = 0;
   addr_t buf = 0;
   if (!syscall.TryGetArgs(memory, state, &path, &buf)) {
@@ -441,22 +438,22 @@ static Memory *SysLstat(Memory *memory, State *state,
     STRACE_ERROR(lstat, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(lstat, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  struct stat info = {};
+  struct stat info = { };
   if (lstat(gPath, &info)) {
     auto err = errno;
     STRACE_ERROR(lstat, "Can't lstat path %s: %s", gPath, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  T info32 = {};
+  T info32 = { };
   CopyStat(info, &info32);
 
   if (TryWriteMemory(memory, buf, info32)) {
@@ -469,9 +466,8 @@ static Memory *SysLstat(Memory *memory, State *state,
 }
 
 // Emulate a an `fstat` system call.
-template <typename T>
-static Memory *SysFstat(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+template<typename T, typename ABI>
+static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   if (!syscall.TryGetArgs(memory, state, &fd, &buf)) {
@@ -485,14 +481,14 @@ static Memory *SysFstat(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
-  struct stat info = {};
+  struct stat info = { };
   if (fstat(fd, &info)) {
     auto err = errno;
     STRACE_ERROR(fstat, "Can't fstat fd %d: %s", fd, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  T info32 = {};
+  T info32 = { };
   CopyStat(info, &info32);
 
   if (TryWriteMemory(memory, buf, info32)) {
@@ -504,8 +500,9 @@ static Memory *SysFstat(Memory *memory, State *state,
   }
 }
 
+template<typename ABI>
 static Memory *SysGetCurrentWorkingDirectory(Memory *memory, State *state,
-                                             const SystemCallABI &syscall) {
+                                             const ABI &syscall) {
   addr_t buf = 0;
   addr_t size = 0;
   if (!syscall.TryGetArgs(memory, state, &buf, &size)) {
@@ -537,7 +534,7 @@ static Memory *SysGetCurrentWorkingDirectory(Memory *memory, State *state,
       free(ret);
     }
     STRACE_ERROR(getcwd, "Buffer size %" PRIuADDR " < %zu too small",
-                 size, cwd_len + 1);
+        size, cwd_len + 1);
     return syscall.SetReturn(memory, state, -ERANGE);
   }
 
@@ -561,8 +558,8 @@ static Memory *SysGetCurrentWorkingDirectory(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, len_or_err);
 }
 
-static Memory *SysReadLink(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysReadLink(Memory *memory, State *state, const ABI &syscall) {
   addr_t path = 0;
   addr_t buf = 0;
   addr_t size = 0;
@@ -600,10 +597,10 @@ static Memory *SysReadLink(Memory *memory, State *state,
   auto ret = readlink(gPath, link_path, max_size);
   if (-1 == ret) {
     auto err = errno;
-    delete [] link_path;
-    STRACE_ERROR(
-        readlink, "Could not read link of %s into buffer of size %zu: %s",
-        gPath, max_size, strerror(errno));
+    delete[] link_path;
+    STRACE_ERROR(readlink,
+                 "Could not read link of %s into buffer of size %zu: %s", gPath,
+                 max_size, strerror(errno));
     return syscall.SetReturn(memory, state, -err);
   }
 
@@ -611,13 +608,13 @@ static Memory *SysReadLink(Memory *memory, State *state,
   CopyToMemory(memory, buf, link_path, max_size);
 
   STRACE_SUCCESS(readlink, "path=%s, link=%s, len=%td", gPath, link_path, ret);
-  delete [] link_path;
+  delete[] link_path;
 
   return syscall.SetReturn(memory, state, ret);
 }
 
-static Memory *SysReadLinkAt(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysReadLinkAt(Memory *memory, State *state, const ABI &syscall) {
   int fd = 0;
   addr_t path = 0;
   addr_t buf = 0;
@@ -656,25 +653,26 @@ static Memory *SysReadLinkAt(Memory *memory, State *state,
   auto ret = readlinkat(fd, gPath, link_path, max_size);
   if (-1 == ret) {
     auto err = errno;
-    delete [] link_path;
-    STRACE_ERROR(
-        readlinkat, "Could not read link of %s into buffer of size %zu: %s",
-        gPath, max_size, strerror(errno));
+    delete[] link_path;
+    STRACE_ERROR(readlinkat,
+                 "Could not read link of %s into buffer of size %zu: %s", gPath,
+                 max_size, strerror(errno));
     return syscall.SetReturn(memory, state, -err);
   }
 
   link_path[max_size] = '\0';
   CopyToMemory(memory, buf, link_path, max_size);
 
-  STRACE_SUCCESS(readlinkat, "fd=%d, path=%s, link=%s, len=%td",
-                 fd, gPath, link_path, ret);
-  delete [] link_path;
+  STRACE_SUCCESS(readlinkat, "fd=%d, path=%s, link=%s, len=%td", fd, gPath,
+                 link_path, ret);
+  delete[] link_path;
 
   return syscall.SetReturn(memory, state, ret);
 }
 
+template<typename ABI>
 static Memory *SysGetDirEntries64(Memory *memory, State *state,
-                                  const SystemCallABI &syscall) {
+                                  const ABI &syscall) {
   int fd = -1;
   addr_t dirent = 0;
   unsigned count = 0;
@@ -686,7 +684,7 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
 
   if (!CanWriteMemory(memory, dirent, count)) {
     STRACE_ERROR(getdents64, "Can't write count=%u bytes to dirent=%" PRIxADDR,
-                 count, dirent);
+        count, dirent);
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
@@ -694,16 +692,16 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
   auto our_fd = dup(fd);
   if (-1 == our_fd) {
     auto err = errno;
-    STRACE_ERROR(getdents64, "Can't read directory fd=%d entries (1): %s",
-                 fd, strerror(err));
+    STRACE_ERROR(getdents64, "Can't read directory fd=%d entries (1): %s", fd,
+                 strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
   auto dir = fdopendir(our_fd);
   if (!dir) {
     auto err = errno;
-    STRACE_ERROR(getdents64, "Can't read directory fd=%d entries (2): %s",
-                 fd, strerror(err));
+    STRACE_ERROR(getdents64, "Can't read directory fd=%d entries (2): %s", fd,
+                 strerror(err));
 
     close(our_fd);
     return syscall.SetReturn(memory, state, -err);
@@ -713,7 +711,7 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
 
   long int ret = 0;
   int num_entries = 0;
-  for (auto written = 0U; ; ) {
+  for (auto written = 0U;;) {
     if (written) {
       pos = telldir(dir);
     }
@@ -723,15 +721,15 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
       break;
     }
 
-    struct linux_dirent64 entry = {};
+    struct linux_dirent64 entry = { };
     auto name_len = strlen(our_entry->d_name);
     auto entry_addr = dirent + written;
     auto dirent_size = __builtin_offsetof(struct linux_dirent64, d_type) + 1;
-    auto to_write = dirent_size + name_len + sizeof(char); // For NUL-byte.
+    auto to_write = dirent_size + name_len + sizeof(char);  // For NUL-byte.
 
     // Align it.
-    if (0 != (to_write % alignof(entry.d_ino))) {
-      to_write += alignof(entry.d_ino) - (to_write % alignof(entry.d_ino));
+    if (0 != (to_write % alignof (entry.d_ino))) {
+      to_write += alignof (entry.d_ino) - (to_write % alignof (entry.d_ino));
     }
 
     // Don't write beyond the end of the provided buffer.
@@ -760,14 +758,14 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
   lseek(fd, pos, SEEK_SET);
   closedir(dir);
 
-  STRACE_SUCCESS(
-      getdents64, "Read %ld of count=%u bytes (%d entries) from dir fd=%d",
-      ret, count, num_entries, fd);
+  STRACE_SUCCESS(getdents64,
+                 "Read %ld of count=%u bytes (%d entries) from dir fd=%d", ret,
+                 count, num_entries, fd);
   return syscall.SetReturn(memory, state, ret);
 }
 
-static Memory *SysFcntl64(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysFcntl64(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
   int cmd = 0;
   addr_t arg = 0;
@@ -788,11 +786,11 @@ static Memory *SysFcntl64(Memory *memory, State *state,
       auto err = errno;
       if (err) {
         STRACE_ERROR(fcntl64, "cmd=%d fd=%d arg=%" PRIdADDR ": %s",
-                     cmd, fd, arg, strerror(err));
+            cmd, fd, arg, strerror(err));
         return syscall.SetReturn(memory, state, -err);
       } else {
         STRACE_SUCCESS(fcntl64, "cmd=%d fd=%d arg=%" PRIdADDR " ret=%d",
-                       cmd, fd, arg, ret);
+            cmd, fd, arg, ret);
         return syscall.SetReturn(memory, state, ret);
       }
     }
@@ -801,17 +799,16 @@ static Memory *SysFcntl64(Memory *memory, State *state,
     case F_SETLKW:
     case F_GETLK:
 
-    // TODO(pag): We don't support the command, but lets pretend that it
-    //            went through.
+      // TODO(pag): We don't support the command, but lets pretend that it
+      //            went through.
     default:
       STRACE_ERROR(fcntl64, "Unuspported cmd=%d", cmd);
       return syscall.SetReturn(memory, state, 0);
   }
 }
 
-template <typename StatType>
-static Memory *SysStatFs64(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename StatType, typename ABI>
+static Memory *SysStatFs64(Memory *memory, State *state, const ABI &syscall) {
   addr_t file = 0;
   addr_t buf_size = 0;
   addr_t buf = 0;
@@ -823,7 +820,7 @@ static Memory *SysStatFs64(Memory *memory, State *state,
 
   if (buf_size != sizeof(StatType)) {
     STRACE_ERROR(statfs64, "buf_size=%" PRIdADDR " must be %ld",
-                 buf_size, sizeof(StatType));
+        buf_size, sizeof(StatType));
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
@@ -834,15 +831,15 @@ static Memory *SysStatFs64(Memory *memory, State *state,
     STRACE_ERROR(statfs64, "Path name too long: %s", gPath);
     return syscall.SetReturn(memory, state, -ENAMETOOLONG);
 
-  // The string read does not end in a NUL-terminator; i.e. we read less
-  // than `PATH_MAX`, but as much as we could without faulting, and we didn't
-  // read the NUL char.
+    // The string read does not end in a NUL-terminator; i.e. we read less
+    // than `PATH_MAX`, but as much as we could without faulting, and we didn't
+    // read the NUL char.
   } else if ('\0' != gPath[path_len]) {
     STRACE_ERROR(statfs64, "Non-NUL-terminated path");
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  struct statfs64 info = {};
+  struct statfs64 info = { };
   auto ret = statfs64(gPath, &info);
   if (-1 == ret) {
     auto err = errno;
@@ -850,7 +847,7 @@ static Memory *SysStatFs64(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -err);
   }
 
-  StatType cinfo = {};
+  StatType cinfo = { };
   cinfo.f_type = static_cast<decltype(cinfo.f_type)>(info.f_type);
   cinfo.f_bsize = static_cast<decltype(cinfo.f_bsize)>(info.f_bsize);
   cinfo.f_blocks = static_cast<decltype(cinfo.f_blocks)>(info.f_blocks);
@@ -869,18 +866,17 @@ static Memory *SysStatFs64(Memory *memory, State *state,
 
   if (!TryWriteMemory(memory, buf, cinfo)) {
     STRACE_ERROR(statfs64, "Can't write info on file=%s to buf=%" PRIxADDR,
-                 gPath, buf);
+        gPath, buf);
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  STRACE_SUCCESS(statfs64, "file=%s f_type=%ld f_bsize=%ld",
-                 gPath, info.f_type, info.f_bsize);
+  STRACE_SUCCESS(statfs64, "file=%s f_type=%ld f_bsize=%ld", gPath, info.f_type,
+                 info.f_bsize);
   return syscall.SetReturn(memory, state, 0);
 }
 
-template <typename StatType>
-static Memory *SysFStatFs64(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename StatType, typename ABI>
+static Memory *SysFStatFs64(Memory *memory, State *state, const ABI &syscall) {
   int fd = 0;
   addr_t buf_size = 0;
   addr_t buf = 0;
@@ -892,11 +888,11 @@ static Memory *SysFStatFs64(Memory *memory, State *state,
 
   if (buf_size != sizeof(StatType)) {
     STRACE_ERROR(fstatfs64, "buf_size=%" PRIdADDR " must be %ld",
-                 buf_size, sizeof(StatType));
+        buf_size, sizeof(StatType));
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
-  struct statfs64 info = {};
+  struct statfs64 info = { };
   auto ret = fstatfs64(fd, &info);
   if (-1 == ret) {
     auto err = errno;
@@ -904,7 +900,7 @@ static Memory *SysFStatFs64(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -err);
   }
 
-  StatType cinfo = {};
+  StatType cinfo = { };
   cinfo.f_type = static_cast<decltype(cinfo.f_type)>(info.f_type);
   cinfo.f_bsize = static_cast<decltype(cinfo.f_bsize)>(info.f_bsize);
   cinfo.f_blocks = static_cast<decltype(cinfo.f_blocks)>(info.f_blocks);
@@ -923,18 +919,17 @@ static Memory *SysFStatFs64(Memory *memory, State *state,
 
   if (!TryWriteMemory(memory, buf, cinfo)) {
     STRACE_ERROR(fstatfs64, "Can't write info on fd=%d to buf=%" PRIxADDR,
-                 fd, buf);
+        fd, buf);
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  STRACE_SUCCESS(fstatfs64, "fd=%d f_type=%ld f_bsize=%ld",
-                 fd, info.f_type, info.f_bsize);
+  STRACE_SUCCESS(fstatfs64, "fd=%d f_type=%ld f_bsize=%ld", fd, info.f_type,
+                 info.f_bsize);
   return syscall.SetReturn(memory, state, 0);
 }
 
-template <typename OffsetT, typename LenT>
-static Memory *SysFAdvise(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+template<typename OffsetT, typename LenT, typename ABI>
+static Memory *SysFAdvise(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
   OffsetT offset = 0;
   LenT len = 0;
@@ -953,18 +948,18 @@ static Memory *SysFAdvise(Memory *memory, State *state,
 
   if (-1 == ret) {
     auto err = errno;
-    STRACE_ERROR(fadvise, "fd=%d, offset=%d, len=%d, advice=%d: %s",
-                 fd, offset, len, advice, strerror(err));
+    STRACE_ERROR(fadvise, "fd=%d, offset=%d, len=%d, advice=%d: %s", fd, offset,
+                 len, advice, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  STRACE_SUCCESS(fadvise, "fd=%d, offset=%d, len=%d, advice=%d",
-                 fd, offset, len, advice);
+  STRACE_SUCCESS(fadvise, "fd=%d, offset=%d, len=%d, advice=%d", fd, offset,
+                 len, advice);
   return syscall.SetReturn(memory, state, 0);
 }
 
-static Memory *SysEventFd(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysEventFd(Memory *memory, State *state, const ABI &syscall) {
   uint32_t count = 0;
 
   if (!syscall.TryGetArgs(memory, state, &count)) {
@@ -988,8 +983,8 @@ static Memory *SysEventFd(Memory *memory, State *state,
 #endif
 }
 
-static Memory *SysEventFd2(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysEventFd2(Memory *memory, State *state, const ABI &syscall) {
   uint32_t count = 0;
   int flags = 0;
 
@@ -1005,7 +1000,7 @@ static Memory *SysEventFd2(Memory *memory, State *state,
   if (-1 == ret) {
     auto err = errno;
     STRACE_ERROR(eventfd2, "count=%x, flags=%x: %s",
-                 count, flags, strerror(err));
+        count, flags, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   } else {
     STRACE_SUCCESS(eventfd2, "count=%x, flags=%x, fd=%d", count, flags, ret);
@@ -1015,8 +1010,9 @@ static Memory *SysEventFd2(Memory *memory, State *state,
 }
 
 // Emulate a `mkdir` system call.
+template<typename ABI>
 static Memory *SysMakeDirectory(Memory *memory, State *state,
-                                const SystemCallABI &syscall) {
+                                const ABI &syscall) {
   addr_t path = 0;
   mode_t mode = 0;
   if (!syscall.TryGetArgs(memory, state, &path, &mode)) {
@@ -1030,8 +1026,8 @@ static Memory *SysMakeDirectory(Memory *memory, State *state,
   auto ret = mkdir(gPath, mode);
   if (-1 == ret) {
     auto err = errno;
-    STRACE_ERROR(mkdir, "Couldn't make path=%s, mode=%u: %s",
-                 gPath, mode, strerror(err));
+    STRACE_ERROR(mkdir, "Couldn't make path=%s, mode=%u: %s", gPath, mode,
+                 strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
@@ -1040,8 +1036,9 @@ static Memory *SysMakeDirectory(Memory *memory, State *state,
 }
 
 // Emulate a `mkdirat` system call.
+template<typename ABI>
 static Memory *SysMakeDirectoryAt(Memory *memory, State *state,
-                                  const SystemCallABI &syscall) {
+                                  const ABI &syscall) {
   int dirfd = -1;
   addr_t path = 0;
   mode_t mode = 0;
@@ -1056,8 +1053,8 @@ static Memory *SysMakeDirectoryAt(Memory *memory, State *state,
   auto ret = mkdirat(dirfd, gPath, mode);
   if (-1 == ret) {
     auto err = errno;
-    STRACE_ERROR(mkdirat, "Couldn't make dirfd=%d, path=%s, mode=%u: %s",
-                 dirfd, gPath, mode, strerror(err));
+    STRACE_ERROR(mkdirat, "Couldn't make dirfd=%d, path=%s, mode=%u: %s", dirfd,
+                 gPath, mode, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
@@ -1065,10 +1062,10 @@ static Memory *SysMakeDirectoryAt(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, 0);
 }
 
-
 // Emulate a `rmdir` system call.
+template<typename ABI>
 static Memory *SysRemoveDirectory(Memory *memory, State *state,
-                                  const SystemCallABI &syscall) {
+                                  const ABI &syscall) {
   addr_t path = 0;
   if (!syscall.TryGetArgs(memory, state, &path)) {
     STRACE_ERROR(rmdir, "Couldn't get args");
@@ -1089,10 +1086,9 @@ static Memory *SysRemoveDirectory(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, 0);
 }
 
-
 // Emulate a `dup` system call.
-static Memory *SysDup(Memory *memory, State *state,
-                      const SystemCallABI &syscall) {
+template<typename ABI>
+static Memory *SysDup(Memory *memory, State *state, const ABI &syscall) {
   int fd = 0;
   if (!syscall.TryGetArgs(memory, state, &fd)) {
     STRACE_ERROR(dup, "Couldn't get args");

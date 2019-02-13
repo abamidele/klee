@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "Run.h"
+#include <tools/klee/runtime/Native/OS/Linux/Run.h>
 namespace {
 
 // Intermediate buffer for copying data to/from the runtime memory and the
@@ -32,21 +32,22 @@ static char gHostName[HOST_NAME_MAX + 1] = {};
 
 #include "Clock.cpp"
 #include "FS.cpp"
-//#include "Futex.cpp"
+#include "Futex.cpp"
 #include "IO.cpp"
 #include "MM.cpp"
-//#include "Net.cpp"
-//#include "Process.cpp"
-//#include "Sys.cpp"
-//#include "Thread.cpp"
+#include "Net.cpp"
+#include "Process.cpp"
+#include "Sys.cpp"
+#include "Thread.cpp"
 
 namespace {
 
-//#ifdef VMILL_RUNTIME_X86
+#ifdef KLEEMILL_RUNTIME_X86
 // 32-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
+template <typename ABI>
 static Memory *X86SystemCall(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
   STRACE_SYSCALL_NUM(syscall_num);
   exit(0);
@@ -145,11 +146,12 @@ static Memory *X86SystemCall(Memory *memory, State *state,
   */
 }
 
-//# if 64 == VMILL_RUNTIME_X86
+#if 64 == KLEEMILL_RUNTIME_X86
 // 64-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
+template <typename ABI>
 static Memory *AMD64SystemCall(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
   STRACE_SYSCALL_NUM(syscall_num);
   puts("amd 64 syscall\n");
@@ -273,14 +275,15 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
       return syscall.SetReturn(memory, state, 0);
   }
 }
-// # endif  // 64 == VMILL_RUNTIME_X86
-//#endif  // VMILL_RUNTIME_X86
+# endif  // 64 == KLEEMILL_RUNTIME_X86
+#endif  // KLEEMILL_RUNTIME_X86
 
-//#ifdef VMILL_RUNTIME_AARCH64
+#ifdef KLEEMILL_RUNTIME_AARCH64
 
 // 64-bit system call dispatcher for `svc` system call entry points.
+template <typename ABI>
 static Memory *AArch64SystemCall(Memory *memory, State *state,
-                                 const SystemCallABI &syscall) {
+                                 const ABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
   STRACE_SYSCALL_NUM(syscall_num);
   exit(0);
@@ -351,6 +354,6 @@ static Memory *AArch64SystemCall(Memory *memory, State *state,
   */
 }
 
-//#endif  // VMILL_RUNTIME_AARCH64
+#endif  // KLEEMILL_RUNTIME_AARCH64
 
 }  // namespace

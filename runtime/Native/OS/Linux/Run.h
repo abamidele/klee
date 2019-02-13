@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef TOOLS_VMILL_VMILL_RUNTIME_LINUX_RUN_H_
-#define TOOLS_VMILL_VMILL_RUNTIME_LINUX_RUN_H_
+#ifndef TOOLS_KLEEMILL_KLEEMILL_RUNTIME_LINUX_RUN_H_
+#define TOOLS_KLEEMILL_KLEEMILL_RUNTIME_LINUX_RUN_H_
 
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
@@ -327,7 +327,7 @@ struct linux_x86_user_desc {
   bool limit_in_pages:1;
   bool seg_not_present:1;
   bool useable:1;
-#if defined(VMILL_RUNTIME_X86) && VMILL_RUNTIME_X86 == 64
+#if defined(KLEEMILL_RUNTIME_X86) && KLEEMILL_RUNTIME_X86 == 64
   uint64_t lm:1;
   uint64_t _padding:24;
 #else
@@ -402,9 +402,9 @@ static constexpr unsigned kBlockedForever = ~0U;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
 
-// State needed to emulate a Linux thread.
-struct linux_task: public Task {
- public:
+
+struct linux_task : public Task {
+  Memory *memory;
   linux_task *next;
   linux_task *next_circular;
   linux_x86_user_desc tls_slots[kNumTLSSlots];
@@ -430,4 +430,4 @@ extern "C" linux_task *__kleemill_current(void);
 
 }  // namespace
 
-#endif  // TOOLS_VMILL_VMILL_RUNTIME_LINUX_RUN_H_
+#endif  // TOOLS_KLEEMILL_KLEEMILL_RUNTIME_LINUX_RUN_H_

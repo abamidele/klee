@@ -17,41 +17,46 @@
 namespace {
 
 // Emulate an `getpid` system call.
+template <typename ABI>
 static Memory *SysGetProcessId(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   //auto id = getpid();
   STRACE_SUCCESS(getpid, "process id=%u", kProcessId);
   return syscall.SetReturn(memory, state, kProcessId);
 }
 
 // Emulate an `getpid` system call.
+template <typename ABI>
 static Memory *SysGetParentProcessId(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                                     const ABI &syscall) {
   //auto id = getppid();
   STRACE_SUCCESS(getppid, "parent process id=%u", kParentProcessId);
   return syscall.SetReturn(memory, state, kParentProcessId);
 }
 
 // Emulate an `getpgrp` system call.
+template <typename ABI>
 static Memory *SysGetProcessGroupId(Memory *memory, State *state,
-                                    const SystemCallABI &syscall) {
+                                    const ABI &syscall) {
   //auto id = getpgrp();
   STRACE_SUCCESS(getpgrp, "process group id=%u", kParentProcessGroupId);
   return syscall.SetReturn(memory, state, kParentProcessGroupId);
 }
 
 // Emulate an `gettid` system call.
+template <typename ABI>
 static Memory *SysGetThreadId(Memory *memory, State *state,
-                              const SystemCallABI &syscall) {
-  auto current = reinterpret_cast<Task *>(state);
+                              const ABI &syscall) {
+  auto current = reinterpret_cast<linux_task *>(state);
   auto id = current->tid;
   STRACE_SUCCESS(gettid, "thread id=%u", id);
   return syscall.SetReturn(memory, state, id);
 }
 
 // Emulate an `kill` system call.
+template <typename ABI>
 static Memory *SysKill(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   pid_t pid = 0;
   int signum = 0;
   if (!syscall.TryGetArgs(memory, state, &pid, &signum)) {

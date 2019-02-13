@@ -16,8 +16,9 @@
 
 namespace {
 
+template <typename ABI>
 static Memory *SysSocket(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int domain = 0;
   int type = 0;
   int protocol = 0;
@@ -38,8 +39,9 @@ static Memory *SysSocket(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysBind(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   int sockfd = -1;
   addr_t addr = 0;
   socklen_t addrlen = 0;
@@ -73,8 +75,9 @@ static Memory *SysBind(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysConnect(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+                          const ABI &syscall) {
   int sockfd = -1;
   addr_t addr = 0;
   socklen_t addrlen = 0;
@@ -114,8 +117,9 @@ static Memory *SysConnect(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysListen(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int sockfd = -1;
   int backlog = 0;
   if (!syscall.TryGetArgs(memory, state, &sockfd, &backlog)) {
@@ -135,8 +139,9 @@ static Memory *SysListen(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *DoSysAccept(Memory *memory, State *state,
-                           const SystemCallABI &syscall,
+                           const ABI &syscall,
                            int fd, addr_t addr, addr_t addrlen_addr,
                            int flags) {
   socklen_t addrlen = 0;
@@ -213,8 +218,9 @@ static Memory *DoSysAccept(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, ret_fd);
 }
 
+template <typename ABI>
 static Memory *SysAccept(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int fd = -1;
   addr_t addr = 0;
   addr_t addr_len = 0;
@@ -226,8 +232,9 @@ static Memory *SysAccept(Memory *memory, State *state,
   return DoSysAccept(memory, state, syscall, fd, addr, addr_len, 0);
 }
 
+template <typename ABI>
 static Memory *SysAccept4(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int fd = -1;
   addr_t addr = 0;
   addr_t addr_len = 0;
@@ -239,8 +246,9 @@ static Memory *SysAccept4(Memory *memory, State *state,
   return DoSysAccept(memory, state, syscall, fd, addr, addr_len, flags);
 }
 
+template <typename ABI>
 static Memory *SysGetSockName(Memory *memory, State *state,
-                              const SystemCallABI &syscall) {
+                              const ABI &syscall) {
   int fd = -1;
   addr_t addr = 0;
   addr_t addrlen_addr = 0;
@@ -287,8 +295,9 @@ static Memory *SysGetSockName(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysGetPeerName(Memory *memory, State *state,
-                              const SystemCallABI &syscall) {
+                              const ABI &syscall) {
   int fd = -1;
   addr_t addr = 0;
   addr_t addrlen_addr = 0;
@@ -337,8 +346,9 @@ struct SocketVector {
   int pair[2];
 } __attribute__((packed));
 
+template <typename ABI>
 static Memory *SysSocketPair(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   int domain = 0;
   int type = 0;
   int protocol = 0;
@@ -371,8 +381,9 @@ static Memory *SysSocketPair(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *DoSysSendTo(Memory *memory, State *state,
-                           const SystemCallABI &syscall,
+                           const ABI &syscall,
                            int fd, addr_t buf, size_t n, int flags,
                            addr_t addr, socklen_t addrlen) {
 
@@ -426,8 +437,9 @@ static Memory *DoSysSendTo(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysSend(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   size_t n = 0;
@@ -439,8 +451,9 @@ static Memory *SysSend(Memory *memory, State *state,
   return DoSysSendTo(memory, state, syscall, fd, buf, n, flags, 0, 0);
 }
 
+template <typename ABI>
 static Memory *SysSendTo(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   size_t n = 0;
@@ -455,8 +468,9 @@ static Memory *SysSendTo(Memory *memory, State *state,
   return DoSysSendTo(memory, state, syscall, fd, buf, n, flags, addr, addr_len);
 }
 
+template <typename ABI>
 static Memory *DoSysRecvFrom(Memory *memory, State *state,
-                             const SystemCallABI &syscall,
+                             const ABI &syscall,
                              int fd, addr_t buf, size_t n, unsigned flags,
                              addr_t addr, addr_t addrlen_addr) {
   if (!n) {
@@ -533,8 +547,9 @@ static Memory *DoSysRecvFrom(Memory *memory, State *state,
   }
 }
 
+template <typename ABI>
 static Memory *SysRecv(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   size_t n = 0;
@@ -546,8 +561,9 @@ static Memory *SysRecv(Memory *memory, State *state,
   return DoSysRecvFrom(memory, state, syscall, fd, buf, n, flags, 0, 0);
 }
 
+template <typename ABI>
 static Memory *SysRecvFrom(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+                           const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   size_t n = 0;
@@ -564,8 +580,9 @@ static Memory *SysRecvFrom(Memory *memory, State *state,
                        flags, addr, addr_len);
 }
 
+template <typename ABI>
 static Memory *SysShutdown(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+                           const ABI &syscall) {
   int socket = -1;
   int how = 0;
   if (!syscall.TryGetArgs(memory, state, &socket, &how)) {
@@ -584,8 +601,9 @@ static Memory *SysShutdown(Memory *memory, State *state,
 }
 
 // TODO(pag): Not clear how to make a compatibility version of this.
+template <typename ABI>
 static Memory *SysSetSockOpt(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   int socket = -1;
   int level = 0;
   int option_name = 0;
@@ -632,8 +650,9 @@ static Memory *SysSetSockOpt(Memory *memory, State *state,
 }
 
 // TODO(pag): Not clear how to make a compatibility version of this.
+template <typename ABI>
 static Memory *SysGetSockOpt(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   int socket = -1;
   int level = 0;
   int option_name = 0;
@@ -877,9 +896,9 @@ struct MessageHeader final : public msghdr {
   IOVecT *orig_iov;
 };
 
-template <typename MsgHdrT, typename IOVecT>
+template <typename MsgHdrT, typename IOVecT, typename ABI>
 static Memory *SysSendMsg(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+                          const ABI &syscall) {
   int socket = -1;
   addr_t message = 0;
   int flags = 0;
@@ -915,9 +934,9 @@ static Memory *SysSendMsg(Memory *memory, State *state,
   }
 }
 
-template <typename MsgHdrT, typename IOVecT>
+template <typename MsgHdrT, typename IOVecT, typename ABI>
 static Memory *SysRecvMsg(Memory *memory, State *state,
-                          const SystemCallABI &syscall) {
+                          const ABI &syscall) {
   int socket = -1;
   addr_t message = 0;
   int flags = 0;
@@ -1004,9 +1023,10 @@ extern int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
                     unsigned int flags, struct timespec *timeout);
 }  // extern C
 
-template <typename MsgHdrT, typename IOVecT, typename TimeSpecT>
+template <typename MsgHdrT, typename IOVecT, typename TimeSpecT,
+          typename ABI>
 static Memory *SysRecvMmsg(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+                           const ABI &syscall) {
   using MmsgHdrT = typename MultiMessageHeader<MsgHdrT, IOVecT>::CompatType;
 
   int socket = -1;
@@ -1057,7 +1077,7 @@ static Memory *SysRecvMmsg(Memory *memory, State *state,
 
 #endif
 
-#ifdef VMILL_RUNTIME_X86
+#ifdef KLEEMILL_RUNTIME_X86
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
@@ -1066,15 +1086,13 @@ static Memory *SysRecvMmsg(Memory *memory, State *state,
 // parameterized by `AddrT` because if this is a 32-bit compatibility
 // `socketcall` then all addresses and arguments must be treated as 32-bit
 // values.
-template <typename AddrT>
-class SocketCallABI : public SystemCallABI {
+template <typename AddrT, typename InABI>
+class SocketCallABI : public SystemCallABI<SocketCallABI<AddrT, InABI>> {
  public:
-  SocketCallABI(const SystemCallABI &syscall_, addr_t arg_addr_)
+  SocketCallABI(const InABI &syscall_, addr_t arg_addr_)
       : syscall(syscall_),
         arg_addr(arg_addr_),
         padding(0) {}
-
-  virtual ~SocketCallABI(void) = default;
 
   addr_t GetPC(const State *state) const final {
     return syscall.GetPC(state);
@@ -1113,16 +1131,16 @@ class SocketCallABI : public SystemCallABI {
         arg_addr + static_cast<addr_t>(static_cast<addr_t>(i) * sizeof(AddrT)));
   }
 
-  const SystemCallABI &syscall;
+  const InABI &syscall;
   addr_t arg_addr;
   uint32_t padding;
 };
 
 #pragma clang diagnostic pop
 
-template <typename AddrT>
+template <typename AddrT, typename ABI>
 static Memory *SysSocketCall(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   int call = 0;
   AddrT args = 0;
   if (!syscall.TryGetArgs(memory, state, &call, &args)) {
@@ -1133,7 +1151,7 @@ static Memory *SysSocketCall(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
-  SocketCallABI<AddrT> abi(syscall, args);
+  SocketCallABI<AddrT, ABI> abi(syscall, args);
   switch (call) {
     case 1: // SYS_SOCKET
       return SysSocket(memory, state, abi);
@@ -1181,6 +1199,6 @@ static Memory *SysSocketCall(Memory *memory, State *state,
   }
 }
 
-#endif  // VMILL_RUNTIME_X86
+#endif  // KLEEMILL_RUNTIME_X86
 
 }  // namespace

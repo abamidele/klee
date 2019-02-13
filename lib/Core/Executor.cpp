@@ -1747,7 +1747,7 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
-//  i->dump();
+  i->dump();
   switch (i->getOpcode()) {
     // Control flow
     case Instruction::Ret: {
@@ -3953,99 +3953,96 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
 void Executor::runFunctionAsMain(Function *f,
                                  const std::vector<std::string> &argv,
                                  const std::vector<std::string> &envp) {
-  std::vector<ref<Expr> > arguments;
-  LOG(INFO)<< "argv ref created";
+  LOG(INFO)
+      << "Preparing to run main function";
   // force deterministic initialization of memory objects
   srand(1);
   srandom(1);
-
-  MemoryObject *argvMO = 0;
 
   // In order to make uclibc happy and be closer to what the system is
   // doing we lay out the environments at the end of the argv array
   // (both are terminated by a null). There is also a final terminating
   // null that uclibc seems to expect, possibly the ELF header?
 
-  //for (envc=0; envp[envc]; ++envc) ;
-  LOG(INFO)<< "indexed into envp";
-
   const auto argc = argv.size();
   const auto envc = envp.size();
 
-  unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
-  KFunction *kf = kmodule->functionMap[f];
-  assert(kf);
-  Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
-  if (ai != ae) {
-    arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
-    if (++ai != ae) {
-      Instruction *first = &*(f->begin()->begin());
-      argvMO = memory->allocate((argc + 1 + envc + 1 + 1 + 3280) * NumPtrBytes,
-      /*isLocal=*/false, /*isGlobal=*/
-                                true,
-                                /*allocSite=*/first, /*alignment=*/
-                                8);
+  Instruction * const first = &*(f->begin()->begin());
+  const unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
 
-      if (!argvMO)
-        klee_error("Could not allocate memory for function arguments");
+  KFunction * const kf = kmodule->functionMap[f];
+  ExecutionState * const state = new ExecutionState(kmodule->functionMap[f]);
+  LOG(INFO)
+      << "Created New Execution State from kmodule";
 
-      arguments.push_back(argvMO->getBaseExpr());
+  std::vector<ref<Expr> > arguments;
+  arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
+  auto argv_ptr = memory->allocate((argc + 1) * NumPtrBytes,
+                                  /*isLocal=*/false, /*isGlobal=*/ true,
+                                  /*allocSite=*/first, /*alignment=*/8);
+  auto argv_os = bindObjectInState(*state, argv_ptr, false);
+  arguments.push_back(argv_ptr->getBaseExpr());
 
-      if (++ai != ae) {
-        uint64_t envp_start = argvMO->address + (argc + 1) * NumPtrBytes;
-        arguments.push_back(Expr::createPointer(envp_start));
+  auto envp_ptr = memory->allocate((envc + 1) * NumPtrBytes,
+                                   /*isLocal=*/false, /*isGlobal=*/ true,
+                                   /*allocSite=*/first, /*alignment=*/8);
+  auto envp_os = bindObjectInState(*state, envp_ptr, false);
+  arguments.push_back(envp_ptr->getBaseExpr());
 
-        if (++ai != ae)
-          klee_error("invalid main function (expect 0-3 arguments)");
-      }
+  auto i = 0UL;
+  for (auto &arg : argv) {
+    auto arg_ptr = memory->allocate(arg.size() + 1,
+                                    /*isLocal=*/false,
+                                    /*isGlobal=*/ true,
+                                    /*allocSite=*/state->pc->inst,
+                                    /*alignment=*/8);
+    auto arg_os = bindObjectInState(*state, arg_ptr, false);
+    for (size_t j = 0; j < arg.size(); j++) {
+      arg_os->write8(j, arg[j]);
     }
+    arg_os->write8(arg.size(), 0);  // `NUL`-terminator.
+    argv_os->write((i++) * NumPtrBytes, arg_ptr->getBaseExpr());
   }
 
-  ExecutionState *state = new ExecutionState(kmodule->functionMap[f]);
-  LOG(INFO)<< "Created New Execution State from kmodule";
+  i = 0;
+  for (auto &arg : envp) {
+    auto arg_ptr = memory->allocate(arg.size() + 1,
+                                    /*isLocal=*/false,
+                                    /*isGlobal=*/ true,
+                                    /*allocSite=*/state->pc->inst,
+                                    /*alignment=*/8);
+    auto arg_os = bindObjectInState(*state, arg_ptr, false);
+    for (size_t j = 0; j < arg.size(); j++) {
+      arg_os->write8(j, arg[j]);
+    }
+    arg_os->write8(arg.size(), 0);  // `NUL`-terminator.
+    envp_os->write((i++) * NumPtrBytes, arg_ptr->getBaseExpr());
+  }
 
-  if (pathWriter)
+  // Add a `NULL` sentinel at the end of each of argv and envp.
+  argv_os->write(argc * NumPtrBytes, Expr::createPointer(0));
+  envp_os->write(envc * NumPtrBytes, Expr::createPointer(0));
+
+  if (pathWriter) {
     state->pathOS = pathWriter->open();
-  if (symPathWriter)
-    state->symPathOS = symPathWriter->open();
-
-  if (statsTracker)
-    statsTracker->framePushed(*state, 0);
-
-  assert(arguments.size() == f->arg_size() && "wrong number of arguments");
-  for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
-    bindArgument(kf, i, *state, arguments[i]);
-
-  if (argvMO) {
-    ObjectState *argvOS = bindObjectInState(*state, argvMO, false);
-
-    for (int i = 0; i < argc + 1 + envc + 1 + 1; i++) {
-      if (i == argc || i >= argc + 1 + envc) {
-        // Write NULL pointer
-        argvOS->write(i * NumPtrBytes, Expr::createPointer(0));
-      } else {
-        const auto &s = i < argc ? argv[i] : envp[i - (argc + 1)];
-        const auto len = s.size();
-
-        MemoryObject *arg = memory->allocate(len + 1, /*isLocal=*/false, /*isGlobal=*/
-                                             true,
-                                             /*allocSite=*/state->pc->inst, /*alignment=*/
-                                             8);
-        if (!arg) {
-          klee_error("Could not allocate memory for function arguments");
-        }
-        ObjectState *os = bindObjectInState(*state, arg, false);
-        for (size_t j = 0; j < len + 1; j++) {
-          os->write8(j, s[j]);
-        }
-
-        // Write pointer to newly allocated and initialised argv/envp c-string
-        argvOS->write(i * NumPtrBytes, arg->getBaseExpr());
-      }
-    }
   }
+
+  if (symPathWriter) {
+    state->symPathOS = symPathWriter->open();
+  }
+
+  if (statsTracker) {
+    statsTracker->framePushed(*state, 0);
+  }
+
+  // Bind up to three arguments to the function.
+  for (i = 0; i < f->arg_size(); ++i) {
+    bindArgument(kf, i, *state, arguments[i]);
+  }
+
   initializeGlobals(*state);
-  LOG(INFO)<< "globals initialized from state";
+  LOG(INFO)
+      << "Initialized globals in state";
 
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef VMILL_RUNTIME_LINUX_RUN_CPP_
-#define VMILL_RUNTIME_LINUX_RUN_CPP_
+#ifndef KLEEMILL_RUNTIME_LINUX_RUN_CPP_
+#define KLEEMILL_RUNTIME_LINUX_RUN_CPP_
 
 namespace {
 
@@ -49,19 +49,17 @@ extern "C" void __kleemill_fini(void) {
 }
 
 // adds new OS task
-extern "C" linux_task *__kleemill_create_task(State &state) {
-  auto native_task = reinterpret_cast<Task &>(state);
+extern "C" linux_task *__kleemill_create_task(State *state,
+                                              Memory *memory) {
   auto task = new linux_task;
-  bzero(task, sizeof(linux_task));
-
-  task->state = native_task.state;
-  task->time_stamp_counter = native_task.time_stamp_counter;
+  memcpy(&(task->state), state, sizeof(State));
+  task->time_stamp_counter = 0;
   task->status = kTaskStatusRunnable;
-  task->continuation = native_task.continuation;
-  task->location = native_task.location;
-  task->last_pc = native_task.last_pc;
-
+  task->location = kTaskStoppedAtSnapshotEntryPoint;
   task->tid = gNextTid++;
+  task->memory = memory;
+  task->last_pc = CurrentPC(task->state);
+  task->continuation = __kleemill_get_lifted_function(memory, task->last_pc);
 
   if (gTaskList) {
     gLastTask->next_circular = task;
@@ -79,14 +77,15 @@ extern "C" linux_task *__kleemill_create_task(State &state) {
 }
 
 // Call into kleemill to execute the actual task.
-extern "C" void __kleemill_run(linux_task *task, Memory *memory){
+extern "C" void __kleemill_run(linux_task *task){
   gCurrent = task;
-  task->continuation(reinterpret_cast<State &>(*task), task->last_pc, memory);
+  task->continuation(reinterpret_cast<State &>(*task),
+                     task->last_pc, task->memory);
   gCurrent = nullptr;
 }
 
 // Called by the executor when all initial tasks are loaded.
-extern "C" void __kleemill_resume(Memory * memory) {
+extern "C" void __kleemill_schedule(void) {
   for (auto progressed = true; progressed; ) {
     progressed = false;
     for (auto task = gTaskList; task; task = task->next) {
@@ -95,7 +94,7 @@ extern "C" void __kleemill_resume(Memory * memory) {
         case kTaskStatusResumable:
           progressed = true;
           if (!task->blocked_count) {
-            __kleemill_run(task, memory);
+            __kleemill_run(task);
           } else {
             task->blocked_count--;
           }
@@ -110,4 +109,4 @@ extern "C" void __kleemill_resume(Memory * memory) {
   }
 }
 
-#endif  // VMILL_RUNTIME_LINUX_RUN_CPP_
+#endif  // KLEEMILL_RUNTIME_LINUX_RUN_CPP_

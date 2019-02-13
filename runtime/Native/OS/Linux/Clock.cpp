@@ -17,9 +17,9 @@
 namespace {
 
 // Emulate a 32-bit `gettimeofday` system call.
-template <typename TimeVal, typename TimeZone>
+template <typename TimeVal, typename TimeZone, typename ABI>
 static Memory *SysGetTimeOfDay(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   addr_t tv_addr = 0;
   addr_t tz_addr = 0;
 
@@ -69,9 +69,9 @@ static Memory *SysGetTimeOfDay(Memory *memory, State *state,
 }
 
 // Emulate a 32-bit `settimeofday` system call.
-template <typename TimeVal, typename TimeZone>
+template <typename TimeVal, typename TimeZone, typename ABI>
 static Memory *SysSetTimeOfDay(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   addr_t tv_addr = 0;
   addr_t tz_addr = 0;
 
@@ -120,9 +120,9 @@ static Memory *SysSetTimeOfDay(Memory *memory, State *state,
   }
 }
 
-template <typename TimeSpec>
+template <typename TimeSpec, typename ABI>
 static Memory *SysClockGetTime(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   clockid_t clock_id = {};  // Might be an `int`, might be an `enum`.
   addr_t tp = 0;
 
@@ -156,9 +156,9 @@ static Memory *SysClockGetTime(Memory *memory, State *state,
 }
 
 
-template <typename TimeSpec>
+template <typename TimeSpec, typename ABI>
 static Memory *SysClockGetResolution(Memory *memory, State *state,
-                                     const SystemCallABI &syscall) {
+                                     const ABI &syscall) {
   clockid_t clock_id = {};
   addr_t res = 0;
 
@@ -193,8 +193,9 @@ static Memory *SysClockGetResolution(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, 0);
 }
 
+template <typename ABI>
 static Memory *SysTime(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   addr_t time_addr = 0;
 
   if (!syscall.TryGetArgs(memory, state, &time_addr)) {

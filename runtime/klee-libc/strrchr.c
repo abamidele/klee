@@ -13,7 +13,7 @@ char *strrchr(const char *t, int c) {
   char ch;
   const char *l=0;
 
-  ch = c;
+  ch = (char) c;
   for (;;) {
     if (*t == ch) l=t; if (!*t) return (char*)l; ++t;
   }

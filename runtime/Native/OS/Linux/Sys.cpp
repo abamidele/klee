@@ -15,8 +15,10 @@
  */
 
 namespace {
+
+template <typename ABI>
 static Memory *SysExit(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   return memory;
   /*
   int exit_code = EXIT_SUCCESS;
@@ -27,14 +29,14 @@ static Memory *SysExit(Memory *memory, State *state,
     STRACE_SUCCESS(exit, "status=%d", exit_code);
   }
 
-  auto task = __vmill_current();
+  auto task = __kleemill_current();
 
   if (task->clear_child_tid) {
     // futex(clear_child_tid, FUTEX_WAKE, 1, NULL, NULL, 0);
     DoWake(task, task->clear_child_tid, ~0U, 1);
   }
 
-  __vmill_set_location(static_cast<addr_t>(task->pc),
+  __kleemill_set_location(static_cast<addr_t>(task->pc),
                        vmill::kTaskStoppedAtExit);
   return memory;
   */
@@ -71,8 +73,9 @@ static Memory *SysExit(Memory *memory, State *state,
 
 
 // Emulate an `sethostname` system call.
+template <typename ABI>
 static Memory *SysSetHostName(Memory *memory, State *state,
-                              const SystemCallABI &syscall) {
+                              const ABI &syscall) {
   addr_t name = 0;
   size_t len = 0;
   if (!syscall.TryGetArgs(memory, state, &name, &len)) {
@@ -128,9 +131,9 @@ static void SetDomainName(const struct utsname &info,
 }
 
 // Emulate the `uname` system calls.
-template <typename T>
+template <typename T, typename ABI>
 static Memory *SysUname(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+                        const ABI &syscall) {
   addr_t buf = 0;
   if (!syscall.TryGetArgs(memory, state, &buf)) {
     STRACE_ERROR(uname, "Couldn't get args");
@@ -148,10 +151,10 @@ static Memory *SysUname(Memory *memory, State *state,
   memcpy(&(compat.nodename[0]), &(info.nodename[0]), sizeof(compat.nodename));
   memcpy(&(compat.release[0]), &(info.release[0]), sizeof(compat.release));
   memcpy(&(compat.version[0]), &(info.version[0]), sizeof(compat.version));
-#if defined(VMILL_RUNTIME_AARCH64)
+#if defined(KLEEMILL_RUNTIME_AARCH64)
   memcpy(&(compat.machine[0]), "aarch64", 8);
-#elif defined(VMILL_RUNTIME_X86)
-# if 32 == VMILL_RUNTIME_X86
+#elif defined(KLEEMILL_RUNTIME_X86)
+# if 32 == KLEEMILL_RUNTIME_X86
   memcpy(&(compat.machine[0]), "i686", 6);
 # else
   memcpy(&(compat.machine[0]), "x86_64", 7);
@@ -173,16 +176,18 @@ static Memory *SysUname(Memory *memory, State *state,
 }
 
 // Emulate an `getuid` system call.
+template <typename ABI>
 static Memory *SysGetUserId(Memory *memory, State *state,
-                            const SystemCallABI &syscall) {
+                            const ABI &syscall) {
   auto id = getuid();
   STRACE_SUCCESS(getuid, "user id=%u", id);
   return syscall.SetReturn(memory, state, id);
 }
 
 // Emulate an `geteuid` system call.
+template <typename ABI>
 static Memory *SysGetEffectiveUserId(Memory *memory, State *state,
-                                     const SystemCallABI &syscall) {
+                                     const ABI &syscall) {
   auto id = geteuid();
   STRACE_SUCCESS(geteuid, "effective user id=%u", id);
   return syscall.SetReturn(memory, state, id);
@@ -190,24 +195,26 @@ static Memory *SysGetEffectiveUserId(Memory *memory, State *state,
 
 
 // Emulate an `getgid` system call.
+template <typename ABI>
 static Memory *SysGetGroupId(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   auto id = getgid();
   STRACE_SUCCESS(getgid, "group id=%u", id);
   return syscall.SetReturn(memory, state, id);
 }
 
 // Emulate an `getegid` system call.
+template <typename ABI>
 static Memory *SysGetEffectiveGroupId(Memory *memory, State *state,
-                                      const SystemCallABI &syscall) {
+                                      const ABI &syscall) {
   auto id = getegid();
   STRACE_SUCCESS(getegid, "effective group id=%u", id);
   return syscall.SetReturn(memory, state, id);
 }
 
-template <typename T>
+template <typename T, typename ABI>
 static Memory *SysGetRlimit(Memory *memory, State *state,
-                            const SystemCallABI &syscall) {
+                            const ABI &syscall) {
   int resource = 0;
   addr_t rlim_addr = 0;
   if (!syscall.TryGetArgs(memory, state, &resource, &rlim_addr)) {
@@ -243,9 +250,9 @@ static Memory *SysGetRlimit(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, 0);
 }
 
-template <typename T>
+template <typename T, typename ABI>
 static Memory *SysGetRESUserId(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   addr_t rid = 0;
   addr_t eid = 0;
   addr_t sid = 0;
@@ -297,9 +304,9 @@ static Memory *SysGetRESUserId(Memory *memory, State *state,
 }
 
 
-template <typename T>
+template <typename T, typename ABI>
 static Memory *SysGetRESGroupId(Memory *memory, State *state,
-                               const SystemCallABI &syscall) {
+                               const ABI &syscall) {
   addr_t rid = 0;
   addr_t eid = 0;
   addr_t sid = 0;
@@ -350,9 +357,9 @@ static Memory *SysGetRESGroupId(Memory *memory, State *state,
   return syscall.SetReturn(memory, state, 0);
 }
 
-template <typename InfoT>
+template <typename InfoT, typename ABI>
 static Memory *SysGetSysInfo(Memory *memory, State *state,
-                             const SystemCallABI &syscall) {
+                             const ABI &syscall) {
   addr_t info_addr = 0;
   if (!syscall.TryGetArgs(memory, state, &info_addr)) {
     STRACE_ERROR(sysinfo, "Couldn't get args");

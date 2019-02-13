@@ -18,10 +18,10 @@
 
 #include <cstdint>
 
+#include "Intrinsics.h"
+
 struct ArchState;
 struct Memory;
-
-typedef Memory * (LiftedFunc)(State &, addr_t, Memory *);
 
 enum TaskStatus : uint64_t {
   // This task is ready to run.
@@ -44,6 +44,7 @@ enum TaskStopLocation : uint64_t {
   kTaskStoppedAtCallTarget,
   kTaskStoppedAtReturnTarget,
   kTaskStoppedAtError,
+  kTaskStoppedBeforeHyperCall,
   kTaskStoppedAfterHyperCall,
   kTaskStoppedBeforeUnhandledHyperCall,
   kTaskStoppedAtUnsupportedInstruction,

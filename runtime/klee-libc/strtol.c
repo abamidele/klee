@@ -31,11 +31,7 @@
  * SUCH DAMAGE.
  */
 
-#include <limits.h>
-#include <ctype.h>
-#include <errno.h>
-#include <stdlib.h>
-
+int isspace(int);
 
 /*
  * Convert a string to a long integer.

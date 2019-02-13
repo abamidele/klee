@@ -65,12 +65,12 @@
 
 namespace {
 
-#ifdef VMILL_RUNTIME_X86
+#ifdef KLEEMILL_RUNTIME_X86
 
 // Emulate the `set_thread_area` system call.
-template <typename T>
+template <typename T, typename ABI>
 static Memory *DoSetThreadArea(Memory *memory, State *state,
-                               const SystemCallABI &syscall,
+                               const ABI &syscall,
                                addr_t addr) {
   T info = {};
   if (!TryReadMemory(memory, addr, &info)) {
@@ -158,7 +158,7 @@ static Memory *DoSetThreadArea(Memory *memory, State *state,
     state->addr.cs_base.dword = info.base_addr;
   }
 
-  auto task = __vmill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
   task->tls_slots[index - kLinuxMinIndexForTLSInGDT] = info;
 
   STRACE_SUCCESS(
@@ -169,9 +169,9 @@ static Memory *DoSetThreadArea(Memory *memory, State *state,
 }
 
 // Emulate the `set_thread_area` system call.
-template <typename T>
+template <typename T, typename ABI>
 static Memory *SysSetThreadArea(Memory *memory, State *state,
-                                const SystemCallABI &syscall) {
+                                const ABI &syscall) {
   addr_t addr = 0;
   if (!syscall.TryGetArgs(memory, state, &addr)) {
     STRACE_ERROR(set_thread_area, "Couldn't get args");
@@ -181,11 +181,14 @@ static Memory *SysSetThreadArea(Memory *memory, State *state,
   return DoSetThreadArea<T>(memory, state, syscall, addr);
 }
 
-#endif  // VMILL_RUNTIME_X86
+#endif  // KLEEMILL_RUNTIME_X86
+
+extern "C" linux_task *__kleemill_create_task(State *state, Memory *memory);
 
 // Emulate the `clone` system call.
+template <typename ABI>
 static Memory *DoClone(Memory *memory, State *state,
-                       const SystemCallABI &syscall, addr_t child_stack,
+                       const ABI &syscall, addr_t child_stack,
                        addr_t flags, addr_t ptid, addr_t newtls, addr_t ctid) {
 
   addr_t thread_flags = CLONE_FILES | CLONE_FS | CLONE_IO |
@@ -196,11 +199,11 @@ static Memory *DoClone(Memory *memory, State *state,
                             CLONE_NEWUTS | CLONE_PARENT;
 
   // TODO(pag): `CLONE_THREAD` is quite complex so we'll ignore it for now.
-
+  auto task = reinterpret_cast<linux_task *>(state);
   if (thread_flags != (thread_flags & flags) &&
       0 != (flags & not_thread_flags)) {
     STRACE_ERROR(clone, "Trying to create a process?");
-    __vmill_set_location(0, vmill::kTaskStoppedAtExit);
+    task->location = kTaskStoppedAtExit;
     return memory;
   }
 
@@ -233,12 +236,12 @@ static Memory *DoClone(Memory *memory, State *state,
   addr_t ret_addr = syscall.GetReturnAddress(
       memory, state, syscall.GetPC(state));
 
-  linux_task *parent = __vmill_current();
-  linux_task *child = __vmill_create_task(
-      parent->state, static_cast<vmill::PC>(ret_addr), parent->memory);
+  linux_task *parent = task;
+  linux_task *child = __kleemill_create_task(&(parent->state),
+                                             parent->memory);
 
   child->last_pc = parent->last_pc;
-  auto child_state = reinterpret_cast<State *>(child->state);
+  auto child_state = reinterpret_cast<State *>(&(child->state));
 
   // Make it so that the child resumes where the parent left off.
   syscall.SetPC(child_state, ret_addr);
@@ -248,8 +251,8 @@ static Memory *DoClone(Memory *memory, State *state,
     syscall.SetSP(child_state, child_stack);
   }
 
-  child->status = vmill::kTaskStatusRunnable;
-  child->location = vmill::kTaskStoppedAfterHyperCall;
+  child->status = kTaskStatusRunnable;
+  child->location = kTaskStoppedAfterHyperCall;
 
   if (CLONE_PARENT_SETTID & flags) {
     (void) TryWriteMemory(memory, ptid, child->tid);
@@ -276,14 +279,14 @@ static Memory *DoClone(Memory *memory, State *state,
   memory = syscall.SetReturn(memory, state, child->tid);
 
   if (CLONE_SETTLS & flags) {
-#if defined(VMILL_RUNTIME_X86)
-# if 32 == VMILL_RUNTIME_X86
+#if defined(KLEEMILL_RUNTIME_X86)
+# if 32 == KLEEMILL_RUNTIME_X86
     memory = DoSetThreadArea<linux_x86_user_desc>(
         memory, child_state, syscall, newtls);
 # else
     child_state->addr.fs_base.aword = newtls;
 # endif
-#elif defined(VMILL_RUNTIME_AARCH64)
+#elif defined(KLEEMILL_RUNTIME_AARCH64)
     child_state->sr.tpidr_el0.aword = newtls;
 #else
 # error "Unsupported architecture!"
@@ -294,8 +297,9 @@ static Memory *DoClone(Memory *memory, State *state,
 }
 
 // Emulate the `clone` system call on x86-64.
+template <typename ABI>
 static Memory *SysCloneA(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   addr_t child_stack = 0;
   addr_t flags = 0;
   addr_t ptid = 0;
@@ -314,8 +318,9 @@ static Memory *SysCloneA(Memory *memory, State *state,
 
 
 // Emulate the `clone` system call on x86, ARMv8.
+template <typename ABI>
 static Memory *SysCloneB(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   addr_t child_stack = 0;
   addr_t flags = 0;
   addr_t ptid = 0;
@@ -332,10 +337,11 @@ static Memory *SysCloneB(Memory *memory, State *state,
                  flags, ptid, newtls, ctid);
 }
 
-#if 64 == VMILL_RUNTIME_X86
+#if 64 == KLEEMILL_RUNTIME_X86
 // Emulate the `arch_prctl` system call on x86, ARMv8.
+template <typename ABI>
 static Memory *SysArchPrctl(Memory *memory, State *state,
-                            const SystemCallABI &syscall) {
+                            const ABI &syscall) {
   int code = 0;
   addr_t addr = 0;
   if (!syscall.TryGetArgs(memory, state, &code, &addr)) {
@@ -345,7 +351,7 @@ static Memory *SysArchPrctl(Memory *memory, State *state,
 
   switch (code) {
     case ARCH_SET_FS:
-      if (!__vmill_can_read_byte(memory, addr)) {
+      if (!__kleemill_can_read_byte(memory, addr)) {
         STRACE_ERROR(
             arch_prctl, "Invalid addr=%" PRIxADDR " for ARCH_SET_FS", addr);
         return syscall.SetReturn(memory, state, -EPERM);
@@ -356,7 +362,7 @@ static Memory *SysArchPrctl(Memory *memory, State *state,
       }
 
     case ARCH_SET_GS:
-      if (!__vmill_can_read_byte(memory, addr)) {
+      if (!__kleemill_can_read_byte(memory, addr)) {
         STRACE_ERROR(
             arch_prctl, "Invalid addr=%" PRIxADDR " for ARCH_SET_GS", addr);
         return syscall.SetReturn(memory, state, -EPERM);
@@ -395,18 +401,19 @@ static Memory *SysArchPrctl(Memory *memory, State *state,
       return syscall.SetReturn(memory, state, -EINVAL);
   }
 }
-#endif  // 64 == VMILL_RUNTIME_X86
+#endif  // 64 == KLEEMILL_RUNTIME_X86
 
 // Emulate the `set_tid_address` system call.
+template <typename ABI>
 static Memory *SysSetThreadIdAddress(Memory *memory, State *state,
-                                     const SystemCallABI &syscall) {
+                                     const ABI &syscall) {
   addr_t tidptr = 0;
   if (!syscall.TryGetArgs(memory, state, &tidptr)) {
     STRACE_ERROR(set_tid_address, "Couldn't get args");
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  auto task = __vmill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
   task->clear_child_tid = tidptr;
   STRACE_SUCCESS(set_tid_address, "clear_child_tid=%" PRIxADDR, tidptr);
   return syscall.SetReturn(memory, state, task->tid);

@@ -83,8 +83,9 @@ const char *FutexCommandName(FutexCommand op) {
   }
 }
 
+template <typename ABI>
 static Memory *DoFutexWaitBitSet(Memory *memory, State *state,
-                                 const SystemCallABI &syscall,
+                                 const ABI &syscall,
                                  addr_t uaddr, uint32_t val,
                                  struct timespec *timeout, uint32_t bitset) {
 
@@ -100,7 +101,7 @@ static Memory *DoFutexWaitBitSet(Memory *memory, State *state,
 
   uint32_t uval = 0;
 
-  auto task = __vmill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
 
   while (true) {
     if (!TryReadMemory(memory, uaddr, &uval) ||
@@ -158,7 +159,10 @@ static Memory *DoFutexWaitBitSet(Memory *memory, State *state,
             "Blocked on uaddr=%" PRIxADDR " with val=%x and uval=%x",
             uaddr, val, uval);
 
-        __vmill_yield(task);
+        // NOTE(pag): This will return out of the hypercall without marking
+        //            the syscall as complete; next time this task is executed
+        //            it will retry the function.
+        return memory;
       }
     }
   }
@@ -191,11 +195,12 @@ static uint32_t DoWake(linux_task *task, addr_t uaddr, uint32_t bitset,
   return num_woken;
 }
 
+template <typename ABI>
 static Memory *DoFutexWakeBitSet(Memory *memory, State *state,
-                                 const SystemCallABI &syscall,
+                                 const ABI &syscall,
                                  addr_t uaddr, uint32_t num_to_wake,
                                  uint32_t bitset) {
-  auto task = __vmill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
   task->blocked_count = 0;
 
   if (0 != (uaddr % sizeof(uint32_t))) {
@@ -257,8 +262,9 @@ static_assert(sizeof(FutexOp) == sizeof(uint32_t),
 //      8 futex_wake_op(u32 __user *uaddr1, unsigned int flags, u32 __user *uaddr2,
 //      1609          int nr_wake, int nr_wake2, int op)
 
+template <typename ABI>
 static Memory *DoFutexWakeOp(Memory *memory, State *state,
-                             const SystemCallABI &syscall,
+                             const ABI &syscall,
                              addr_t uaddr1, unsigned flags,
                              addr_t uaddr2, uint32_t num_to_wake1,
                              uint32_t num_to_wake2, uint32_t op_) {
@@ -343,7 +349,7 @@ static Memory *DoFutexWakeOp(Memory *memory, State *state,
       break;
   }
 
-  auto task = __vmill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
   auto num_woken1 = DoWake(task, uaddr1, ~0U, num_to_wake1);
   uint32_t num_woken2 = 0;
   if (wake_another) {
@@ -358,9 +364,9 @@ static Memory *DoFutexWakeOp(Memory *memory, State *state,
 }
 
 // Emulate a `futex` system call.
-template <typename TimeSpecT>
+template <typename TimeSpecT, typename ABI>
 static Memory *SysFutex(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+                        const ABI &syscall) {
   addr_t uaddr = 0;
   int op = -1;
   unsigned flags = 0;

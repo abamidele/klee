@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2018 Trail of Bits, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wpadded"
+#include "runtime/Native/OS/Linux/SystemCall.cpp"
 
 // 64-bit `svc` system call ABI.
-class AArch64SupervisorCall : public SystemCallABI {
+class AArch64SupervisorCall : public SystemCallABI<AArch64SupervisorCall> {
  public:
-  virtual ~AArch64SupervisorCall(void) = default;
+  ~AArch64SupervisorCall(void) = default;
 
   addr_t GetPC(const State *state) const  {
     return state->gpr.pc.aword;
@@ -42,7 +41,6 @@ class AArch64SupervisorCall : public SystemCallABI {
     return state->gpr.x8.qword;
   }
 
- protected:
   Memory *DoSetReturn(Memory *memory, State *state,
                     addr_t ret_val) const {
     state->gpr.x0.qword = ret_val;
@@ -73,48 +71,21 @@ class AArch64SupervisorCall : public SystemCallABI {
   }
 };
 
-#pragma clang diagnostic pop
-
-/*
-#include "vmill/Runtime/Linux/SystemCall.cpp"
+inline static addr_t CurrentPC(AArch64State &state) {
+  return state.gpr.pc.aword;
+}
 
 extern "C" {
 
-Memory *__remill_async_hyper_call(
-    State &state, addr_t ret_addr, Memory *memory) {
-
-  switch (state.hyper_call) {
-    case AsyncHyperCall::kAArch64SupervisorCall: {
-      AArch64SupervisorCall syscall;
-      memory = AArch64SystemCall(memory, &state, syscall);
-      if (syscall.Completed()) {
-        ret_addr = syscall.GetReturnAddress(memory, &state, ret_addr);
-        state.gpr.pc.aword = ret_addr;
-        __vmill_set_location(ret_addr, vmill::kTaskStoppedAfterHyperCall);
-      }
-      break;
-    }
-
-    default:
-      __vmill_set_location(
-          ret_addr, vmill::kTaskStoppedBeforeUnhandledHyperCall);
-      break;
-  }
-
+Memory *__remill_sync_hyper_call(AArch64State &, Memory *memory, SyncHyperCall::Name) {
+  abort();
   return memory;
 }
 
-Memory *__remill_sync_hyper_call(
-    State &state, Memory *memory, SyncHyperCall::Name call) {
-
-  switch (call) {
-    default:
-      STRACE_ERROR(sync_hyper_call, "%u", call);
-      break;
-  }
-
+Memory *__remill_async_hyper_call(
+    State &state, addr_t ret_addr, Memory *memory) {
+  abort();
   return memory;
 }
 
 }  // extern C
-*/
