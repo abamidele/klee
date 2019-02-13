@@ -445,6 +445,8 @@ int main(int argc, char *argv[3], char *envp[]) {
     return EXIT_FAILURE;
   }
 
+  __kleemill_init();
+
   Memory *memory = nullptr;
   Task task;
   gCurrent = &task;
@@ -453,12 +455,14 @@ int main(int argc, char *argv[3], char *envp[]) {
   memcpy(&memory, argv[2], sizeof(memory));
 
   task.time_stamp_counter = 0;
+  task.status = kTaskStatusRunnable;
   task.location = kTaskStoppedAtSnapshotEntryPoint;
   task.last_pc = CurrentPC(task.state);
   task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
 
-  memory = task.continuation(task.state, task.last_pc, memory);
-
+  __kleemill_create_task(task.state);
+  __kleemill_resume(memory);
+  __kleemill_fini();
   return EXIT_SUCCESS;
 }
 

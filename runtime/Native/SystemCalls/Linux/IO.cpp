@@ -44,8 +44,10 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
 }
 
 // Emulate a `read` system call.
+
+template <typename ABI>
 static Memory *SysRead(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   addr_t size = 0;
@@ -92,8 +94,10 @@ static int DoWrite(Memory *memory, int fd, addr_t buf, size_t size,
 }
 
 // Emulate a `read` system call.
+
+template <typename ABI>
 static Memory *SysWrite(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+                        const ABI &syscall) {
   int fd = -1;
   addr_t buf = 0;
   addr_t size = 0;
@@ -119,8 +123,9 @@ static Memory *SysWrite(Memory *memory, State *state,
 }
 
 // Emulate a `readv` system call.
+template <typename ABI>
 static Memory *SysReadV(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int fd = -1;
   addr_t iov = 0;
   addr_t iovcount = 0;
@@ -154,8 +159,10 @@ static Memory *SysReadV(Memory *memory, State *state,
 }
 
 // Emulate a `writev` system call.
+
+template <typename ABI>
 static Memory *SysWriteV(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int fd = -1;
   addr_t iov = 0;
   addr_t iovcount = 0;
@@ -192,8 +199,10 @@ static Memory *SysWriteV(Memory *memory, State *state,
 }
 
 // Emulate an `open` system call.
+
+template <typename ABI>
 static Memory *SysOpen(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   addr_t path = 0;
   int oflag = 0;
   mode_t mode = 0;
@@ -231,8 +240,10 @@ static Memory *SysOpen(Memory *memory, State *state,
 }
 
 // Emulate an `openat` system call.
+
+template <typename ABI>
 static Memory *SysOpenAt(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   int dirfd = -1;
   addr_t path = 0;
   int oflag = 0;
@@ -271,8 +282,10 @@ static Memory *SysOpenAt(Memory *memory, State *state,
 }
 
 // Emulate a `close` system call.
+
+template <typename ABI>
 static Memory *SysClose(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+                        const ABI &syscall) {
   int fd = -1;
   if (!syscall.TryGetArgs(memory, state, &fd)) {
     STRACE_ERROR(close, "Couldn't get args");
@@ -291,8 +304,10 @@ static Memory *SysClose(Memory *memory, State *state,
 }
 
 // Emulate an `ioctl` system call.
+
+template <typename ABI>
 static Memory *SysIoctl(Memory *memory, State *state,
-                        const SystemCallABI &syscall) {
+                        const ABI &syscall) {
   int fd = -1;
   unsigned long cmd = 0;
   addr_t argp = 0;
@@ -437,8 +452,10 @@ static Memory *SysIoctl(Memory *memory, State *state,
 }
 
 // Emulate a `poll` system call.
+
+template <typename ABI>
 static Memory *SysPoll(Memory *memory, State *state,
-                       const SystemCallABI &syscall) {
+                       const ABI &syscall) {
   addr_t fds = 0;
   uint32_t nfds = 0;
   int timeout_msec = 0;

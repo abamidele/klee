@@ -33,12 +33,12 @@ uint64_t DR6;
 uint64_t DR7;
 
 // Control regs.
-CR0Reg CR0;
-CR1Reg CR1;
-CR2Reg CR2;
-CR3Reg CR3;
-CR4Reg CR4;
-CR8Reg CR8;
+CR0Reg gCR0;
+CR1Reg gCR1;
+CR2Reg gCR2;
+CR3Reg gCR3;
+CR4Reg gCR4;
+CR8Reg gCR8;
 
 }  // extern C
 
@@ -46,19 +46,19 @@ class X86BaseSystemCall : public SystemCallABI {
  public:
   virtual ~X86BaseSystemCall(void) {}
 
-  addr_t GetPC(const State *state) const final {
+  addr_t GetPC(const State *state) const  {
     return state->gpr.rip.aword;
   }
 
-  void SetPC(State *state, addr_t new_pc) const final {
+  void SetPC(State *state, addr_t new_pc) const  {
     state->gpr.rip.aword = new_pc;
   }
 
-  void SetSP(State *state, addr_t new_sp) const final {
+  void SetSP(State *state, addr_t new_sp) const  {
     state->gpr.rsp.aword = new_sp;
   }
 
-  addr_t GetSystemCallNum(Memory *, State *state) const final {
+  addr_t GetSystemCallNum(Memory *, State *state) const  final {
     return state->gpr.rax.aword;
   }
 };
@@ -68,7 +68,7 @@ class X86Int0x80SystemCall : public X86BaseSystemCall {
  public:
   virtual ~X86Int0x80SystemCall(void) = default;
 
-  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const final {
+  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
     return ret_addr;
   }
 
@@ -84,7 +84,7 @@ class X86Int0x80SystemCall : public X86BaseSystemCall {
   }
 
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64_compat.S.html#283
-  addr_t GetArg(Memory *&memory, State *state, int i) const final {
+  addr_t GetArg(Memory *&memory, State *state, int i) const  final {
     switch (i) {
       case 0:
         return state->gpr.rbx.aword;
@@ -111,7 +111,7 @@ class X86SysEnter32SystemCall : public X86BaseSystemCall {
 
   // Find the return address of this system call.
   addr_t GetReturnAddress(Memory *memory, State *,
-                          addr_t ret_addr) const final {
+                          addr_t ret_addr) const {
     addr_t addr = ret_addr;
     for (addr_t i = 0; i < 15; ++i) {
       uint8_t b0 = 0;
@@ -129,7 +129,7 @@ class X86SysEnter32SystemCall : public X86BaseSystemCall {
     return addr;
   }
 
-  bool CanReadArgs(Memory *memory, State *state, int num_args) const final {
+  bool CanReadArgs(Memory *memory, State *state, int num_args) const  {
     if (num_args == 6) {
       addr_t arg6_addr = state->gpr.rbp.aword;
       return CanReadMemory(memory, arg6_addr, sizeof(addr_t));
@@ -140,13 +140,13 @@ class X86SysEnter32SystemCall : public X86BaseSystemCall {
 
  protected:
   Memory *DoSetReturn(Memory *memory, State *state,
-                      addr_t ret_val) const final {
+                      addr_t ret_val) const {
     state->gpr.rax.aword = ret_val;
     return memory;
   }
 
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64_compat.S.html#38
-  addr_t GetArg(Memory *&memory, State *state, int i) const final {
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
       case 0:
         return state->gpr.rbx.aword;
@@ -171,23 +171,23 @@ class Amd64SyscallSystemCall : public X86BaseSystemCall {
  public:
   virtual ~Amd64SyscallSystemCall(void) = default;
 
-  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const final {
+  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
     return ret_addr;
   }
 
  protected:
   Memory *DoSetReturn(Memory *memory, State *state,
-                      addr_t ret_val) const final {
+                      addr_t ret_val) const {
     state->gpr.rax.aword = ret_val;
     return memory;
   }
 
-  bool CanReadArgs(Memory *, State *, int num_args) const final {
+  bool CanReadArgs(Memory *, State *, int num_args) const {
     return num_args <= 6;
   }
 
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64.S.html#106
-  addr_t GetArg(Memory *&memory, State *state, int i) const final {
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
       case 0:
         return state->gpr.rdi.aword;
@@ -234,6 +234,11 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr, Memory *memory)
             state.gpr.rip.aword = ret_addr;
             state.gpr.rcx.aword = ret_addr;
             task.location = kTaskStoppedAfterHyperCall;
+            task.continuation = 
+                __kleemill_get_lifted_function(memory, ret_addr);
+        } else {
+            STRACE_ERROR(sync_hyper_call, "unhandled async hyper call\n");
+            // perform unhandled syscall routine
         }
         break;
       }

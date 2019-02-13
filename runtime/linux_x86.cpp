@@ -44,16 +44,17 @@
 #include "remill/Arch/Runtime/Intrinsics.cpp"
 #include "remill/Arch/X86/Runtime/State.h"
 
-#include "Intrinsic/Intrinsics.cpp"
-#include "Intrinsic/Memory.cpp"
 #include "klee-libc/klee-libc.h"
+#include "Intrinsic/Intrinsics.cpp"
+#include "Native/Intrinsics.h"
 
-#include "SystemCalls/Linux/Run.h"
+#include "Native/Memory.cpp"
+#include "Native/SystemCalls/Linux/Run.h"
 #include "Native/Task.h"
+#include "Native/SystemCalls/Linux/Run.cpp"
 #include "Native/X86.cpp"
-
-#include "SystemCalls/Linux/SystemCallABI.h"
-#include "SystemCalls/Linux/X86.cpp"
+#include "Native/SystemCalls/Linux/SystemCallABI.h"
+#include "Native/SystemCalls/Linux/X86.cpp"
 
 
 #pragma clang diagnostic pop

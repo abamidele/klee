@@ -30,11 +30,11 @@ static char gHostName[HOST_NAME_MAX + 1] = {};
 
 }  // namespace
 
-//#include "Clock.cpp"
-//#include "FS.cpp"
+#include "Clock.cpp"
+#include "FS.cpp"
 //#include "Futex.cpp"
-//#include "IO.cpp"
-//#include "MM.cpp"
+#include "IO.cpp"
+#include "MM.cpp"
 //#include "Net.cpp"
 //#include "Process.cpp"
 //#include "Sys.cpp"
@@ -152,9 +152,8 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
                                const SystemCallABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
   STRACE_SYSCALL_NUM(syscall_num);
-  exit(0);
+  puts("amd 64 syscall\n");
   switch (syscall_num) {
-    /*
     case 0: return SysRead(memory, state, syscall);
     case 1: return SysWrite(memory, state, syscall);
     case 2: return SysOpen(memory, state, syscall);
@@ -168,6 +167,7 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 10: return SysMprotect(memory, state, syscall);
     case 11: return SysMunmap(memory, state, syscall);
     case 12: return SysBrk(memory, state, syscall);
+    /*
     case 13:
       STRACE_ERROR(rt_sigaction, "Suppressed");
       return syscall.SetReturn(memory, state, 0);

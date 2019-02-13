@@ -20,7 +20,6 @@ docs/doxygen.cfg
 include/klee/Config/CompileTimeInfo.h
 *.config
 
-config.h
 site.exp
 
 # Site file for llvm-lit

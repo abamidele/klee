@@ -20,7 +20,7 @@ inline static addr_t CurrentPC(X86State &state) {
 }
 
 #include "Task.cpp"
-#include "../SystemCalls/Linux/Run.h"
+#include "SystemCalls/Linux/Run.h"
 
 extern "C" {
 

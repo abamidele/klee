@@ -47,7 +47,7 @@ enum TaskStopLocation : uint64_t {
   kTaskStoppedAfterHyperCall,
   kTaskStoppedBeforeUnhandledHyperCall,
   kTaskStoppedAtUnsupportedInstruction,
-  kTaskStoppedAtExit
+  kTaskStoppedAtExit,
 };
 
 inline static bool CanContinue(TaskStopLocation loc) {
@@ -80,6 +80,7 @@ struct Task {
   State state;
   uint64_t time_stamp_counter;
   LiftedFunc *continuation;
+  TaskStatus status;
   TaskStopLocation location;
   addr_t last_pc;
 };

@@ -22,38 +22,38 @@ class AArch64SupervisorCall : public SystemCallABI {
  public:
   virtual ~AArch64SupervisorCall(void) = default;
 
-  addr_t GetPC(const State *state) const final {
+  addr_t GetPC(const State *state) const  {
     return state->gpr.pc.aword;
   }
 
-  void SetPC(State *state, addr_t new_pc) const final {
+  void SetPC(State *state, addr_t new_pc) const  {
     state->gpr.pc.aword = new_pc;
   }
 
-  void SetSP(State *state, addr_t new_sp) const final {
+  void SetSP(State *state, addr_t new_sp) const {
     state->gpr.sp.aword = new_sp;
   }
 
-  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const final {
+  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
     return ret_addr;
   }
 
-  addr_t GetSystemCallNum(Memory *, State *state) const final {
+  addr_t GetSystemCallNum(Memory *, State *state) const {
     return state->gpr.x8.qword;
   }
 
  protected:
   Memory *DoSetReturn(Memory *memory, State *state,
-                    addr_t ret_val) const final {
+                    addr_t ret_val) const {
     state->gpr.x0.qword = ret_val;
     return memory;
   }
 
-  bool CanReadArgs(Memory *, State *, int num_args) const final {
+  bool CanReadArgs(Memory *, State *, int num_args) const {
     return num_args <= 6;
   }
 
-  addr_t GetArg(Memory *&memory, State *state, int i) const final {
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
       case 0:
         return state->gpr.x0.qword;

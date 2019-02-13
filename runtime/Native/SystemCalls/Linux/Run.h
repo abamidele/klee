@@ -28,6 +28,8 @@
 # define __USE_ATFILE
 #endif
 
+#include "../../Task.h"
+
 #include <algorithm>
 #include <csignal>
 #include <ctime>
@@ -52,6 +54,7 @@
 # include <sys/sysinfo.h>
 # include <sys/vfs.h>  // Maybe `sys/statfs.h` on other systems.
 #endif  // __linux__
+
 
 #if defined(__APPLE__)
 static_assert(sizeof(off_t) == 8, "Expected macOS `off_t` to be 64-bits.");
@@ -400,7 +403,7 @@ static constexpr unsigned kBlockedForever = ~0U;
 #pragma clang diagnostic ignored "-Wpadded"
 
 // State needed to emulate a Linux thread.
-struct linux_task {
+struct linux_task: public Task {
  public:
   linux_task *next;
   linux_task *next_circular;
@@ -424,10 +427,6 @@ struct linux_task {
 
 // Returns a pointer to the currently executing task.
 extern "C" linux_task *__kleemill_current(void);
-
-// Add a task to the operating system.
-extern "C" linux_task *__kleemill_create_task(
-    const void *state, addr_t pc, Memory *memory);
 
 }  // namespace
 

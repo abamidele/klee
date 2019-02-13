@@ -17,7 +17,6 @@
 #ifndef VMILL_RUNTIME_LINUX_RUN_CPP_
 #define VMILL_RUNTIME_LINUX_RUN_CPP_
 
-namespace vmill {
 namespace {
 
 static linux_task *gTaskList = nullptr;
@@ -28,20 +27,20 @@ static linux_task *gLastTask = nullptr;
 static pid_t gNextTid = kProcessId;
 
 // Initialize the emulated Linux operating system.
-extern "C" void __vmill_init(void) {
+extern "C" void __kleemill_init(void) {
   gNextTid = kProcessId;
   gTaskList = nullptr;
   gLastTask = nullptr;
 }
 
 // Tear down the emulated Linux operating system.
-extern "C" void __vmill_fini(void) {
+extern "C" void __kleemill_fini(void) {
   linux_task *next_task = nullptr;
   for (auto task = gTaskList; task; task = next_task) {
     next_task = task->next;
     task->next = nullptr;
     task->next_circular = nullptr;
-    __vmill_fini_task(task);
+
     delete task;
   }
 
@@ -49,13 +48,18 @@ extern "C" void __vmill_fini(void) {
   gLastTask = nullptr;
 }
 
-// Add a task to the operating system.
-extern "C" linux_task *__vmill_create_task(
-    const void *state, vmill::PC pc, vmill::AddressSpace *memory) {
+// adds new OS task
+extern "C" linux_task *__kleemill_create_task(State &state) {
+  auto native_task = reinterpret_cast<Task &>(state);
   auto task = new linux_task;
   bzero(task, sizeof(linux_task));
 
-  __vmill_init_task(task, state, pc, memory);
+  task->state = native_task.state;
+  task->time_stamp_counter = native_task.time_stamp_counter;
+  task->status = kTaskStatusRunnable;
+  task->continuation = native_task.continuation;
+  task->location = native_task.location;
+  task->last_pc = native_task.last_pc;
 
   task->tid = gNextTid++;
 
@@ -74,20 +78,24 @@ extern "C" linux_task *__vmill_create_task(
   return task;
 }
 
-// Call into vmill to execute the actual task.
-extern "C" void __vmill_run(linux_task *task);
+// Call into kleemill to execute the actual task.
+extern "C" void __kleemill_run(linux_task *task, Memory *memory){
+  gCurrent = task;
+  task->continuation(reinterpret_cast<State &>(*task), task->last_pc, memory);
+  gCurrent = nullptr;
+}
 
 // Called by the executor when all initial tasks are loaded.
-extern "C" void __vmill_resume(void) {
+extern "C" void __kleemill_resume(Memory * memory) {
   for (auto progressed = true; progressed; ) {
     progressed = false;
     for (auto task = gTaskList; task; task = task->next) {
       switch (task->status) {
-        case vmill::kTaskStatusRunnable:
-        case vmill::kTaskStatusResumable:
+        case kTaskStatusRunnable:
+        case kTaskStatusResumable:
           progressed = true;
           if (!task->blocked_count) {
-            __vmill_run(task);
+            __kleemill_run(task, memory);
           } else {
             task->blocked_count--;
           }
@@ -101,7 +109,5 @@ extern "C" void __vmill_resume(void) {
     }
   }
 }
-
-}  // namespace vmill
 
 #endif  // VMILL_RUNTIME_LINUX_RUN_CPP_

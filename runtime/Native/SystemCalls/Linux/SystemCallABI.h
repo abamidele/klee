@@ -34,17 +34,17 @@ class SystemCallABI {
 
   virtual ~SystemCallABI(void) = default;
 
-  virtual addr_t GetPC(const State *state) const = 0;
-  virtual void SetPC(State *state, addr_t new_pc) const = 0;
-  virtual void SetSP(State *state, addr_t new_sp) const = 0;
+  //virtual addr_t GetPC(const State *state) const = 0;
+  //virtual void SetPC(State *state, addr_t new_pc) const = 0;
+  //virtual void SetSP(State *state, addr_t new_sp) const = 0;
 
   inline bool Completed(void) {
     return completed;
   }
 
   // Find the return address of this system call.
-  virtual addr_t GetReturnAddress(Memory *memory, State *state,
-                                  addr_t ret_addr) const = 0;
+  //virtual addr_t GetReturnAddress(Memory *memory, State *state,
+  //                                addr_t ret_addr) const = 0;
 
   template <typename T1>
   inline bool TryGetArgs(Memory *memory, State *state,

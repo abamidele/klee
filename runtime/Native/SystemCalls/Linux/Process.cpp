@@ -43,7 +43,7 @@ static Memory *SysGetProcessGroupId(Memory *memory, State *state,
 // Emulate an `gettid` system call.
 static Memory *SysGetThreadId(Memory *memory, State *state,
                               const SystemCallABI &syscall) {
-  auto current = __vmill_current();
+  auto current = reinterpret_cast<Task *>(state);
   auto id = current->tid;
   STRACE_SUCCESS(gettid, "thread id=%u", id);
   return syscall.SetReturn(memory, state, id);

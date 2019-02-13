@@ -253,6 +253,7 @@ void SpecialFunctionHandler::handle__kleemill_free_memory(
 void SpecialFunctionHandler::handle__kleemill_allocate_memory(
     ExecutionState &state, KInstruction *target, 
     std::vector<ref<Expr> > &arguments) {
+
   
 }
 

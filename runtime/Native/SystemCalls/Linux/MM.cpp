@@ -34,8 +34,9 @@ static constexpr addr_t kAllocMax = IF_64BIT_ELSE((1ULL << 47ULL),
                                                   0xf7000000);
 
 // Emulate an `brk` system call.
+template <typename ABI>
 static Memory *SysBrk(Memory *memory, State *state,
-                      const SystemCallABI &syscall) {
+                      const ABI &syscall) {
   addr_t addr = 0;
   if (!syscall.TryGetArgs(memory, state, &addr)) {
     STRACE_ERROR(brk, "Can't get args");
@@ -59,8 +60,9 @@ static Memory *SysBrk(Memory *memory, State *state,
 #endif
 
 // Emulate an `mmap` system call.
+template <typename ABI>
 static Memory *SysMmap(Memory *memory, State *state,
-                       const SystemCallABI &syscall,
+                       const ABI &syscall,
                        addr_t offset_scale=1) {
   addr_t addr = 0;
   addr_t size = 0;
@@ -286,8 +288,9 @@ static Memory *SysMmap(Memory *memory, State *state,
 }
 
 // Emulate an `munmap` system call.
+template <typename ABI>
 static Memory *SysMunmap(Memory *memory, State *state,
-                         const SystemCallABI &syscall) {
+                         const ABI &syscall) {
   addr_t addr = 0;
   addr_t size = 0;
   if (!syscall.TryGetArgs(memory, state, &addr, &size)) {
@@ -313,8 +316,10 @@ static Memory *SysMunmap(Memory *memory, State *state,
 
 
 // Emulate an `mprotect` system call.
+
+template <typename ABI>
 static Memory *SysMprotect(Memory *memory, State *state,
-                           const SystemCallABI &syscall) {
+                           const ABI &syscall) {
   addr_t addr = 0;
   addr_t size = 0;
   int prot = 0;
