@@ -518,13 +518,13 @@ static bool ReadPageInfoLine(const std::string &line,
   if (strstr(path, "[stack]")) {
     info->set_kind(klee::native::snapshot::kLinuxStackPageRange);
 
-    auto curr_stack_size = end - begin;
-    auto new_stack_size = std::max(curr_stack_size, GetMaxStackSize());
-
-    info->set_base(static_cast<int64_t>(end - new_stack_size & kPageMask));
-
-    LOG(INFO)
-        << "New stack base is " << std::hex << info->base() << std::dec;
+//    auto curr_stack_size = end - begin;
+//    auto new_stack_size = std::max(curr_stack_size, GetMaxStackSize());
+//
+//    info->set_base(static_cast<int64_t>(end - new_stack_size & kPageMask));
+//
+//    LOG(INFO)
+//        << "New stack base is " << std::hex << info->base() << std::dec;
 
   } else if (strstr(path, "[vvar]")) {
     info->set_kind(klee::native::snapshot::kLinuxVVarPageRange);
