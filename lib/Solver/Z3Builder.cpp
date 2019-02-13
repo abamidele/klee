@@ -49,8 +49,8 @@ inline static A GetZ3Error(A (*func)(B, C), B b, C c) {
 }
 
 template <typename A, typename B, typename C>
-inline static A GetZ3Error(A (*func)(B), B b, C c) {
-  return func(b);
+inline static A GetZ3Error(A (*func)(C), B b, C c) {
+  return func(c);
 }
 
 void custom_z3_error_handler(Z3_context ctx, Z3_error_code ec) {
