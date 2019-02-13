@@ -611,6 +611,8 @@ static void CopyTraceeMemory(
     CHECK(-1 != dest_fd)
         << "Can't open " << dest_path << " for writing.";
 
+    CHECK_LE(static_cast<uint64_t>(info.base()),
+             static_cast<uint64_t>(info.limit()));
     auto size_to_copy = static_cast<uint64_t>(info.limit() - info.base());
     ftruncate(dest_fd, size_to_copy);
 
