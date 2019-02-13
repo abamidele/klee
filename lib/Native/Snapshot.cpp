@@ -81,6 +81,13 @@ enum : int {
   kMaxNumAttempts = 10
 };
 
+enum : size_t {
+  kPageBuffSize = 4096ULL,
+  kPageMask = ~(kPageBuffSize - 1ULL)
+};
+
+static char gPageBuff[kPageBuffSize];
+
 static int gTraceeArgc = 0;
 
 static char **gTraceeArgv = nullptr;
@@ -514,7 +521,7 @@ static bool ReadPageInfoLine(const std::string &line,
     auto curr_stack_size = end - begin;
     auto new_stack_size = std::max(curr_stack_size, GetMaxStackSize());
 
-    info->set_base(static_cast<int64_t>(end - new_stack_size));
+    info->set_base(static_cast<int64_t>(end - new_stack_size & kPageMask));
 
     LOG(INFO)
         << "New stack base is " << std::hex << info->base() << std::dec;
@@ -576,12 +583,6 @@ static bool CopyTraceeMemoryWithPtrace(pid_t pid, uint64_t addr,
 
   return true;
 }
-
-enum {
-  kPageBuffSize = 4096
-};
-
-static char gPageBuff[kPageBuffSize];
 
 // Copy memory from the tracee into the snapshot file.
 static void CopyTraceeMemory(
