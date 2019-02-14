@@ -427,8 +427,6 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   State *state = reinterpret_cast<State *>(argv[1]);
   Task *task = __kleemill_create_task(state, memory);
-  gCurrent = task;
-
   __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;

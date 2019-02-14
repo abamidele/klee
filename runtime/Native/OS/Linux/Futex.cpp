@@ -171,9 +171,9 @@ static Memory *DoFutexWaitBitSet(Memory *memory, State *state,
 static uint32_t DoWake(linux_task *task, addr_t uaddr, uint32_t bitset,
                        uint32_t num_to_wake) {
   uint32_t num_woken = 0;
-  for (auto next_task = task->next_circular;
+  for (auto next_task = *(task->next_circular);
        next_task != task;
-       next_task = next_task->next_circular) {
+       next_task = *(next_task->next_circular)) {
 
     // Tasks in different address spaces can't share futexes (in vmill).
     if (task->memory != next_task->memory) {

@@ -52,6 +52,7 @@ extern "C" void __kleemill_fini(void) {
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory) {
   auto task = new linux_task;
+  memset(task, 0, sizeof(task));
   memcpy(&(task->state), state, sizeof(State));
   task->time_stamp_counter = 0;
   task->status = kTaskStatusRunnable;
@@ -60,28 +61,19 @@ extern "C" linux_task *__kleemill_create_task(State *state,
   task->memory = memory;
   task->last_pc = CurrentPC(task->state);
   task->continuation = __kleemill_get_lifted_function(memory, task->last_pc);
-
-  if (gTaskList) {
-    gLastTask->next_circular = task;
-    task->next_circular = gTaskList;
-
-  } else {
-    gLastTask = task;
-    task->next_circular = task;
-  }
+  task->blocked_count = 0;
+  task->wake_count = 0;
 
   task->next = gTaskList;
   gTaskList = task;
 
-  return task;
-}
+  if (!gTaskList) {
+    task->next_circular = &gTaskList;
+  } else {
+    task->next_circular = &(task->next);
+  }
 
-// Call into kleemill to execute the actual task.
-extern "C" void __kleemill_run(linux_task *task){
-  gCurrent = task;
-  task->continuation(reinterpret_cast<State &>(*task),
-                     task->last_pc, task->memory);
-  gCurrent = nullptr;
+  return task;
 }
 
 // Called by the executor when all initial tasks are loaded.
@@ -90,20 +82,52 @@ extern "C" void __kleemill_schedule(void) {
     progressed = false;
     for (auto task = gTaskList; task; task = task->next) {
       switch (task->status) {
-        case kTaskStatusRunnable:
+
         case kTaskStatusResumable:
-          progressed = true;
-          if (!task->blocked_count) {
-            __kleemill_run(task);
-          } else {
+          if (task->blocked_count) {
             task->blocked_count--;
+            break;
+          } else {
+            task->status = kTaskStatusRunnable;
           }
+          [[clang::fallthrough]];
+
+        case kTaskStatusRunnable:
+          progressed = true;
+          if (task->blocked_count) {
+            puts("Cannot have a runnable task with non-zero blocked count\n");
+            abort();
+          }
+
+          gCurrent = task;
+          printf("executing\n");
+          task->continuation(reinterpret_cast<State &>(*task),
+                             task->last_pc, task->memory);
+          gCurrent = nullptr;
           break;
 
         default:
           printf("Task status %p = %" PRIx64 "\n",
                  reinterpret_cast<void *>(&(task->status)), task->status);
           break;
+      }
+    }
+
+    // Unblock any blocked tasks. This will count down all `blocked_count`s
+    // until at least one of them becomes unblocked.
+    for (auto try_again = true; try_again && !progressed; ) {
+      try_again = false;
+      for (auto task = gTaskList; task; task = task->next) {
+        if (kTaskStatusResumable == task->status) {
+          if (task->blocked_count) {
+            task->blocked_count--;
+            try_again = true;
+
+          } else {
+            task->status = kTaskStatusRunnable;
+            progressed = true;
+          }
+        }
       }
     }
   }
