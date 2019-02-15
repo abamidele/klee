@@ -171,10 +171,13 @@ class SpecialFunctionHandler {
  
   HANDLER(handle__remill_write_64);
   HANDLER(handle__remill_write_32);
+  HANDLER(handle__remill_write_f32);
   HANDLER(handle__remill_write_16);
   HANDLER(handle__remill_write_8);
+  HANDLER(handle__remill_read_f64);
   HANDLER(handle__remill_read_64);
   HANDLER(handle__remill_read_32);
+  HANDLER(handle__remill_read_f32);
   HANDLER(handle__remill_read_16);
   HANDLER(handle__remill_read_8);
   

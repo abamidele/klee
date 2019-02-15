@@ -189,7 +189,7 @@ int main(int argc, char **argv, char **envp) {
       "",
       "main"  /* Entrypoint */,
       true  /* Optimize */,
-      true  /* Check div by zero */,
+      false  /* Check div by zero */,
       false  /* Check overshift */);
 
   klee::Interpreter::InterpreterOptions interp_options;
