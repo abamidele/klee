@@ -1094,38 +1094,38 @@ class SocketCallABI : public SystemCallABI<SocketCallABI<AddrT, InABI>> {
         arg_addr(arg_addr_),
         padding(0) {}
 
-  addr_t GetPC(const State *state) const final {
+  addr_t GetPC(const State *state) const {
     return syscall.GetPC(state);
   }
 
-  void SetPC(State *state, addr_t new_pc) const final {
+  void SetPC(State *state, addr_t new_pc) const {
     syscall.SetPC(state, new_pc);
   }
 
-  void SetSP(State *state, addr_t new_sp) const final {
+  void SetSP(State *state, addr_t new_sp) const {
     syscall.SetSP(state, new_sp);
   }
 
   addr_t GetReturnAddress(Memory *memory, State *state,
-                          addr_t ret_addr) const final {
+                          addr_t ret_addr) const {
     return syscall.GetReturnAddress(memory, state, ret_addr);
   }
 
-  addr_t GetSystemCallNum(Memory *memory, State *state) const final {
+  addr_t GetSystemCallNum(Memory *memory, State *state) const {
     return syscall.GetSystemCallNum(memory, state);
   }
 
   Memory *DoSetReturn(Memory *memory, State *state,
-                      addr_t ret_val) const final {
+                      addr_t ret_val) const  {
     return syscall.SetReturn(memory, state, ret_val);
   }
 
-  bool CanReadArgs(Memory *memory, State *, int num_args) const final {
+  bool CanReadArgs(Memory *memory, State *, int num_args) const {
     return CanReadMemory(
         memory, arg_addr, static_cast<size_t>(num_args) * sizeof(AddrT));
   }
 
-  addr_t GetArg(Memory *&memory, State *state, int i) const final {
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
     return ReadMemory<AddrT>(
         memory,
         arg_addr + static_cast<addr_t>(static_cast<addr_t>(i) * sizeof(AddrT)));

@@ -190,7 +190,7 @@ int main(int argc, char **argv, char **envp) {
       "main"  /* Entrypoint */,
       true  /* Optimize */,
       true  /* Check div by zero */,
-      true  /* Check overshift */);
+      false  /* Check overshift */);
 
   klee::Interpreter::InterpreterOptions interp_options;
   interp_options.MakeConcreteSymbolic = false;

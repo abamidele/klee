@@ -1,5 +1,2 @@
-templatize system call ABI
-Add scheduling
-fix alllocate function in special function handler
 Add incomplete system call status to task and modify else case in `__remill_async_hyper_call`
 Figure out issue with klee overshift intrinsic

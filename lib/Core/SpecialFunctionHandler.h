@@ -180,6 +180,8 @@ class SpecialFunctionHandler {
   
   HANDLER(handle__llvm_ctpop);
 
+  HANDLER(handle__klee_overshift_check);
+
 #undef HANDLER
 };
 }  // End klee namespace

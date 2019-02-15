@@ -168,7 +168,6 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 10: return SysMprotect(memory, state, syscall);
     case 11: return SysMunmap(memory, state, syscall);
     case 12: return SysBrk(memory, state, syscall);
-    /*
     case 13:
       STRACE_ERROR(rt_sigaction, "Suppressed");
       return syscall.SetReturn(memory, state, 0);
@@ -206,30 +205,29 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 97: return SysGetRlimit<linux_rlimit>(memory, state, syscall);
     case 102: return SysGetUserId(memory, state, syscall);
     case 158: return SysArchPrctl(memory, state, syscall);
-    case 202: return SysFutex<linux64_timespec>(memory, state, syscall);
+    //case 202: return SysFutex<linux64_timespec>(memory, state, syscall);
     case 218: return SysSetThreadIdAddress(memory, state, syscall);
-*/
-/*
-    case 13: return SysTime(memory, state, syscall);
+    //case 13: return SysTime(memory, state, syscall);
     case 24: return SysGetUserId(memory, state, syscall);
-    case 39: return SysMakeDirectory(memory, state, syscall);
+    //case 39: return SysMakeDirectory(memory, state, syscall);
     case 40: return SysRemoveDirectory(memory, state, syscall);
-    case 47: return SysGetGroupId(memory, state, syscall);
-    case 49: return SysGetEffectiveUserId(memory, state, syscall);
-    case 50: return SysGetEffectiveGroupId(memory, state, syscall);
+    //case 47: return SysGetGroupId(memory, state, syscall);
+    //case 49: return SysGetEffectiveUserId(memory, state, syscall);
+    //case 50: return SysGetEffectiveGroupId(memory, state, syscall);
     case 59: return SysUname<linux_oldold_utsname>(memory, state, syscall);
     case 64: return SysGetParentProcessId(memory, state, syscall);
     case 65: return SysGetProcessGroupId(memory, state, syscall);
     case 74: return SysSetHostName(memory, state, syscall);
     case 76: return SysGetRlimit<linux_rlimit>(memory, state, syscall);
-    case 78:
-      return SysGetTimeOfDay<linux32_timeval, linux32_timezone>(
-          memory, state, syscall);
-    case 79:
-      return SysSetTimeOfDay<linux32_timeval, linux32_timezone>(
-          memory, state, syscall);
-    case 85: return SysReadLink(memory, state, syscall);
-    case 102: return SysSocketCall<uint32_t>(memory, state, syscall);
+    //case 78:
+    //  return SysGetTimeOfDay<linux32_timeval, linux32_timezone>(
+    //      memory, state, syscall);
+    //case 79:
+    //  return SysSetTimeOfDay<linux32_timeval, linux32_timezone>(
+    //      memory, state, syscall);
+    //case 85: return SysReadLink(memory, state, syscall);
+    //case 102: return SysSocketCall<uint32_t>(memory, state, syscall);
+    /*
     case 109: return SysUname<linux_old_utsname>(memory, state, syscall);
     case 116: return SysGetSysInfo<linux_sysinfo>(memory, state, syscall);
     case 120: return SysCloneB(memory, state, syscall);
@@ -260,14 +258,16 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 268: return SysStatFs64<linux32_statfs64>(memory, state, syscall);
     case 269: return SysFStatFs64<linux32_statfs64>(memory, state, syscall);
     case 272: return SysFAdvise<int32_t, int32_t>(memory, state, syscall);
-    case 295: return SysOpenAt(memory, state, syscall);
+    */
+    case 257: return SysOpenAt(memory, state, syscall);
+    /*
     case 296: return SysMakeDirectoryAt(memory, state, syscall);
     case 300: return SysFStatAt<linux32_stat64>(memory, state, syscall);
     case 305: return SysReadLinkAt(memory, state, syscall);
     case 307: return SysFAccessAt(memory, state, syscall);
     case 323: return SysEventFd(memory, state, syscall);
     case 328: return SysEventFd2(memory, state, syscall);
-*/
+    */
     default:
       STRACE_ERROR(unsupported, ANSI_COLOR_MAGENTA "nr=%" PRIuADDR,
                    syscall_num);

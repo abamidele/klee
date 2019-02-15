@@ -185,10 +185,26 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
+    add("klee_overshift_check", handle__klee_overshift_check , false)
 
 #undef addDNR
 #undef add
     };
+
+
+void SpecialFunctionHandler::handle__klee_overshift_check(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  auto shift_val = executor.toUnique(state, arguments[0]);
+  auto shift_uint = llvm::dyn_cast<ConstantExpr>(shift_val)->getZExtValue();
+
+  auto bitWidth_val = executor.toUnique(state, arguments[1]);
+  auto bitWidth_uint = llvm::dyn_cast<ConstantExpr>(bitWidth_val)->getZExtValue();
+
+  if(shift_uint >= bitWidth_uint){
+      LOG(ERROR) << "overshift has occured";
+  }
+}
 
 void SpecialFunctionHandler::handle__kleemill_can_read_byte(
     ExecutionState &state, KInstruction *target,
@@ -253,8 +269,29 @@ void SpecialFunctionHandler::handle__kleemill_free_memory(
 void SpecialFunctionHandler::handle__kleemill_allocate_memory(
     ExecutionState &state, KInstruction *target, 
     std::vector<ref<Expr> > &arguments) {
-
   
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  
+  auto where_val = executor.toUnique(state, arguments[1]);
+  auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)
+      ->getZExtValue();
+
+  auto size_val = executor.toUnique(state, arguments[2]);
+  auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)
+      ->getZExtValue();
+
+  auto name_val = executor.toUnique(state, arguments[3]);
+  auto name_uint = llvm::dyn_cast<ConstantExpr>(name_val)->getZExtValue();
+  auto name_char = reinterpret_cast<char *>(name_uint);
+  
+  auto offset_val = executor.toUnique(state, arguments[4]);
+  auto offset_uint = llvm::dyn_cast<ConstantExpr>(offset_val)
+      ->getZExtValue();
+
+  auto mem = executor.Memory(mem_uint);
+  mem->AddMap(where_uint, size_uint, name_char, offset_uint);
+  executor.bindLocal( target, state, mem_val );
 }
 
 void SpecialFunctionHandler::handle__kleemill_protect_memory(

@@ -269,7 +269,7 @@ static Memory *SysOpenAt(Memory *memory, State *state,
   }
 
   auto fd = openat(dirfd, gPath, oflag, mode);
-
+  puts(gPath);
   if (-1 == fd) {
     auto err = errno;
     STRACE_ERROR(openat, "Couldn't open %s: %s", gPath, strerror(err));

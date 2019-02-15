@@ -19,8 +19,6 @@ namespace {
 template <typename ABI>
 static Memory *SysExit(Memory *memory, State *state,
                        const ABI &syscall) {
-  return memory;
-  /*
   int exit_code = EXIT_SUCCESS;
   if (!syscall.TryGetArgs(memory, state, &exit_code)) {
     STRACE_ERROR(exit, "Couldn't get args");
@@ -29,19 +27,19 @@ static Memory *SysExit(Memory *memory, State *state,
     STRACE_SUCCESS(exit, "status=%d", exit_code);
   }
 
-  auto task = __kleemill_current();
+  auto task = reinterpret_cast<linux_task *>(state);
 
   if (task->clear_child_tid) {
     // futex(clear_child_tid, FUTEX_WAKE, 1, NULL, NULL, 0);
     DoWake(task, task->clear_child_tid, ~0U, 1);
   }
 
-  __kleemill_set_location(static_cast<addr_t>(task->pc),
-                       vmill::kTaskStoppedAtExit);
-  return memory;
-  */
+  task->location = kTaskStoppedAtExit;
+  task->status = kTaskStatusExited;
 
+  return memory;
 }
+
 //// Emulate an `gethostname` system call.
 //static Memory *SysGetHostName(Memory *memory, State *state,
 //                              const SystemCallABI &syscall) {
