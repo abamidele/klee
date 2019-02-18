@@ -584,8 +584,8 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   guide.verify_input = false;
   guide.eliminate_dead_stores = true;
 
-  LOG(INFO)
-      << "Optimizing lifted traces";
+  //LOG(INFO)
+  //    << "Optimizing lifted traces";
 
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
@@ -3018,9 +3018,9 @@ void Executor::bindModuleConstants(llvm::Module *mod) {
   const auto needed_constants = new_num_constants - old_num_constants;
   const auto needed_bytes = needed_constants * sizeof(Cell);
 
-  LOG(INFO)
-      << "Adding " << needed_constants << " constant cells beyond "
-      << old_num_constants << " previous ones";
+  //LOG(INFO)
+  //    << "Adding " << needed_constants << " constant cells beyond "
+  //    << old_num_constants << " previous ones";
 
   if (!kmodule->constantTable) {
     kmodule->constantTable = reinterpret_cast<Cell *>(

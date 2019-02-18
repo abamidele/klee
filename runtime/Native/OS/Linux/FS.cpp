@@ -17,6 +17,7 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 
+
 #ifndef AT_FDCWD
 # define AT_FDCWD (-100)
 #endif
@@ -466,6 +467,7 @@ static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
 }
 
 // Emulate a an `fstat` system call.
+//
 template<typename T, typename ABI>
 static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
@@ -482,13 +484,14 @@ static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
   }
 
   struct stat info = { };
+
   if (fstat(fd, &info)) {
     auto err = errno;
     STRACE_ERROR(fstat, "Can't fstat fd %d: %s", fd, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  T info32 = { };
+  T info32 = {};
   CopyStat(info, &info32);
 
   if (TryWriteMemory(memory, buf, info32)) {

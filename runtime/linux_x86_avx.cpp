@@ -39,8 +39,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-alignof-expression"
 
+#include "runtime/POSIX/posix.c"
 #include "runtime/FreeStanding/FreeStanding.cpp"
-
 #include "remill/Arch/Runtime/Intrinsics.h"
 #include "remill/Arch/Runtime/Intrinsics.cpp"
 #include "remill/Arch/X86/Runtime/State.h"

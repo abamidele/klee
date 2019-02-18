@@ -56,11 +56,11 @@ int open(const char *pathname, int flags, ...) {
   return __fd_open(pathname, flags, mode);
 }
 
+/*
 int openat(int fd, const char *pathname, int flags, ...) {
   mode_t mode = 0;
   
   if (flags & O_CREAT) {
-    /* get mode */
     va_list ap;
     va_start(ap, flags);
     mode = va_arg(ap, mode_t);
@@ -69,6 +69,7 @@ int openat(int fd, const char *pathname, int flags, ...) {
 
   return __fd_openat(fd, pathname, flags, mode);
 }
+*/
 
 off64_t lseek(int fd, off64_t offset, int whence) {
   return __fd_lseek(fd, offset, whence);
@@ -94,7 +95,7 @@ int __fxstat(int vers, int fd, struct stat *buf) {
   return __fd_fstat(fd, (struct stat64*) buf);
 }
 
-int fstat(int fd, struct stat *buf) {
+int fstat64(int fd, struct stat *buf) {
   return __fd_fstat(fd, (struct stat64*) buf);
 }
 
@@ -110,5 +111,5 @@ int statfs(const char *path, struct statfs *buf) {
 int getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) {
   return __fd_getdents(fd, (struct dirent64*) dirp, count);
 }
-int __getdents64(unsigned int fd, struct dirent *dirp, unsigned int count)
-     __attribute__((alias("getdents64")));
+//int __getdents64(unsigned int fd, struct dirent *dirp, unsigned int count)
+//     __attribute__((alias("getdents64")));

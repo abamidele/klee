@@ -36,9 +36,11 @@
 #include <cstdio>
 #include <cstring>
 
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-alignof-expression"
 
+#include "runtime/POSIX/posix.c"
 #include "runtime/FreeStanding/FreeStanding.cpp"
 
 #include "remill/Arch/Runtime/Intrinsics.h"

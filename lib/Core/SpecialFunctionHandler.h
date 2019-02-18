@@ -174,16 +174,15 @@ class SpecialFunctionHandler {
   HANDLER(handle__remill_write_f32);
   HANDLER(handle__remill_write_16);
   HANDLER(handle__remill_write_8);
-  HANDLER(handle__remill_read_f64);
   HANDLER(handle__remill_read_64);
   HANDLER(handle__remill_read_32);
-  HANDLER(handle__remill_read_f32);
   HANDLER(handle__remill_read_16);
   HANDLER(handle__remill_read_8);
   
   HANDLER(handle__llvm_ctpop);
 
   HANDLER(handle__klee_overshift_check);
+  HANDLER(handle__fstat64);
 
 #undef HANDLER
 };

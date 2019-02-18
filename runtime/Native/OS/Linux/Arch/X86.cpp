@@ -336,17 +336,26 @@ Memory *__remill_sync_hyper_call(X86State &state, Memory *mem,
       }
       break;
 
-    case SyncHyperCall::kX86CPUID:
+    case SyncHyperCall::kX86CPUID: {
+      auto eax = state.gpr.rax.dword;
+      auto ecx = state.gpr.rcx.dword;
+
       state.gpr.rax.aword = 0;
       state.gpr.rbx.aword = 0;
       state.gpr.rcx.aword = 0;
       state.gpr.rdx.aword = 0;
+      STRACE_ERROR(
+          sync_hyper_call, "kX86CPUID eax=%x ecx=%x -> eax=0 ebx=0 ecx=0 edx=0",
+          eax, ecx);
       break;
+    }
 
     case SyncHyperCall::kX86ReadTSC:
       state.gpr.rax.aword = static_cast<uint32_t>(task.time_stamp_counter);
       state.gpr.rdx.aword =
-          static_cast<uint32_t>(task.time_stamp_counter >> 32);
+        static_cast<uint32_t>(task.time_stamp_counter >> 32);
+      STRACE_SUCCESS(sync_hyper_call, "kX86ReadTSC eax=%x edx=%x",
+                      state.gpr.rax.dword, state.gpr.rdx.dword);
       break;
 
     case SyncHyperCall::kX86ReadTSCP:

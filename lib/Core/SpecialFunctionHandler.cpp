@@ -50,6 +50,9 @@
 #include <errno.h>
 #include <sstream>
 #include <iostream>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "remill/BC/Util.h"
 
@@ -182,39 +185,29 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_write_memory_16", handle__remill_write_16, true),
     add("__remill_write_memory_8", handle__remill_write_8, true),
     add("__remill_read_memory_64", handle__remill_read_64, true),
-    add("__remill_read_memory_f64", handle__remill_read_f64, true),
     add("__remill_read_memory_32", handle__remill_read_32, true),
-    add("__remill_read_memory_f32", handle__remill_read_f32, true),
     add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
-    add("klee_overshift_check", handle__klee_overshift_check , false)
-
+    add("klee_overshift_check", handle__klee_overshift_check , false),
+    //add("fstat64", handle__fstat64 , true)
 #undef addDNR
 #undef add
     };
 
-void SpecialFunctionHandler::handle__remill_read_f64(
+void SpecialFunctionHandler::handle__fstat64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+  auto fd_val = executor.toUnique(state, arguments[0]);
+  auto fd_uint = llvm::dyn_cast<ConstantExpr>(fd_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
-  double value_uint = static_cast<double>(0);
-  
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR)
-        << "Failed 8-byte read from address 0x" << addr_uint
-        << " in address space " << mem_uint;
-  }
+  auto stat_val = executor.toUnique(state, arguments[1]);
+  auto stat_uint = llvm::dyn_cast<ConstantExpr>(stat_val)->getZExtValue();
 
-  executor.bindLocal(
-      target, state, ConstantExpr::create(value_uint, Expr::Int64));
+  auto stat = reinterpret_cast<struct stat64 *>(stat_uint);
+  auto stat_ret = fstat64(fd_uint, stat);
+  executor.bindLocal(target, state, ConstantExpr::create( stat_ret , Expr::Int32));
 }
-
 
 void SpecialFunctionHandler::handle__klee_overshift_check(
     ExecutionState &state, KInstruction *target,
@@ -468,25 +461,6 @@ void SpecialFunctionHandler::handle__remill_read_32(
       target, state, ConstantExpr::create(value_uint, Expr::Int32));
 }
 
-void SpecialFunctionHandler::handle__remill_read_f32(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr> > &arguments) {
-
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-
-  auto mem = executor.Memory(mem_uint);
-  float value_uint = static_cast<float>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR)
-        << "Failed 4-byte read from address 0x" << addr_uint
-        << " in address space " << mem_uint;
-  }
-  executor.bindLocal(
-      target, state, ConstantExpr::create(value_uint, Expr::Int32));
-}
 
 void SpecialFunctionHandler::handle__remill_read_64(
     ExecutionState &state, KInstruction *target,
@@ -531,9 +505,9 @@ void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
   auto mem = executor.Memory(mem_uint);
   auto func = executor.GetLiftedFunction(mem, pc_uint);
 
-  LOG(INFO)
-      << "Indirect branch lookup " << std::hex << pc_uint << std::dec
-      << " in address space " << mem_uint;
+  //LOG(INFO)
+  //    << "Indirect branch lookup " << std::hex << pc_uint << std::dec
+  //    << " in address space " << mem_uint;
 
   executor.bindLocal(target, state,
                      Expr::createPointer(reinterpret_cast<uintptr_t>(func)));

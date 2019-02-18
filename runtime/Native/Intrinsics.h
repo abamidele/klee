@@ -76,6 +76,7 @@ extern Memory *__kleemill_protect_memory(Memory *memory, addr_t where,
 
 extern bool __kleemill_is_mapped_address(Memory *memory, addr_t where);
 
+
 // Finds some unmapped memory.
 addr_t __kleemill_find_unmapped_address(Memory *memory, addr_t base,
                                      addr_t limit, addr_t size);
@@ -144,6 +145,8 @@ inline static addr_t AlignToPage(addr_t addr) {
 inline static addr_t AlignToNextPage(addr_t addr) {
   return (addr + 4095UL) & ~4095UL;
 }
+
+
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

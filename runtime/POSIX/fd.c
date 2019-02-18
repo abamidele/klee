@@ -68,16 +68,16 @@ static exe_file_t *__get_file(int fd) {
   return 0;
 }
 
-int access(const char *pathname, int mode) {
-  exe_disk_file_t *dfile = __get_sym_file(pathname);
+//int access(const char *pathname, int mode) {
+//  exe_disk_file_t *dfile = __get_sym_file(pathname);
   
-  if (dfile) {
+//  if (dfile) {
     /* XXX we should check against stat values but we also need to
        enforce in open and friends then. */
-    return 0;
-  }
-  return syscall(__NR_access, __concretize_string(pathname), mode);
-}
+//    return 0;
+//  }
+//  return syscall(__NR_access, __concretize_string(pathname), mode);
+//}
 
 mode_t umask(mode_t mask) {  
   mode_t r = __exe_env.umask;
@@ -289,7 +289,8 @@ int futimesat(int fd, const char* path, const struct timeval times[2]) {
   return syscall(__NR_futimesat, (long)fd,
                  (path ? __concretize_string(path) : NULL), times);
 }
- 
+
+/*
 int close(int fd) {
   static int n_calls = 0;
   exe_file_t *f;
@@ -311,7 +312,6 @@ int close(int fd) {
 
 #if 0
   if (!f->dfile) {
-    /* if a concrete fd */
     r = syscall(__NR_close, f->fd);
   }
   else r = 0;
@@ -321,6 +321,7 @@ int close(int fd) {
   
   return r;
 }
+*/
 
 ssize_t read(int fd, void *buf, size_t count) {
   static int n_calls = 0;
@@ -860,7 +861,7 @@ int ioctl(int fd, unsigned long request, ...) {
 
     switch (request) {
     case TCGETS: {      
-      struct termios *ts = buf;
+      struct termios *ts = (struct termios *)buf;
 
       klee_warning_once("(TCGETS) symbolic file, incomplete model");
 
@@ -929,7 +930,7 @@ int ioctl(int fd, unsigned long request, ...) {
       }
     }
     case TIOCGWINSZ: {
-      struct winsize *ws = buf;
+      struct winsize *ws = (struct winsize *)buf;
       ws->ws_row = 24;
       ws->ws_col = 80;
       klee_warning_once("(TIOCGWINSZ) symbolic file, incomplete model");
@@ -952,7 +953,7 @@ int ioctl(int fd, unsigned long request, ...) {
       }
     }
     case FIONREAD: {
-      int *res = buf;
+      int *res = (int *)buf;
       klee_warning_once("(FIONREAD) symbolic file, incomplete model");
       if (S_ISCHR(stat->st_mode)) {
         if (f->off < (off64_t) f->dfile->size) {
@@ -1289,6 +1290,7 @@ int select(int nfds, fd_set *read, fd_set *write,
 
 /*** Library functions ***/
 
+/*
 char *getcwd(char *buf, size_t size) {
   static int n_calls = 0;
   int r;
@@ -1309,20 +1311,16 @@ char *getcwd(char *buf, size_t size) {
   
   buf = __concretize_ptr(buf);
   size = __concretize_size(size);
-  /* XXX In terms of looking for bugs we really should do this check
-     before concretization, at least once the routine has been fixed
-     to properly work with symbolics. */
   klee_check_memory_access(buf, size);
   r = syscall(__NR_getcwd, buf, size);
   if (r == -1)
     return NULL;
   return buf;
 }
-
+*/
 /*** Helper functions ***/
-
+/*
 static void *__concretize_ptr(const void *p) {
-  /* XXX 32-bit assumption */
   char *pc = (char*) klee_get_valuel((long) p);
   klee_assume(pc == p);
   return pc;
@@ -1360,9 +1358,6 @@ static const char *__concretize_string(const char *s) {
 
 
 
-/* Trivial model:
-   if path is "/" (basically no change) accept, otherwise reject
-*/
 int chroot(const char *path) {
   if (path[0] == '\0') {
     errno = ENOENT;
@@ -1377,3 +1372,4 @@ int chroot(const char *path) {
   errno = ENOENT;
   return -1;
 }
+*/
