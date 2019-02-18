@@ -60,17 +60,6 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
   return task.continuation(state, task.last_pc, memory);
 }
 
-
-double __remill_read_memory_f64(Memory * memory, addr_t addr){
-  auto read = __remill_read_memory_64(memory, addr);
-  return reinterpret_cast<double &>(read);
-}
-
-float __remill_read_memory_f32(Memory * memory, addr_t addr){
-  auto read = __remill_read_memory_32(memory, addr);
-  return reinterpret_cast<float &>(read);
-}
-
 Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
   auto task = reinterpret_cast<Task &>(state);
   task.status = kTaskStatusError;

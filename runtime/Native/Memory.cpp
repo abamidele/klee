@@ -22,6 +22,26 @@
 
 #include "remill/Arch/Runtime/Operators.h"
 
+Memory *__remill_write_memory_f32(Memory *memory, addr_t addr, float val) {
+  auto val_uint = reinterpret_cast<uint32_t &>(val);
+  return __remill_write_memory_32(memory, addr, val_uint);
+}
+
+Memory *__remill_write_memory_f64(Memory *memory, addr_t addr, double val) {
+  auto val_uint = reinterpret_cast<uint64_t &>(val);
+  return __remill_write_memory_64(memory, addr, val_uint);
+}
+
+double __remill_read_memory_f64(Memory * memory, addr_t addr){
+  auto read = __remill_read_memory_64(memory, addr);
+  return reinterpret_cast<double &>(read);
+}
+
+float __remill_read_memory_f32(Memory * memory, addr_t addr){
+  auto read = __remill_read_memory_32(memory, addr);
+  return reinterpret_cast<float &>(read);
+}
+
 size_t NumReadableBytes(Memory *memory, addr_t addr, size_t size) {
   addr_t i = 0;
   for (; i < size; i += 4096) {

@@ -20,11 +20,13 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <assert.h>
-#include <sys/vfs.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/ioctl.h>
-#include <sys/mtio.h>
+#ifdef __linux__
+# include <sys/vfs.h>
+# include <sys/mtio.h>
+#endif
 #include <termios.h>
 #include <sys/select.h>
 #include <klee/klee.h>
