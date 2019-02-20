@@ -192,7 +192,7 @@ static Memory *SysMmap(Memory *memory, State *state,
   uint64_t fd_offset = 0;
 
   if (0 <= fd) {
-    old_offset = lseek(fd, 0, SEEK_CUR);
+    old_offset =  lseek(fd, 0, SEEK_CUR);
 
     if (-1 == old_offset) {
       auto err = errno;
@@ -207,19 +207,19 @@ static Memory *SysMmap(Memory *memory, State *state,
     // Seek to the end of the range where we want to `mmap`. This is a dumb
     // way of checking to see that the region of memory is big enough to be
     // `mmap`ed.
-    if (-1 == lseek(fd, offset + static_cast<off_t>(size), SEEK_SET)) {
+    if (-1 ==  lseek(fd, offset + static_cast<off_t>(size), SEEK_SET)) {
       auto err = errno;
       STRACE_ERROR(mmap, "Couldn't get set seek position for fd %d: %s",
                    fd, strerror(err));
       memory = syscall.SetReturn(memory, state, -err);
     }
 
-    if (-1 == lseek(fd, offset, SEEK_SET)) {
+    if (-1 ==  lseek(fd, offset, SEEK_SET)) {
       auto err = errno;
       STRACE_ERROR(mmap, "Couldn't set new seek position for fd %d: %s",
                    fd, strerror(err));
       memory = syscall.SetReturn(memory, state, -err);
-      lseek(fd, old_offset, SEEK_SET);  // Maintain transparency.
+       lseek(fd, old_offset, SEEK_SET);  // Maintain transparency.
       return memory;
     }
 
@@ -238,7 +238,7 @@ static Memory *SysMmap(Memory *memory, State *state,
   if (0 <= fd) {
     addr_t remaining = size;
     for (addr_t i = 0; remaining; ) {
-      auto ret = read(fd, gIOBuffer,
+      auto ret =  read(fd, gIOBuffer,
                       std::min<addr_t>(remaining, kIOBufferSize));
 
       // Failed to copy part of the file into memory, need to reset the seek
@@ -250,7 +250,7 @@ static Memory *SysMmap(Memory *memory, State *state,
                      fd, strerror(err));
 
         memory = syscall.SetReturn(memory, state, -err);
-        lseek(fd, old_offset, SEEK_SET);  // Reset.
+         lseek(fd, old_offset, SEEK_SET);  // Reset.
         return __kleemill_free_memory(memory, addr, size);
 
       } else if (ret) {
@@ -266,7 +266,7 @@ static Memory *SysMmap(Memory *memory, State *state,
       }
     }
 
-    lseek(fd, old_offset, SEEK_SET);  // Reset.
+     lseek(fd, old_offset, SEEK_SET);  // Reset.
   }
 
   bool can_read = PROT_READ & prot;

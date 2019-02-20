@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <sys/param.h>
-#include <sys/mount.h>
+//#include <sys/param.h>
+//#include <sys/mount.h>
 
 
 #ifndef AT_FDCWD
@@ -943,7 +943,7 @@ static Memory *SysFAdvise(Memory *memory, State *state, const ABI &syscall) {
   }
 
 #ifndef __APPLE__
-  auto ret = posix_fadvise(fd, offset, len, advice);
+  auto ret = fadvise(fd, offset, len, advice);
 #else
 # warning "Incomplete support for fadvise."
   auto ret = 0;

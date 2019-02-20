@@ -112,6 +112,7 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
                    int save_all_writes_flag, unsigned max_failures) {
   unsigned k;
   char name[7] = "?-data";
+  /*
   struct stat64 s;
 
   stat64(".", &s);
@@ -123,7 +124,6 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
     __create_new_dfile(&__exe_fs.sym_files[k], file_length, name, &s);
   }
   
-  /* setting symbolic stdin */
   if (stdin_length) {
     __exe_fs.sym_stdin = (exe_disk_file_t *)malloc(sizeof(*__exe_fs.sym_stdin));
     __create_new_dfile(__exe_fs.sym_stdin, stdin_length, "stdin", &s);
@@ -146,7 +146,6 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
     klee_make_symbolic(__exe_fs.getcwd_fail, sizeof(*__exe_fs.getcwd_fail), "getcwd_fail");
   }
 
-  /* setting symbolic stdout */
   if (sym_stdout_flag) {
     __exe_fs.sym_stdout = (exe_disk_file_t *)malloc(sizeof(*__exe_fs.sym_stdout));
     __create_new_dfile(__exe_fs.sym_stdout, 1024, "stdout", &s);
@@ -154,7 +153,10 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
     __exe_fs.stdout_writes = 0;
   }
   else __exe_fs.sym_stdout = NULL;
-  
+  */
+  __exe_fs.sym_stdin = NULL;
+  __exe_fs.max_failures = max_failures;
+  __exe_fs.sym_stdout = NULL;
   __exe_env.save_all_writes = save_all_writes_flag;
   __exe_env.version = __sym_uint32("model_version");
   klee_assume(__exe_env.version == 1);

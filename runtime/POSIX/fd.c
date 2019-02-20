@@ -81,7 +81,7 @@ static exe_file_t *__get_file(int fd) {
 //  return syscall(__NR_access, __concretize_string(pathname), mode);
 //}
 
-mode_t umask(mode_t mask) {  
+mode_t posix_umask(mode_t mask) {  
   mode_t r = __exe_env.umask;
   __exe_env.umask = mask & 0777;
   return r;
@@ -245,7 +245,7 @@ int __fd_openat(int basefd, const char *pathname, int flags, mode_t mode) {
 }
 
 
-int utimes(const char *path, const struct timeval times[2]) {
+int posix_utimes(const char *path, const struct timeval times[2]) {
   exe_disk_file_t *dfile = __get_sym_file(path);
 
   if (dfile) {
@@ -270,7 +270,7 @@ int utimes(const char *path, const struct timeval times[2]) {
 }
 
 
-int futimesat(int fd, const char* path, const struct timeval times[2]) {
+int posix_futimesat(int fd, const char* path, const struct timeval times[2]) {
   if (fd != AT_FDCWD) {
     exe_file_t *f = __get_file(fd);
 
@@ -292,8 +292,7 @@ int futimesat(int fd, const char* path, const struct timeval times[2]) {
                  (path ? __concretize_string(path) : NULL), times);
 }
 
-/*
-int close(int fd) {
+int posix_close(int fd) {
   static int n_calls = 0;
   exe_file_t *f;
   int r = 0;
@@ -323,9 +322,8 @@ int close(int fd) {
   
   return r;
 }
-*/
 
-ssize_t read(int fd, void *buf, size_t count) {
+ssize_t posix_read(int fd, void *buf, size_t count) {
   static int n_calls = 0;
   exe_file_t *f;
 
@@ -362,7 +360,7 @@ ssize_t read(int fd, void *buf, size_t count) {
        to properly work with symbolics. */
     klee_check_memory_access(buf, count);
     if (f->fd == 0)
-      r = syscall(__NR_read, f->fd, buf, count);
+      r = read(f->fd, buf, count);
     else
       r = syscall(__NR_pread64, f->fd, buf, count, (off64_t) f->off);
 
@@ -391,7 +389,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 }
 
 
-ssize_t write(int fd, const void *buf, size_t count) {
+ssize_t posix_write(int fd, const void *buf, size_t count) {
   static int n_calls = 0;
   exe_file_t *f;
 
@@ -420,7 +418,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
        to properly work with symbolics. */
     klee_check_memory_access(buf, count);
     if (f->fd == 1 || f->fd == 2)
-      r = syscall(__NR_write, f->fd, buf, count);
+      r = write(f->fd, buf, count);
     else r = syscall(__NR_pwrite64, f->fd, buf, count, (off64_t) f->off);
 
     if (r == -1)
@@ -532,7 +530,7 @@ int __fd_stat(const char *path, struct stat64 *buf) {
   }
 }
 
-int fstatat(int fd, const char *path, struct stat *buf, int flags) {  
+int posix_fstatat(int fd, const char *path, struct stat *buf, int flags) {  
   if (fd != AT_FDCWD) {
     exe_file_t *f = __get_file(fd);
 
@@ -578,7 +576,7 @@ int __fd_lstat(const char *path, struct stat64 *buf) {
   }
 }
 
-int chdir(const char *path) {
+int posix_chdir(const char *path) {
   exe_disk_file_t *dfile = __get_sym_file(path);
 
   if (dfile) {
@@ -591,7 +589,7 @@ int chdir(const char *path) {
   return syscall(__NR_chdir, __concretize_string(path));
 }
 
-int fchdir(int fd) {
+int posix_fchdir(int fd) {
   exe_file_t *f = __get_file(fd);
   
   if (!f) {
@@ -622,7 +620,7 @@ static int __df_chmod(exe_disk_file_t *df, mode_t mode) {
   }
 }
 
-int chmod(const char *path, mode_t mode) {
+int posix_chmod(const char *path, mode_t mode) {
   static int n_calls = 0;
 
   exe_disk_file_t *dfile = __get_sym_file(path);
@@ -641,7 +639,7 @@ int chmod(const char *path, mode_t mode) {
   return syscall(__NR_chmod, __concretize_string(path), mode);
 }
 
-int fchmod(int fd, mode_t mode) {
+int posix_fchmod(int fd, mode_t mode) {
   static int n_calls = 0;
 
   exe_file_t *f = __get_file(fd);
@@ -671,7 +669,7 @@ static int __df_chown(exe_disk_file_t *df, uid_t owner, gid_t group) {
   return -1;  
 }
 
-int chown(const char *path, uid_t owner, gid_t group) {
+int posix_chown(const char *path, uid_t owner, gid_t group) {
   exe_disk_file_t *df = __get_sym_file(path);
 
   if (df) {
@@ -681,7 +679,7 @@ int chown(const char *path, uid_t owner, gid_t group) {
   return syscall(__NR_chown, __concretize_string(path), owner, group);
 }
 
-int fchown(int fd, uid_t owner, gid_t group) {
+int posix_fchown(int fd, uid_t owner, gid_t group) {
   exe_file_t *f = __get_file(fd);
 
   if (!f) {
@@ -696,7 +694,7 @@ int fchown(int fd, uid_t owner, gid_t group) {
   return syscall(__NR_fchown, fd, owner, group);
 }
 
-int lchown(const char *path, uid_t owner, gid_t group) {
+int posix_lchown(const char *path, uid_t owner, gid_t group) {
   /* XXX Ignores 'l' part */
   exe_disk_file_t *df = __get_sym_file(path);
 
@@ -838,9 +836,9 @@ int __fd_getdents(unsigned int fd, struct dirent64 *dirp, unsigned int count) {
 }
 
 #if __WORDSIZE == 64
-int ioctl(int fd, unsigned long int request, ...) {
+int posix_ioctl(int fd, unsigned long int request, ...) {
 #else
-int ioctl(int fd, unsigned long request, ...) {
+int posix_ioctl(int fd, unsigned long request, ...) {
 #endif
   exe_file_t *f = __get_file(fd);
   va_list ap;
@@ -983,7 +981,7 @@ int ioctl(int fd, unsigned long request, ...) {
   return syscall(__NR_ioctl, f->fd, request, buf);
 }
 
-int fcntl(int fd, int cmd, ...) {
+int posix_fcntl(int fd, int cmd, ...) {
   exe_file_t *f = __get_file(fd);
   va_list ap;
   unsigned arg; /* 32 bit assumption (int/ptr) */
@@ -1046,7 +1044,7 @@ int __fd_statfs(const char *path, struct statfs *buf) {
   return syscall(__NR_statfs, __concretize_string(path), buf);
 }
 
-int fstatfs(int fd, struct statfs *buf) {
+int posix_fstatfs(int fd, struct statfs *buf) {
   exe_file_t *f = __get_file(fd);
 
   if (!f) {
@@ -1062,7 +1060,7 @@ int fstatfs(int fd, struct statfs *buf) {
   return syscall(__NR_fstatfs, f->fd, buf);
 }
 
-int fsync(int fd) {
+int posix_fsync(int fd) {
   exe_file_t *f = __get_file(fd);
 
   if (!f) {
@@ -1074,7 +1072,7 @@ int fsync(int fd) {
   return syscall(__NR_fsync, f->fd);
 }
 
-int dup2(int oldfd, int newfd) {
+int posix_dup2(int oldfd, int newfd) {
   exe_file_t *f = __get_file(oldfd);
 
   if (!f || !(newfd>=0 && newfd<MAX_FDS)) {
@@ -1099,7 +1097,7 @@ int dup2(int oldfd, int newfd) {
   }
 }
 
-int dup(int oldfd) {
+int posix_dup(int oldfd) {
   exe_file_t *f = __get_file(oldfd);
   if (!f) {
     errno = EBADF;
@@ -1118,7 +1116,7 @@ int dup(int oldfd) {
   }
 }
 
-int rmdir(const char *pathname) {
+int posix_rmdir(const char *pathname) {
   exe_disk_file_t *dfile = __get_sym_file(pathname);
   if (dfile) {
     /* XXX check access */ 
@@ -1136,7 +1134,7 @@ int rmdir(const char *pathname) {
   return -1;
 }
 
-int unlink(const char *pathname) {
+int posix_unlink(const char *pathname) {
   exe_disk_file_t *dfile = __get_sym_file(pathname);
   if (dfile) {
     /* XXX check access */ 
@@ -1157,7 +1155,7 @@ int unlink(const char *pathname) {
   return -1;
 }
 
-int unlinkat(int dirfd, const char *pathname, int flags) {
+int posix_unlinkat(int dirfd, const char *pathname, int flags) {
   /* similar to unlink. keep them separated though to avoid
      problems if unlink changes to actually delete files */
   exe_disk_file_t *dfile = __get_sym_file(pathname);
@@ -1180,7 +1178,7 @@ int unlinkat(int dirfd, const char *pathname, int flags) {
   return -1;
 }
 
-ssize_t readlink(const char *path, char *buf, size_t bufsize) {
+ssize_t posix_readlink(const char *path, char *buf, size_t bufsize) {
   exe_disk_file_t *dfile = __get_sym_file(path);
   if (dfile) {
     /* XXX We need to get the sym file name really, but since we don't
@@ -1208,7 +1206,7 @@ ssize_t readlink(const char *path, char *buf, size_t bufsize) {
 #define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1 << ((n) % NFDBITS)))
 #define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1 << ((n) % NFDBITS)))
 #define FD_ZERO(p)	memset((char *)(p), '\0', sizeof(*(p)))
-int select(int nfds, fd_set *read, fd_set *write,
+int posix_select(int nfds, fd_set *read, fd_set *write,
            fd_set *except, struct timeval *timeout) {
   fd_set in_read, in_write, in_except, os_read, os_write, os_except;
   int i, count = 0, os_nfds = 0;
@@ -1321,7 +1319,6 @@ char *getcwd(char *buf, size_t size) {
 }
 */
 /*** Helper functions ***/
-/*
 static void *__concretize_ptr(const void *p) {
   char *pc = (char*) klee_get_valuel((long) p);
   klee_assume(pc == p);
@@ -1335,7 +1332,7 @@ static size_t __concretize_size(size_t s) {
 }
 
 static const char *__concretize_string(const char *s) {
-  char *sc = __concretize_ptr(s);
+  char *sc = (char *)(__concretize_ptr(s));
   unsigned i;
 
   for (i=0; ; ++i) {
@@ -1360,7 +1357,7 @@ static const char *__concretize_string(const char *s) {
 
 
 
-int chroot(const char *path) {
+int posix_chroot(const char *path) {
   if (path[0] == '\0') {
     errno = ENOENT;
     return -1;
@@ -1374,4 +1371,3 @@ int chroot(const char *path) {
   errno = ENOENT;
   return -1;
 }
-*/

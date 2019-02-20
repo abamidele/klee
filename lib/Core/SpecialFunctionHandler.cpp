@@ -53,6 +53,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "remill/BC/Util.h"
 
@@ -189,10 +190,40 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check , false),
-    //add("fstat64", handle__fstat64 , true)
+    add("fstat64", handle__fstat64 , true),
+    add("stat64", handle__stat64 , true),
+    add("openat64", handle_openat64, true),
+
 #undef addDNR
 #undef add
     };
+
+
+void SpecialFunctionHandler::handle_openat64(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+ 
+ auto dirfd_val = executor.toUnique(state, arguments[0]);
+ auto dirfd_uint = llvm::dyn_cast<ConstantExpr>(dirfd_val)->getZExtValue();
+ 
+ auto pathname_val = executor.toUnique(state, arguments[1]);
+ auto pathname_uint = llvm::dyn_cast<ConstantExpr>(pathname_val)->getZExtValue();
+ auto pathname = reinterpret_cast<char *>(pathname_uint);
+
+ auto flags_val = executor.toUnique(state, arguments[2]);
+ auto flags_uint = llvm::dyn_cast<ConstantExpr>(flags_val)->getZExtValue();
+
+ auto mode_val = executor.toUnique(state, arguments[3]);
+ auto mode_uint = llvm::dyn_cast<ConstantExpr>(mode_val)->getZExtValue();
+
+ auto open_status = openat(dirfd_uint, pathname, flags_uint, mode_uint);
+
+ LOG(INFO) << open_status;
+
+ executor.bindLocal(target, state, ConstantExpr::create(-1, 
+             Expr::Int64));
+}
+ 
 
 void SpecialFunctionHandler::handle__fstat64(
     ExecutionState &state, KInstruction *target,
@@ -205,6 +236,21 @@ void SpecialFunctionHandler::handle__fstat64(
 
   auto stat = reinterpret_cast<struct stat *>(stat_uint);
   auto stat_ret = fstat(fd_uint, stat);
+  executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handle__stat64(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  auto path_val = executor.toUnique(state, arguments[0]);
+  auto path_uint = llvm::dyn_cast<ConstantExpr>(path_val)->getZExtValue();
+  const char *pathname = reinterpret_cast<char *>(path_uint);
+
+  auto stat_val = executor.toUnique(state, arguments[1]);
+  auto stat_uint = llvm::dyn_cast<ConstantExpr>(stat_val)->getZExtValue();
+
+  auto stat_struct = reinterpret_cast<struct stat *>(stat_uint);
+  auto stat_ret = stat(pathname, stat_struct);
   executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
 }
 
@@ -362,10 +408,10 @@ void SpecialFunctionHandler::handle__kleemill_is_mapped_address(
 
   auto mem = executor.Memory(mem_uint);
 
-  uint8_t is_mapped = mem->IsMapped(where_uint); 
+  bool is_mapped = mem->IsMapped(where_uint); 
 
   executor.bindLocal(
-      target, state, ConstantExpr::create(is_mapped, Expr::Int8));
+      target, state, ConstantExpr::create(is_mapped, Expr::Bool));
 }
 
 void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(

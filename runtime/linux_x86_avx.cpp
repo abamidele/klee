@@ -51,6 +51,11 @@
 #include "runtime/Native/Intrinsics.h"
 #include "runtime/Native/Memory.cpp"
 #include <runtime/Native/OS/Linux/Run.h>
+
+#define fstat64 fstat
+
+#define stat64 stat
+
 #include <runtime/Native/Task.h>
 #include <runtime/Native/OS/Linux/SystemCallABI.h>
 #include <runtime/Native/OS/Linux/Arch/X86.cpp>

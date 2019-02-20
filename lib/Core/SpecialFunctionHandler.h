@@ -183,6 +183,8 @@ class SpecialFunctionHandler {
 
   HANDLER(handle__klee_overshift_check);
   HANDLER(handle__fstat64);
+  HANDLER(handle__stat64);
+  HANDLER(handle_openat64);
 
 #undef HANDLER
 };

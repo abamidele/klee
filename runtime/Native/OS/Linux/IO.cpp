@@ -31,6 +31,14 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
 
   auto bytes_read = new uint8_t[size];
   auto num_bytes = read(fd, bytes_read, size);
+
+  //if (fd == 5 && size == 832) {
+      //for (int i=0; i < num_bytes; ++i){
+      //  printf("%x  ", bytes_read[i]);
+      //}
+    //  printf("\n*******************BYTES DUMPED****************************\n");
+  //}
+
   auto err = errno;
   if (-1 != num_bytes) {
     err = 0;
@@ -269,8 +277,7 @@ static Memory *SysOpenAt(Memory *memory, State *state,
   }
 
   auto fd = openat(dirfd, gPath, oflag, mode);
-  puts(gPath);
-  if (-1 == fd) {
+  if ((-1 == fd) || (fd == 4294967295)) {
     auto err = errno;
     STRACE_ERROR(openat, "Couldn't open %s: %s", gPath, strerror(err));
     return syscall.SetReturn(memory, state, -err);

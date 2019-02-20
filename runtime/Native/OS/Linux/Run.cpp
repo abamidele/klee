@@ -31,6 +31,7 @@ extern "C" void __kleemill_init(void) {
   gNextTid = kProcessId;
   gTaskList = nullptr;
   gLastTask = nullptr;
+  //klee_init_fds(0,0,0,0,1,0);
 }
 
 // Tear down the emulated Linux operating system.

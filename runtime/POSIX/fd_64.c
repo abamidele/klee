@@ -42,7 +42,7 @@
 
 /*** Forward to actual implementations ***/
 
-int open(const char *pathname, int flags, ...) {
+int posix_open(const char *pathname, int flags, ...) {
   mode_t mode = 0;
   
   if (flags & O_CREAT) {
@@ -56,8 +56,7 @@ int open(const char *pathname, int flags, ...) {
   return __fd_open(pathname, flags, mode);
 }
 
-/*
-int openat(int fd, const char *pathname, int flags, ...) {
+int posix_openat(int fd, const char *pathname, int flags, ...) {
   mode_t mode = 0;
   
   if (flags & O_CREAT) {
@@ -66,12 +65,10 @@ int openat(int fd, const char *pathname, int flags, ...) {
     mode = va_arg(ap, mode_t);
     va_end(ap);
   }
-
   return __fd_openat(fd, pathname, flags, mode);
 }
-*/
 
-off64_t lseek(int fd, off64_t offset, int whence) {
+off64_t posix_lseek(int fd, off64_t offset, int whence) {
   return __fd_lseek(fd, offset, whence);
 }
 
@@ -79,7 +76,7 @@ int __xstat(int vers, const char *path, struct stat *buf) {
   return __fd_stat(path, (struct stat64*) buf);
 }
 
-int stat(const char *path, struct stat *buf) {
+int posix_stat(const char *path, struct stat *buf) {
   return __fd_stat(path, (struct stat64*) buf);
 }
 
@@ -87,7 +84,7 @@ int __lxstat(int vers, const char *path, struct stat *buf) {
   return __fd_lstat(path, (struct stat64*) buf);
 }
 
-int lstat(const char *path, struct stat *buf) {
+int posix_lstat(const char *path, struct stat *buf) {
   return __fd_lstat(path, (struct stat64*) buf);
 }
 
@@ -95,20 +92,20 @@ int __fxstat(int vers, int fd, struct stat *buf) {
   return __fd_fstat(fd, (struct stat64*) buf);
 }
 
-int fstat64(int fd, struct stat *buf) {
+int posix_fstat(int fd, struct stat *buf) {
   return __fd_fstat(fd, (struct stat64*) buf);
 }
 
-int ftruncate64(int fd, off64_t length) {
+int posix_ftruncate64(int fd, off64_t length) {
   return __fd_ftruncate(fd, length);
 }
 
-int statfs(const char *path, struct statfs *buf) __attribute__((weak));
-int statfs(const char *path, struct statfs *buf) {
+int posix_statfs(const char *path, struct statfs *buf) __attribute__((weak));
+int posix_statfs(const char *path, struct statfs *buf) {
   return __fd_statfs(path, buf);
 }
 
-int getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) {
+int posix_getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) {
   return __fd_getdents(fd, (struct dirent64*) dirp, count);
 }
 //int __getdents64(unsigned int fd, struct dirent *dirp, unsigned int count)
