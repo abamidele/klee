@@ -75,6 +75,7 @@
 #include <llvm/Support/Path.h>
 #include <llvm/Support/Process.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/IR/IRBuilder.h>
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
 #include <llvm/Support/CallSite.h>
@@ -582,7 +583,7 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   guide.slp_vectorize = false;
   guide.loop_vectorize = false;
   guide.verify_input = false;
-  guide.eliminate_dead_stores = true;
+  guide.eliminate_dead_stores = false; //true;
 
   //LOG(INFO)
   //    << "Optimizing lifted traces";
@@ -591,8 +592,35 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
 
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
+    // Adding additional debugging instrumentation to remill functions
+    //
+    /*
+    llvm::IRBuilder<> debug_builder(lifted_entry.second->getContext());
+    auto kleemill_log = holding_module -> getFunction("__kleemill_log_state");
+    for (auto &block: *lifted_entry.second){
+      for (auto &ins: block){
+        switch(ins.getOpcode()) {
+            case (Instruction::Call): {
+            auto call_inst = llvm::dyn_cast<CallInst>(&ins);
+            auto func = call_inst->getCalledFunction();
+            auto state_ptr = 
+                llvm::dyn_cast<Value>(call_inst->getArgOperand(0));
+            if (func->getName().str().compare(0,4,"sub_")){
+              for (auto &block: *func){
+                for (auto &ins: block){
+                  debug_builder.SetInsertPoint(&ins);
+                  LOG(INFO) << "INSERT POINT";
+                  debug_builder.CreateCall(kleemill_log, state_ptr);
+                }
+              }
+             }
+              break;
+            }
+        }
+      }
+    }
+    */
   }
-
   kmodule->instrument(holding_module.get(), opts);
   specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
   kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
@@ -1455,6 +1483,7 @@ void Executor::stepInstruction(ExecutionState &state) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
+  auto old_errno = errno;
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
     switch (f->getIntrinsicID()) {
@@ -1647,6 +1676,20 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     unsigned numFormals = f->arg_size();
     for (unsigned i = 0; i < numFormals; ++i)
       bindArgument(kf, i, state, arguments[i]);
+  }
+
+  auto new_errno = errno;
+  if (new_errno != old_errno){
+    LOG(INFO) << "ERRNO IS DIFFERENT on " << f->getName().str();
+    int *errno_addr = getErrnoLocation(state);
+    ObjectPair result;
+    bool resolved = state.addressSpace.resolveOne(
+      ConstantExpr::create((uint64_t) errno_addr, Expr::Int64), result);
+    if (!resolved)
+      klee_error("Could not resolve memory object for errno");
+    ref<Expr> errValueExpr = result.second->read(0, sizeof(*errno_addr) * 8);
+    ConstantExpr *errnoValue = dyn_cast<ConstantExpr>(errValueExpr);
+    externalDispatcher->setLastErrno(errnoValue->getZExtValue(sizeof(*errno_addr) * 8));
   }
 }
 
@@ -3414,8 +3457,10 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
                                     Function *function,
                                     std::vector<ref<Expr> > &arguments) {
   // check if specialFunctionHandler wants it
-  if (specialFunctionHandler->handle(state, function, target, arguments))
+  if (specialFunctionHandler->handle(state, function, target, arguments)) {
+
     return;
+  }
 
   if (ExternalCalls == ExternalCallPolicy::None
       && !okExternals.count(function->getName())) {
@@ -3485,6 +3530,8 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
 
   externalDispatcher->setLastErrno(
       errnoValue->getZExtValue(sizeof(*errno_addr) * 8));
+
+
 #endif
 
   if (!SuppressExternalWarnings) {

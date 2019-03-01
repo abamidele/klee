@@ -250,7 +250,6 @@ void KModule::instrument(llvm::Module *mod,
   if (opts.CheckOvershift) {
     pm.add(new OvershiftCheckPass());
   }
-
   pm.add(new IntrinsicCleanerPass(*targetData));
   pm.run(*mod);
 }

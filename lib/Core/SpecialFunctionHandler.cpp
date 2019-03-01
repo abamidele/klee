@@ -56,6 +56,11 @@
 #include <fcntl.h>
 
 #include "remill/BC/Util.h"
+#include "remill/Arch/X86/Runtime/State.h"
+#include "../Native/Arch/X86/Log.cpp"
+
+#include <fstream>
+
 
 using namespace llvm;
 using namespace klee;
@@ -179,6 +184,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
       handle__kleemill_is_mapped_address, true),
     add("__kleemill_find_unmapped_address", 
       handle__kleemill_find_unmapped_address, true),
+    add("__kleemill_log_state", handle__kleemill_log_state, false),
+  
     
     add("__remill_write_memory_64", handle__remill_write_64, true),
     add("__remill_write_memory_32", handle__remill_write_32, true),
@@ -198,6 +205,18 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 #undef add
     };
 
+std::ofstream klee_trace;
+
+void SpecialFunctionHandler::handle__kleemill_log_state(
+  ExecutionState &state, KInstruction *target,
+  std::vector<ref<Expr> > &arguments) {
+  auto state_ptr_val = executor.toUnique(state, arguments[0]);
+  auto state_ptr_uint = llvm::dyn_cast<ConstantExpr>(state_ptr_val)->getZExtValue();
+  auto state_ptr = reinterpret_cast<State *>(state_ptr_uint);
+  std::ofstream klee_trace;
+  klee_trace.open("./klee-trace.txt", std::ios_base::app);
+  klee::native::LogAMD64RegisterState(klee_trace, state_ptr);
+}
 
 void SpecialFunctionHandler::handle_openat64(
     ExecutionState &state, KInstruction *target,
@@ -216,12 +235,23 @@ void SpecialFunctionHandler::handle_openat64(
  auto mode_val = executor.toUnique(state, arguments[3]);
  auto mode_uint = llvm::dyn_cast<ConstantExpr>(mode_val)->getZExtValue();
 
+
+ LOG(INFO) << "------OPENAT LOG-------------";
+ LOG(INFO) <<"pathname before openat: " << pathname;
+
+
  auto open_status = openat(dirfd_uint, pathname, flags_uint, mode_uint);
 
- LOG(INFO) << open_status;
-
- executor.bindLocal(target, state, ConstantExpr::create(-1, 
-             Expr::Int64));
+ LOG(INFO) << open_status << ", at " << pathname;
+ LOG(INFO) << "------OPENAT LOG-------------";
+ 
+ if (open_status == -1){
+    executor.bindLocal(target, state, ConstantExpr::create(open_status, Expr::Int32));
+    errno = ENOENT;
+ } else {
+    executor.bindLocal(target, state, ConstantExpr::create(open_status, Expr::Int64));
+    errno = 0;
+ }
 }
  
 
@@ -236,7 +266,15 @@ void SpecialFunctionHandler::handle__fstat64(
 
   auto stat = reinterpret_cast<struct stat *>(stat_uint);
   auto stat_ret = fstat(fd_uint, stat);
-  executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
+
+  // must set errno
+  if (stat_ret == -1 ){
+    executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
+    errno = EFAULT;
+  } else {
+    executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int64));
+    errno = 0;
+  }
 }
 
 void SpecialFunctionHandler::handle__stat64(
@@ -251,7 +289,15 @@ void SpecialFunctionHandler::handle__stat64(
 
   auto stat_struct = reinterpret_cast<struct stat *>(stat_uint);
   auto stat_ret = stat(pathname, stat_struct);
-  executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
+  
+  // msust set errno
+  if (stat_ret == -1){
+    executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
+    errno = EFAULT;
+  } else {
+    executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int64));
+    errno = 0;
+  }
 }
 
 void SpecialFunctionHandler::handle__klee_overshift_check(
@@ -1184,6 +1230,7 @@ void SpecialFunctionHandler::handleErrnoLocation(
           executor.kmodule->targetData->getTypeSizeInBits(
               target->inst->getType())));
 }
+
 void SpecialFunctionHandler::handleCalloc(ExecutionState &state,
                                           KInstruction *target,
                                           std::vector<ref<Expr> > &arguments) {

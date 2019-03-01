@@ -53,7 +53,7 @@ Memory *__kleemill_protect_memory(
 
 bool kleemill_is_mapped_address(Memory * memory, addr_t where);
 
-addr_t kleemill_find_unmapped_address(
+uint64_t kleemill_find_unmapped_address(
     Memory *memory, uint64_t base, uint64_t limit, uint64_t size);
 
 // Returns true if the memory at address `addr` is readable.
@@ -76,6 +76,7 @@ extern Memory *__kleemill_protect_memory(Memory *memory, addr_t where,
 
 extern bool __kleemill_is_mapped_address(Memory *memory, addr_t where);
 
+extern void __kleemill_log_state(State *state);
 
 // Finds some unmapped memory.
 addr_t __kleemill_find_unmapped_address(Memory *memory, addr_t base,
@@ -131,6 +132,8 @@ inline static bool TryWriteMemory(Memory *&memory, addr_t addr, const T &val) {
     return false;
   }
 }
+
+
 
 size_t CopyStringFromMemory(Memory *memory, addr_t addr,
                             char *val, size_t max_len);

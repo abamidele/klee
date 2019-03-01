@@ -15,6 +15,7 @@
  */
 
 #include <tools/klee/runtime/Native/OS/Linux/Run.h>
+
 namespace {
 
 // Intermediate buffer for copying data to/from the runtime memory and the
@@ -153,7 +154,8 @@ template <typename ABI>
 static Memory *AMD64SystemCall(Memory *memory, State *state,
                                const ABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
-  STRACE_SYSCALL_NUM(syscall_num);
+  STRACE_SYSCALL_NUM(syscall_num);  
+  //__kleemill_log_state(state);
   switch (syscall_num) {
     case 0: return SysRead(memory, state, syscall);
     case 1: return SysWrite(memory, state, syscall);

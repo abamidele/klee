@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#define ADDRESS_SIZE_BITS 64
+//#define ADDRESS_SIZE_BITS 64
 #define HAS_FEATURE_AVX 1
 #define HAS_FEATURE_AVX512 1
-
+#define KLEEMILL_RUNTIME_X86 64
 #include <iomanip>
 #include <ostream>
 
@@ -29,13 +29,13 @@ namespace {
 
 static void LogGPR32(std::ostream &os, const Reg &reg, const char *name) {
   os << "  " << name << " " << std::hex << std::setw(8)
-     << std::setfill('0') << reg.dword << " at "
+     << std::setfill('0') << reg.aword << " at "
      << &reg << std::endl;
 }
 
 static void LogGPR64(std::ostream &os, const Reg &reg, const char *name) {
   os << "  " << name << " " << std::hex << std::setw(16)
-     << std::setfill('0') << reg.qword << " at "
+     << std::setfill('0') << reg.aword << " at "
      << &reg << std::endl;
 }
 

@@ -70,7 +70,7 @@ Memory *CopyToMemory(Memory *memory, addr_t addr,
     //  printf("addr=%x, byte=%x \n", 
     //          addr+static_cast<addr_t>(i), 
     //          data_bytes[i]);
-    //}
+    //  }
     memory = __remill_write_memory_8(
         memory, addr + static_cast<addr_t>(i), data_bytes[i]);
   }

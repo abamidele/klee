@@ -42,31 +42,31 @@ class MappedRange {
 
   virtual bool IsValid(void) const = 0;
 
-  ALWAYS_INLINE uint64_t BaseAddress(void) const {
+  FOREVER_INLINE uint64_t BaseAddress(void) const {
     return base_address;
   }
 
-  ALWAYS_INLINE uint64_t LimitAddress(void) const {
+  FOREVER_INLINE uint64_t LimitAddress(void) const {
     return limit_address;
   }
 
-  ALWAYS_INLINE const char *Name(void) const {
+  FOREVER_INLINE const char *Name(void) const {
     return name;
   }
 
-  ALWAYS_INLINE uint64_t Offset(void) const {
+  FOREVER_INLINE uint64_t Offset(void) const {
     return offset;
   }
 
-  ALWAYS_INLINE uint64_t Size(void) const {
+  FOREVER_INLINE uint64_t Size(void) const {
     return limit_address - base_address;
   }
 
-  ALWAYS_INLINE bool Contains(uint64_t address) const {
+  FOREVER_INLINE bool Contains(uint64_t address) const {
     return base_address <= address && address < limit_address;
   }
 
-  ALWAYS_INLINE bool LessThan(const MemoryMapPtr &left,
+  FOREVER_INLINE bool LessThan(const MemoryMapPtr &left,
                               const MemoryMapPtr &right) {
     return left->BaseAddress() < right->BaseAddress();
   }

@@ -24,6 +24,13 @@ extern "C" {
 
 LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
 
+void __kleemill_log_state(State *state);
+
+Memory * __remill_log_state(State *state, Memory **memory){
+  __kleemill_log_state(state);
+  return *memory;
+}
+
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
@@ -37,6 +44,7 @@ Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
 }
 
 Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
+
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
@@ -49,6 +57,7 @@ Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
 }
 
 Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
+
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
@@ -61,6 +70,7 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
 }
 
 Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
+
   auto task = reinterpret_cast<Task &>(state);
   task.status = kTaskStatusError;
   task.location = kTaskStoppedAtError;
@@ -70,6 +80,7 @@ Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
 
 Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
                                           Memory *memory) {
+
   auto task = reinterpret_cast<Task &>(state);
   task.status = kTaskStatusError;
   task.location = kTaskStoppedAtError;
@@ -78,6 +89,7 @@ Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
 }
 
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
+
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
     task.status = kTaskStatusError;
@@ -89,6 +101,7 @@ Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
 }
 
 Memory * __remill_error(State &state, addr_t pc, Memory *memory) {
+
   auto &task = reinterpret_cast<Task &>(state);
   if (CanContinue(task.location)) {
     task.status = kTaskStatusError;
@@ -409,8 +422,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
   value = current;
   return memory;
 }
-
-int32_t __kleemill_get_file(int fd, void *statbuf);
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);

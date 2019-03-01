@@ -168,7 +168,8 @@ class SpecialFunctionHandler {
   HANDLER(handle__kleemill_allocate_memory);
   HANDLER(handle__kleemill_is_mapped_address);
   HANDLER(handle__kleemill_find_unmapped_address);
- 
+  HANDLER(handle__kleemill_log_state);
+  
   HANDLER(handle__remill_write_64);
   HANDLER(handle__remill_write_32);
   HANDLER(handle__remill_write_f32);
