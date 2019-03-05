@@ -29,14 +29,12 @@ namespace {
 
 static void LogGPR32(std::ostream &os, const Reg &reg, const char *name) {
   os << "  " << name << " " << std::hex << std::setw(8)
-     << std::setfill('0') << reg.aword << " at "
-     << &reg << std::endl;
+     << std::setfill('0') << reg.aword << std::endl;
 }
 
 static void LogGPR64(std::ostream &os, const Reg &reg, const char *name) {
   os << "  " << name << " " << std::hex << std::setw(16)
-     << std::setfill('0') << reg.aword << " at "
-     << &reg << std::endl;
+     << std::setfill('0') << reg.aword << std::endl;
 }
 
 }  // namespace

@@ -197,26 +197,19 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check , false),
-    add("fstat64", handle__fstat64 , true),
+    add("my_fstat", handle__fstat64 , true),
     add("stat64", handle__stat64 , true),
     add("openat64", handle_openat64, true),
+    add("get_fstat_index", handle_get_fstat_index, true),
+
 
 #undef addDNR
 #undef add
     };
 
-std::ofstream klee_trace;
-
 void SpecialFunctionHandler::handle__kleemill_log_state(
   ExecutionState &state, KInstruction *target,
-  std::vector<ref<Expr> > &arguments) {
-  auto state_ptr_val = executor.toUnique(state, arguments[0]);
-  auto state_ptr_uint = llvm::dyn_cast<ConstantExpr>(state_ptr_val)->getZExtValue();
-  auto state_ptr = reinterpret_cast<State *>(state_ptr_uint);
-  std::ofstream klee_trace;
-  klee_trace.open("./klee-trace.txt", std::ios_base::app);
-  klee::native::LogAMD64RegisterState(klee_trace, state_ptr);
-}
+  std::vector<ref<Expr> > &arguments) {}
 
 void SpecialFunctionHandler::handle_openat64(
     ExecutionState &state, KInstruction *target,
@@ -255,6 +248,31 @@ void SpecialFunctionHandler::handle_openat64(
 }
  
 
+void SpecialFunctionHandler::set_up_fstat_struct(struct stat *info){
+  fstat_vector.clear();
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_dev));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_ino));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_mode));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_nlink));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_uid));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_gid));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_rdev));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_size));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_blksize));
+  fstat_vector.push_back(static_cast<uint64_t>(info->st_blocks));
+}
+
+void SpecialFunctionHandler::handle_get_fstat_index(
+  ExecutionState &state, KInstruction *target,
+  std::vector<ref<Expr> > &arguments) {
+  
+  auto fstat_index_val = executor.toUnique(state, arguments[0]);
+  auto index_uint = llvm::dyn_cast<ConstantExpr>(fstat_index_val)->getZExtValue();
+  
+  executor.bindLocal(target, state, ConstantExpr::create( fstat_vector[index_uint] , Expr::Int64 ));
+}
+
+
 void SpecialFunctionHandler::handle__fstat64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
@@ -267,11 +285,25 @@ void SpecialFunctionHandler::handle__fstat64(
   auto stat = reinterpret_cast<struct stat *>(stat_uint);
   auto stat_ret = fstat(fd_uint, stat);
 
+
+  LOG(INFO) << "----------------SPECIAL FUNC HANDLER FSTAT---------------------";
+  LOG(INFO) << "dev_t " << stat->st_dev;
+  LOG(INFO) << "ino_t " << stat->st_ino;
+  LOG(INFO) << "mode_t " << stat->st_mode;
+  LOG(INFO) << "nlink_t " << stat->st_nlink;
+  LOG(INFO) << "uid_t " << stat->st_uid;
+  LOG(INFO) << "gid_t " << stat->st_gid;
+  LOG(INFO) << "dev_t " << stat->st_rdev;
+  LOG(INFO) << "off_t size"  << stat->st_size;
+  LOG(INFO) << "block size " << stat->st_blksize;
+  LOG(INFO) << "number of blocks" << stat->st_blocks;
+  LOG(INFO) << "----------------SPECIAL FUNC HANDLER FSTAT---------------------";
   // must set errno
   if (stat_ret == -1 ){
     executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));
     errno = EFAULT;
   } else {
+    set_up_fstat_struct(stat);
     executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int64));
     errno = 0;
   }

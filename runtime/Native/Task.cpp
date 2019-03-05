@@ -26,9 +26,43 @@ LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
 
 void __kleemill_log_state(State *state);
 
-Memory * __remill_log_state(State *state, Memory **memory){
-  __kleemill_log_state(state);
-  return *memory;
+inline static void LogGPR64(char *&os, addr_t val, const char *reg_name){
+  os = &os[sprintf(os, "  %s %016llx\n", reg_name, val)];
+}
+
+float __remill_fabs_32(float f32){
+  if (f32 < 0){
+    return f32 * -1;
+  }
+  return f32;
+}
+
+Memory * __remill_log_state(State *state, Memory *memory){
+ /*
+ char buff[512];
+ auto os = &buff[0];
+ LogGPR64(os, state->gpr.rip.aword, "RIP");
+ LogGPR64(os, state->gpr.rsp.aword, "RSP");
+ LogGPR64(os, state->gpr.rbp.aword, "RBP");
+ LogGPR64(os, state->gpr.rax.aword, "RAX");
+ LogGPR64(os, state->gpr.rbx.aword, "RBX");
+ LogGPR64(os, state->gpr.rcx.aword, "RCX");
+ LogGPR64(os, state->gpr.rdx.aword, "RDX");
+ LogGPR64(os, state->gpr.rsi.aword, "RSI");
+ LogGPR64(os, state->gpr.rdi.aword, "RDI");
+ LogGPR64(os, state->gpr.r8.aword, "R8");
+ LogGPR64(os, state->gpr.r9.aword, "R9");
+ LogGPR64(os, state->gpr.r10.aword, "R10");
+ LogGPR64(os, state->gpr.r11.aword, "R11");
+ LogGPR64(os, state->gpr.r12.aword, "R12");
+ LogGPR64(os, state->gpr.r13.aword, "R13");
+ LogGPR64(os, state->gpr.r14.aword, "R14");
+ LogGPR64(os, state->gpr.r15.aword, "R15");
+ os[0] = '\n';
+ os[1] = 0;
+ puts(buff);
+ */
+ return memory;
 }
 
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
@@ -440,6 +474,7 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   State *state = reinterpret_cast<State *>(argv[1]);
   Task *task = __kleemill_create_task(state, memory);
+
   __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;

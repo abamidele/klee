@@ -40,6 +40,12 @@ bool IntrinsicCleanerPass::runOnModule(Module &M) {
     Declare->eraseFromParent();
     dirty = true;
   }
+
+  if (Function *fabsDeclare = M.getFunction("llvm.fabs.f32")){
+    fabsDeclare->setName("__remill_fabs_32");
+    dirty = true;
+  }
+
   return dirty;
 }
 
@@ -265,6 +271,13 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
+      //  TODO (sai) figure out what llvm version this begins 
+      //  to exist in and add a macro
+      case Intrinsic::fabs: {
+        dirty = true;
+        break;
+      }
+
       default:
         IL->LowerIntrinsicCall(ii);
         dirty = true;

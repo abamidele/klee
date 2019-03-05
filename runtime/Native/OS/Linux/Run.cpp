@@ -101,7 +101,7 @@ extern "C" void __kleemill_schedule(void) {
           }
 
           gCurrent = task;
-          printf("executing\n");
+          //printf("executing\n");
           task->continuation(reinterpret_cast<State &>(*task),
                              task->last_pc, task->memory);
           gCurrent = nullptr;

@@ -21,12 +21,16 @@ class Function;
 class Module;
 }  // namespace llvm
 
+
+struct stat;
+
 namespace klee {
 class Executor;
 class Expr;
 class ExecutionState;
 struct KInstruction;
 template<typename T> class ref;
+
 
 class SpecialFunctionHandler {
  private:
@@ -37,6 +41,7 @@ class SpecialFunctionHandler {
       ExecutionState &state, KInstruction *target,
       std::vector<ref<Expr> > &arguments);
   typedef std::map<const llvm::Function*, std::pair<Handler, bool> > handlers_ty;
+  std::vector<uint64_t> fstat_vector;
 
   handlers_ty handlers;
   class Executor &executor;
@@ -108,6 +113,8 @@ class SpecialFunctionHandler {
   /* Convenience routines */
 
   std::string readStringAtAddress(ExecutionState &state, ref<Expr> address);
+
+  void set_up_fstat_struct(struct stat *info);
 
   /* Handlers */
 
@@ -186,6 +193,7 @@ class SpecialFunctionHandler {
   HANDLER(handle__fstat64);
   HANDLER(handle__stat64);
   HANDLER(handle_openat64);
+  HANDLER(handle_get_fstat_index);
 
 #undef HANDLER
 };

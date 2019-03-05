@@ -468,6 +468,10 @@ static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
 
 // Emulate a an `fstat` system call.
 //
+//
+extern "C" int my_fstat(int fd, struct stat *info);
+extern "C" uint64_t get_fstat_index(int index);
+
 template<typename T, typename ABI>
 static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
   int fd = -1;
@@ -483,13 +487,38 @@ static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
-  struct stat info = { };
-
-  if (fstat(fd, &info)) {
+  struct stat info =  {};
+  if (my_fstat(fd, &info)) {
     auto err = errno;
     STRACE_ERROR(fstat, "Can't fstat fd %d: %s", fd, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
+
+  info.st_dev = get_fstat_index(0);
+  info.st_ino = get_fstat_index(1);
+  info.st_mode = get_fstat_index(2);
+  info.st_nlink = get_fstat_index(3);
+  info.st_uid = get_fstat_index(4);
+  info.st_gid = get_fstat_index(5);
+  info.st_rdev = get_fstat_index(6);
+  info.st_size = get_fstat_index(7);
+  info.st_blksize =get_fstat_index(8);
+  info.st_blocks = get_fstat_index(9);
+ 
+  /*
+  puts("---------FSTAT STRUCT FIELDS------------");
+  printf("st_dv: %ld\n", info.st_dev);
+  printf("st_ino: %ld\n", info.st_ino);
+  printf("st_mode: %ld\n", info.st_mode);
+  printf("st_nlink: %ld\n", info.st_nlink);
+  printf("st_uid: %ld\n", info.st_uid);
+  printf("st_gid: %ld\n", info.st_gid);
+  printf("st_rdev: %ld\n", info.st_rdev);
+  printf("st_size: %ld\n", info.st_size);
+  printf("st_blksize: %ld\n", info.st_blksize);
+  printf("st_blocks: %ld\n", info.st_blocks);
+  puts("---------FSTAT STRUCT FIELDS------------");
+  */
 
   T info32 = {};
   CopyStat(info, &info32);

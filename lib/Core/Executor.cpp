@@ -583,11 +583,10 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   guide.slp_vectorize = false;
   guide.loop_vectorize = false;
   guide.verify_input = false;
-  guide.eliminate_dead_stores = false; //true;
+  guide.eliminate_dead_stores = true; // false;
 
   //LOG(INFO)
   //    << "Optimizing lifted traces";
-
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
   for (auto lifted_entry : new_lifted_traces) {
@@ -621,6 +620,27 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
     }
     */
   }
+  /*
+  for (auto& func: *holding_module){
+    for (auto& block: func){
+      for (auto &ins: block){
+        switch(ins.getOpcode()){
+          case (Instruction::Load): {
+            auto load_ins = llvm::dyn_cast<LoadInst>(&ins);
+            load_ins->setVolatile(true);
+            break;
+          }
+          case (Instruction::Store): {
+            auto store_ins = llvm::dyn_cast<StoreInst>(&ins);
+            store_ins->setVolatile(true);
+            break;
+          }
+        }
+      }
+    }
+  }
+  */
+
   kmodule->instrument(holding_module.get(), opts);
   specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
   kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
@@ -644,7 +664,9 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
   }
-
+  //new_lifted_traces[addr] -> dump();
+  //exit(0);
+  //remill::StoreModuleIRToFile(traces_module,  "logging_trace.bc");
   return new_lifted_traces[addr];
 }
 

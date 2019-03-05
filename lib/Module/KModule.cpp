@@ -58,6 +58,7 @@
 #endif
 
 #include <sstream>
+#include "remill/BC/Util.h"
 
 using namespace llvm;
 using namespace klee;
