@@ -66,13 +66,15 @@ extern "C" linux_task *__kleemill_create_task(State *state,
   task->wake_count = 0;
 
   task->next = gTaskList;
+  task->next_circular = gTaskList;
+
   gTaskList = task;
 
   if (!gTaskList) {
-    task->next_circular = &gTaskList;
-  } else {
-    task->next_circular = &(task->next);
+    gLastTask = task;
   }
+
+  gLastTask->next_circular = task;
 
   return task;
 }

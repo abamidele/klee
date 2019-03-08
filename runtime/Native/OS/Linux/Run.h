@@ -406,7 +406,7 @@ static constexpr unsigned kBlockedForever = ~0U;
 struct linux_task : public Task {
   Memory *memory;
   linux_task *next;
-  linux_task **next_circular;
+  linux_task *next_circular;
   linux_x86_user_desc tls_slots[kNumTLSSlots];
 
   // Used for scheduling, e.g. `sleep`, `futex`, etc.
