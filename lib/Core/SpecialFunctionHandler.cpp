@@ -229,15 +229,8 @@ void SpecialFunctionHandler::handle_openat64(
  auto mode_uint = llvm::dyn_cast<ConstantExpr>(mode_val)->getZExtValue();
 
 
- LOG(INFO) << "------OPENAT LOG-------------";
- LOG(INFO) <<"pathname before openat: " << pathname;
-
-
  auto open_status = openat(dirfd_uint, pathname, flags_uint, mode_uint);
 
- LOG(INFO) << open_status << ", at " << pathname;
- LOG(INFO) << "------OPENAT LOG-------------";
- 
  if (open_status == -1){
     executor.bindLocal(target, state, ConstantExpr::create(open_status, Expr::Int32));
     errno = ENOENT;
@@ -285,19 +278,6 @@ void SpecialFunctionHandler::handle__fstat64(
   auto stat = reinterpret_cast<struct stat *>(stat_uint);
   auto stat_ret = fstat(fd_uint, stat);
 
-
-  LOG(INFO) << "----------------SPECIAL FUNC HANDLER FSTAT---------------------";
-  LOG(INFO) << "dev_t " << stat->st_dev;
-  LOG(INFO) << "ino_t " << stat->st_ino;
-  LOG(INFO) << "mode_t " << stat->st_mode;
-  LOG(INFO) << "nlink_t " << stat->st_nlink;
-  LOG(INFO) << "uid_t " << stat->st_uid;
-  LOG(INFO) << "gid_t " << stat->st_gid;
-  LOG(INFO) << "dev_t " << stat->st_rdev;
-  LOG(INFO) << "off_t size"  << stat->st_size;
-  LOG(INFO) << "block size " << stat->st_blksize;
-  LOG(INFO) << "number of blocks" << stat->st_blocks;
-  LOG(INFO) << "----------------SPECIAL FUNC HANDLER FSTAT---------------------";
   // must set errno
   if (stat_ret == -1 ){
     executor.bindLocal(target, state, ConstantExpr::create(stat_ret, Expr::Int32));

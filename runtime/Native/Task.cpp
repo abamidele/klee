@@ -30,13 +30,6 @@ inline static void LogGPR64(char *&os, addr_t val, const char *reg_name){
   os = &os[sprintf(os, "  %s %016llx\n", reg_name, val)];
 }
 
-float __remill_fabs_32(float f32){
-  if (f32 < 0){
-    return f32 * -1;
-  }
-  return f32;
-}
-
 Memory * __remill_log_state(State *state, Memory *memory){
  /*
  char buff[512];
@@ -73,8 +66,9 @@ Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
     task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
+    return task.continuation(state, task.last_pc, memory);
   }
-  return task.continuation(state, task.last_pc, memory);
+  return memory;
 }
 
 Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
@@ -86,8 +80,9 @@ Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
     task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
+    return task.continuation(state, task.last_pc, memory);
   }
-  return task.continuation(state, task.last_pc, memory);
+  return memory;
 }
 
 Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
@@ -99,8 +94,9 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
     task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
+    return task.continuation(state, task.last_pc, memory);
   }
-  return task.continuation(state, task.last_pc, memory);
+  return memory;
 }
 
 Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
@@ -125,13 +121,15 @@ Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
 
   auto &task = reinterpret_cast<Task &>(state);
+  puts("MISSING BLOCK");
   if (CanContinue(task.location)) {
     task.status = kTaskStatusError;
     task.location = kTaskStoppedAtError;
     task.continuation = __kleemill_at_error;
     task.last_pc = pc;
+    //return task.continuation(state, task.last_pc, memory);
   }
-  return task.continuation(state, task.last_pc, memory);
+  return memory;
 }
 
 Memory * __remill_error(State &state, addr_t pc, Memory *memory) {
@@ -142,8 +140,9 @@ Memory * __remill_error(State &state, addr_t pc, Memory *memory) {
     task.location = kTaskStoppedAtError;
     task.continuation = __kleemill_at_error;
     task.last_pc = pc;
+    //return task.continuation(state, task.last_pc, memory);
   }
-  return task.continuation(state, task.last_pc, memory);
+  return memory;
 }
 
 uint8_t __remill_undefined_8(void) {

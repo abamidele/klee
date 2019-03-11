@@ -102,9 +102,8 @@ extern "C" void __kleemill_schedule(void) {
           }
 
           gCurrent = task;
-          //printf("executing\n");
-          task->continuation(reinterpret_cast<State &>(*task),
-                             task->last_pc, task->memory);
+          puts("executing");
+          task->continuation(reinterpret_cast<State &>(*task), task->last_pc, task->memory);
           gCurrent = nullptr;
           break;
 
@@ -120,7 +119,7 @@ extern "C" void __kleemill_schedule(void) {
     for (auto try_again = true; try_again && !progressed; ) {
       try_again = false;
       for (auto task = gTaskList; task; task = task->next) {
-        if (kTaskStatusResumable == task->status) {
+        if (kTaskStatusResumable == task->status || task->status == kTaskStatusRunnable) {
           if (task->blocked_count) {
             task->blocked_count--;
             try_again = true;

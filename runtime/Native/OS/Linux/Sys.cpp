@@ -20,22 +20,22 @@ template <typename ABI>
 static Memory *SysExit(Memory *memory, State *state,
                        const ABI &syscall) {
   int exit_code = EXIT_SUCCESS;
+  
+  auto task = reinterpret_cast<linux_task *>(state);
+
   if (!syscall.TryGetArgs(memory, state, &exit_code)) {
     STRACE_ERROR(exit, "Couldn't get args");
     memory = syscall.SetReturn(memory, state, -EFAULT);
   } else {
     STRACE_SUCCESS(exit, "status=%d", exit_code);
+    task->location = kTaskStoppedAtExit;
+    task->status = kTaskStatusExited;
   }
-
-  auto task = reinterpret_cast<linux_task *>(state);
 
   if (task->clear_child_tid) {
     // futex(clear_child_tid, FUTEX_WAKE, 1, NULL, NULL, 0);
     DoWake(task, task->clear_child_tid, ~0U, 1);
   }
-
-  task->location = kTaskStoppedAtExit;
-  task->status = kTaskStatusExited;
 
   return memory;
 }

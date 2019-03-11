@@ -247,6 +247,10 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     case AsyncHyperCall::kX86SysCall: {
       Amd64SyscallSystemCall syscall;
       memory = AMD64SystemCall(memory, &state, syscall);
+      if(task.status == kTaskStatusExited) {
+          break;
+      }
+
       if (syscall.Completed()) {
         ret_addr = syscall.GetReturnAddress(memory, &state, ret_addr);
         state.gpr.rip.aword = ret_addr;
