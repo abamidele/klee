@@ -155,7 +155,6 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
                                const ABI &syscall) {
   auto syscall_num = syscall.GetSystemCallNum(memory, state);
   STRACE_SYSCALL_NUM(syscall_num);  
-  return SysExit(memory, state, syscall);
   switch (syscall_num) {
     case 0: return SysRead(memory, state, syscall);
     case 1: return SysWrite(memory, state, syscall);
