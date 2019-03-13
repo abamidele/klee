@@ -59,42 +59,51 @@ Memory * __remill_log_state(State *state, Memory *memory){
 }
 
 Memory * __remill_function_call(State &state, addr_t pc, Memory *memory) {
-  auto &task = reinterpret_cast<Task &>(state);
+  
+  //puts("__remill_function_call");
+  auto &task = reinterpret_cast<linux_task &>(state);
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
+    task.state = state;
+    task.memory = memory;
     task.location = kTaskStoppedAtCallTarget;
     task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
-    return task.continuation(state, task.last_pc, memory);
+    //return task.continuation(state, task.last_pc, memory);
   }
   return memory;
 }
 
 Memory * __remill_function_return(State &state, addr_t pc, Memory *memory) {
 
-  auto &task = reinterpret_cast<Task &>(state);
+  //puts("__remill_function_return");
+  auto &task = reinterpret_cast<linux_task &>(state);
   if (CanContinue(task.location)) {
     task.time_stamp_counter += 1000;
+    task.memory = memory;
+    task.state = state;
     task.location = kTaskStoppedAtReturnTarget;
     task.status = kTaskStatusRunnable;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
-    return task.continuation(state, task.last_pc, memory);
+    //return task.continuation(state, task.last_pc, memory);
   }
   return memory;
 }
 
 Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
-
-  auto &task = reinterpret_cast<Task &>(state);
+  //puts("__remill_jump");
+  auto &task = reinterpret_cast<linux_task &>(state);
   if (CanContinue(task.location)) {
+    task.memory = memory;
     task.time_stamp_counter += 1000;
     task.location = kTaskStoppedAtJumpTarget;
     task.status = kTaskStatusRunnable;
+    task.state = state;
     task.last_pc = pc;
     task.continuation = __kleemill_get_lifted_function(memory, pc);
-    return task.continuation(state, task.last_pc, memory);
+    //return task.continuation(state, task.last_pc, memory);
   }
   return memory;
 }
@@ -121,12 +130,13 @@ Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
 
   auto &task = reinterpret_cast<Task &>(state);
-  puts("MISSING BLOCK");
+  //puts("MISSING BLOCK");
   if (CanContinue(task.location)) {
-    task.status = kTaskStatusError;
-    task.location = kTaskStoppedAtError;
-    task.continuation = __kleemill_at_error;
-    task.last_pc = pc;
+    //puts("MISSING CAN CONTINUE");
+    task.status = kTaskStatusResumable;
+    task.location = kTaskStoppedAtMissingBlock;
+    //task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);//__kleemill_at_error;
+    //task.last_pc = pc;
     //return task.continuation(state, task.last_pc, memory);
   }
   return memory;

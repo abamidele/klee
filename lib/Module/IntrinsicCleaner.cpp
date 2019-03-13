@@ -277,6 +277,13 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         dirty = true;
         break;
       }
+      //  TODO (sai) figure out what llvm version this begins 
+      //  to exist in and add a macro
+     
+      case Intrinsic::nearbyint: {
+        dirty = true;
+        break;
+      }
 
       default:
         IL->LowerIntrinsicCall(ii);

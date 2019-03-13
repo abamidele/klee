@@ -423,6 +423,11 @@ struct linux_task : public Task {
   addr_t set_child_tid;
 };
 
+// Unsupported async_hyper_calls in /bin/ls
+// 273
+// 302
+// 137
+
 #pragma clang diagnostic pop
 
 // Returns a pointer to the currently executing task.

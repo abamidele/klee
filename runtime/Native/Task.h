@@ -49,17 +49,16 @@ enum TaskStopLocation : uint64_t {
   kTaskStoppedBeforeUnhandledHyperCall,
   kTaskStoppedAtUnsupportedInstruction,
   kTaskStoppedAtExit,
+  kTaskStoppedAtMissingBlock,
 };
 
 inline static bool CanContinue(TaskStopLocation loc) {
   switch (loc) {
-    case kTaskStoppedAtError:
-    case kTaskStoppedBeforeUnhandledHyperCall:
-    case kTaskStoppedAtUnsupportedInstruction:
-    case kTaskStoppedAtExit:
-      return false;
-    default:
-      return true;
+    case kTaskStoppedAtError: return false;
+    case kTaskStoppedBeforeUnhandledHyperCall: return false;
+    case kTaskStoppedAtUnsupportedInstruction: return false;
+    case kTaskStoppedAtExit: return false;
+    default: return true;
   }
 }
 
