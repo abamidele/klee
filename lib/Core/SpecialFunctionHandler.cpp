@@ -201,6 +201,10 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("stat64", handle__stat64 , true),
     add("openat64", handle_openat64, true),
     add("get_fstat_index", handle_get_fstat_index, true),
+    add("get_dirent_index", handle_get_dirent_index, true),
+    add("get_dirent_name", handle_get_dirent_name, true),
+    add("my_readdir", handle__my_readdir, true),
+ 
 
 
 #undef addDNR
@@ -265,6 +269,65 @@ void SpecialFunctionHandler::handle_get_fstat_index(
   executor.bindLocal(target, state, ConstantExpr::create( fstat_vector[index_uint] , Expr::Int64 ));
 }
 
+void SpecialFunctionHandler::handle_get_dirent_name(
+  ExecutionState &state, KInstruction *target,
+  std::vector<ref<Expr> > &arguments) {
+  executor.bindLocal(target, state, 
+  Expr::createPointer(reinterpret_cast<uintptr_t>(dirent_entry.d_name)));
+}
+
+void SpecialFunctionHandler::handle_get_dirent_index(
+  ExecutionState &state, KInstruction *target,
+  std::vector<ref<Expr> > &arguments) {
+  
+  auto dirent_index_val = executor.toUnique(state, arguments[0]);
+  auto index_uint = llvm::dyn_cast<ConstantExpr>(dirent_index_val)->getZExtValue();
+  unsigned field;
+  switch (index_uint) {
+    case 0: {
+      field = dirent_entry.d_ino;
+    }
+    case 1: {
+      field = dirent_entry.d_off;
+    }
+    case 2: {
+      field = dirent_entry.d_reclen;
+    }
+    case 3: {
+      field = dirent_entry.d_type;
+    }
+  }
+  executor.bindLocal(target, state, ConstantExpr::create( field , Expr::Int64 ));
+}
+
+void SpecialFunctionHandler::set_up_dirent_struct(
+    struct dirent *info){
+  dirent_entry.d_ino = info->d_ino;
+  dirent_entry.d_off = info->d_off;
+  dirent_entry.d_reclen = info->d_reclen;
+  dirent_entry.d_type = info->d_type;
+  strcpy(dirent_entry.d_name, info->d_name);
+}
+
+void SpecialFunctionHandler::handle__my_readdir(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  
+  auto dir_val = executor.toUnique(state, arguments[0]);
+  auto dir_uint = llvm::dyn_cast<ConstantExpr>(dir_val)->getZExtValue();
+
+  auto dir = reinterpret_cast<DIR *>(dir_uint);
+  auto dirent = readdir(dir);
+
+  // must set errno
+  if (!dirent ){
+    executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
+  } else {
+    set_up_dirent_struct(dirent);
+    executor.bindLocal(target, state, ConstantExpr::create(true, Expr::Bool));
+  }
+
+}
 
 void SpecialFunctionHandler::handle__fstat64(
     ExecutionState &state, KInstruction *target,

@@ -702,6 +702,10 @@ static Memory *SysReadLinkAt(Memory *memory, State *state, const ABI &syscall) {
   return syscall.SetReturn(memory, state, ret);
 }
 
+extern "C" bool my_readdir(DIR *dirp);
+extern "C" unsigned get_dirent_index(int index);
+extern "C" char* get_dirent_name();
+
 template<typename ABI>
 static Memory *SysGetDirEntries64(Memory *memory, State *state,
                                   const ABI &syscall) {
@@ -747,14 +751,24 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
     if (written) {
       pos = telldir(dir);
     }
-
-    auto our_entry = readdir(dir);
-    if (!our_entry) {
+    auto our_entry_bool = my_readdir(dir);
+    struct dirent our_entry;
+    if (!our_entry_bool) {
       break;
     }
 
+    our_entry.d_ino = get_dirent_index(0);
+    our_entry.d_off = get_dirent_index(1);
+    
+    our_entry.d_reclen = get_dirent_index(2);
+
+    our_entry.d_type = get_dirent_index(3);
+
+    puts(get_dirent_name());
+    our_entry.d_name[0] = 0;
+    //strcpy(our_entry.d_name,get_dirent_name()); 
     struct linux_dirent64 entry = { };
-    auto name_len = strlen(our_entry->d_name);
+    auto name_len = strlen(our_entry.d_name);
     auto entry_addr = dirent + written;
     auto dirent_size = __builtin_offsetof(struct linux_dirent64, d_type) + 1;
     auto to_write = dirent_size + name_len + sizeof(char);  // For NUL-byte.
@@ -769,18 +783,18 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
       break;
     }
 
-    entry.d_ino = static_cast<decltype(entry.d_ino)>(our_entry->d_ino);
+    entry.d_ino = static_cast<decltype(entry.d_ino)>(our_entry.d_ino);
 #ifdef __APPLE__
-    entry.d_off = static_cast<decltype(entry.d_off)>(our_entry->d_seekoff);
+    entry.d_off = static_cast<decltype(entry.d_off)>(our_entry.d_seekoff);
 #else
-    entry.d_off = static_cast<decltype(entry.d_off)>(our_entry->d_off);
+    entry.d_off = static_cast<decltype(entry.d_off)>(our_entry.d_off);
 #endif
     entry.d_reclen = static_cast<uint16_t>(to_write);
-    entry.d_type = static_cast<decltype(entry.d_type)>(our_entry->d_type);
+    entry.d_type = static_cast<decltype(entry.d_type)>(our_entry.d_type);
 
     TryWriteMemory(memory, entry_addr, entry);
     CopyStringToMemory(memory, entry_addr + static_cast<addr_t>(dirent_size),
-                       our_entry->d_name, name_len + 1);
+                       our_entry.d_name, name_len + 1);
 
     written += to_write;
     ret = static_cast<long int>(written);

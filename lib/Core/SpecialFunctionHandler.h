@@ -15,6 +15,7 @@
 #include <vector>
 #include <string>
 #include <deque>
+#include <dirent.h>
 
 namespace llvm {
 class Function;
@@ -42,6 +43,8 @@ class SpecialFunctionHandler {
       std::vector<ref<Expr> > &arguments);
   typedef std::map<const llvm::Function*, std::pair<Handler, bool> > handlers_ty;
   std::vector<uint64_t> fstat_vector;
+  struct dirent dirent_entry;
+  std::string entry_name;
 
   handlers_ty handlers;
   class Executor &executor;
@@ -115,6 +118,8 @@ class SpecialFunctionHandler {
   std::string readStringAtAddress(ExecutionState &state, ref<Expr> address);
 
   void set_up_fstat_struct(struct stat *info);
+  void set_up_dirent_struct(struct dirent *info);
+
 
   /* Handlers */
 
@@ -194,6 +199,9 @@ class SpecialFunctionHandler {
   HANDLER(handle__stat64);
   HANDLER(handle_openat64);
   HANDLER(handle_get_fstat_index);
+  HANDLER(handle__my_readdir);
+  HANDLER(handle_get_dirent_index);
+  HANDLER(handle_get_dirent_name);
 
 #undef HANDLER
 };
