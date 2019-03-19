@@ -250,6 +250,9 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         auto nullArg = ii->getArgOperand(2);
         assert(nullArg && "Failed to get second argument");
         auto nullArgAsInt = dyn_cast<ConstantInt>(nullArg);
+        if (nullArgAsInt->getBitWidth() == 1 ){
+            puts("third arg is not i1");
+        }
         assert(nullArgAsInt && "Third arg is not a ConstantInt");
         assert(nullArgAsInt->getBitWidth() == 1 &&
                "Third argument is not an i1");

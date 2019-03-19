@@ -248,6 +248,8 @@ static Memory *SysOpen(Memory *memory, State *state,
 }
 
 // Emulate an `openat` system call.
+extern "C" int my_openat(int dirfd, const char * pathname, int flags, 
+        mode_t mode);
 
 template <typename ABI>
 static Memory *SysOpenAt(Memory *memory, State *state,
@@ -276,7 +278,7 @@ static Memory *SysOpenAt(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -EFAULT);
   }
   puts(gPath);
-  auto fd = openat64(dirfd, gPath, oflag, mode);
+  auto fd = openat(dirfd, gPath, oflag, mode);
   puts(gPath);
   if (-1 == fd) {
     auto err = errno;

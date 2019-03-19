@@ -105,7 +105,6 @@ cl::opt<bool> UseCallPaths(
         "Enable calltree tracking for instruction level statistics (default=on)"));
 
 }
-
 ///
 
 bool StatsTracker::useStatistics() {

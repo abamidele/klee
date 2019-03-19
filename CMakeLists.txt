@@ -226,7 +226,6 @@ target_include_directories(${KLEEMILL} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIE
 target_compile_definitions(${KLEEMILL} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${KLEEMILL} PRIVATE ${PROJECT_CXXFLAGS})
 
-
 add_subdirectory(runtime)
 
 if(NOT APPLE)

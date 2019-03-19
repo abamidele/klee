@@ -10,18 +10,20 @@
 #include <glog/logging.h>
 
 #define DEBUG_TYPE "KModule"
-#include "klee/Internal/Module/KModule.h"
-#include "klee/Internal/Support/ErrorHandling.h"
 
 #include "Passes.h"
 
 #include "klee/Config/Version.h"
-#include "klee/Interpreter.h"
 #include "klee/Internal/Module/Cell.h"
-#include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/InstructionInfoTable.h"
+#include "klee/Internal/Module/KInstruction.h"
+#include "klee/Internal/Module/KModule.h"
+#include "klee/Internal/Module/LLVMPassManager.h"
 #include "klee/Internal/Support/Debug.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Support/ModuleUtil.h"
+#include "klee/Interpreter.h"
+#include "klee/OptionCategories.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(4, 0)
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -41,15 +43,18 @@
 #include "llvm/Support/CallSite.h"
 #else
 #include "llvm/IR/CallSite.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #endif
 
-#include "klee/Internal/Module/LLVMPassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Scalar.h"
+#if LLVM_VERSION_CODE >= LLVM_VERSION(8, 0)
+#include "llvm/Transforms/Scalar/Scalarizer.h"
+#endif
 
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -62,6 +67,12 @@
 
 using namespace llvm;
 using namespace klee;
+
+namespace klee {
+cl::OptionCategory
+    ModuleCat("Module-related options",
+              "These options affect the compile-time processing of the code.");
+}
 
 namespace {
   enum SwitchImplType {
@@ -78,10 +89,11 @@ namespace {
   cl::opt<bool>
   OutputModule("output-module",
                cl::desc("Write the bitcode for the final transformed module"),
-               cl::init(false));
+               cl::init(false),
+	       cl::cat(ModuleCat));
 
   cl::opt<SwitchImplType>
-  SwitchType("switch-type", cl::desc("Select the implementation of switch"),
+  SwitchType("switch-type", cl::desc("Select the implementation of switch (default=internal)"),
              cl::values(clEnumValN(eSwitchTypeSimple, "simple", 
                                    "lower to ordered branches"),
                         clEnumValN(eSwitchTypeLLVM, "llvm", 
@@ -89,11 +101,25 @@ namespace {
                         clEnumValN(eSwitchTypeInternal, "internal", 
                                    "execute switch internally")
                         KLEE_LLVM_CL_VAL_END),
-             cl::init(eSwitchTypeInternal));
+             cl::init(eSwitchTypeInternal),
+	     cl::cat(ModuleCat));
   
   cl::opt<bool>
   DebugPrintEscapingFunctions("debug-print-escaping-functions", 
-                              cl::desc("Print functions whose address is taken."));
+                              cl::desc("Print functions whose address is taken (default=false)"),
+			      cl::cat(ModuleCat));
+
+  // Don't run VerifierPass when checking module
+  cl::opt<bool>
+  DontVerify("disable-verify",
+             cl::desc("Do not verify the module integrity (default=false)"),
+             cl::init(false), cl::cat(klee::ModuleCat));
+
+  cl::opt<bool>
+  OptimiseKLEECall("klee-call-optimisation",
+                             cl::desc("Allow optimization of functions that "
+                                      "contain KLEE calls (default=true)"),
+                             cl::init(true), cl::cat(ModuleCat));
 }
 
 /***/
@@ -296,6 +322,9 @@ void KModule::optimiseAndPrepare(
   // linked in something with intrinsics but any external calls are
   // going to be unresolved. We really need to handle the intrinsics
   // directly I think?
+  InstructionOperandTypeCheckPass *operandTypeCheckPass =
+       new InstructionOperandTypeCheckPass();
+
   LegacyLLVMPassManagerTy pm3;
   pm3.add(createCFGSimplificationPass());
   switch(SwitchType) {
@@ -308,8 +337,6 @@ void KModule::optimiseAndPrepare(
     default:
       klee_error("invalid --switch-type");
   }
-  InstructionOperandTypeCheckPass *operandTypeCheckPass =
-      new InstructionOperandTypeCheckPass();
   pm3.add(new IntrinsicCleanerPass(*targetData));
   pm3.add(new PhiCleanerPass());
   pm3.add(operandTypeCheckPass);

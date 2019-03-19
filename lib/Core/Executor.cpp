@@ -1098,9 +1098,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 
   time::Span timeout = coreSolverTimeout;
-  if (isSeeding)
-    timeout *= it->second.size();
   solver->setTimeout(timeout);
+  
   bool success = solver->evaluate(current, condition, res);
   solver->setTimeout(time::Span());
   if (!success) {

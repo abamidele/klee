@@ -11,21 +11,20 @@
 #include "StatsTracker.h"
 #include "ExternalDispatcher.h"
 
-#include "Memory.h"
 #include "SpecialFunctionHandler.h"
+
+#include "Executor.h"
+#include "Memory.h"
+#include "MemoryManager.h"
 #include "TimingSolver.h"
 #include "klee/MergeHandler.h"
 
 #include "klee/ExecutionState.h"
-
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ErrorHandling.h"
-
-#include "Executor.h"
-#include "MemoryManager.h"
-
+#include "klee/OptionCategories.h"
 #include "klee/SolverCmdLine.h"
 
 #include "llvm/IR/Module.h"
@@ -47,6 +46,7 @@
 #include <cstring>
 #include <limits>
 #include <type_traits>
+
 #include <errno.h>
 #include <sstream>
 #include <iostream>
@@ -66,20 +66,19 @@ using namespace llvm;
 using namespace klee;
 
 namespace {
-cl::opt<bool> ReadablePosix(
-    "readable-posix-inputs",
-    cl::init(false),
-    cl::desc(
-        "Prefer creation of POSIX inputs (command-line arguments, files, etc.) with human readable bytes. "
-        "Note: option is expensive when creating lots of tests (default=false)"));
+cl::opt<bool>
+    ReadablePosix("readable-posix-inputs", cl::init(false),
+                  cl::desc("Prefer creation of POSIX inputs (command-line "
+                           "arguments, files, etc.) with human readable bytes. "
+                           "Note: option is expensive when creating lots of "
+                           "tests (default=false)"));
 
-cl::opt<bool> SilentKleeAssume(
-    "silent-klee-assume", cl::init(false),
-    cl::desc("Silently terminate paths with an infeasible "
-             "condition given to klee_assume() rather than "
-             "emitting an error (default=false)"));
-}
-
+cl::opt<bool>
+    SilentKleeAssume("silent-klee-assume", cl::init(false),
+                     cl::desc("Silently terminate paths with an infeasible "
+                              "condition given to klee_assume() rather than "
+                              "emitting an error (default=false)"));
+} // namespace
 /// \todo Almost all of the demands in this file should be replaced
 /// with terminateState calls.
 
@@ -199,13 +198,11 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("klee_overshift_check", handle__klee_overshift_check , false),
     add("my_fstat", handle__fstat64 , true),
     add("stat64", handle__stat64 , true),
-    add("openat64", handle_openat64, true),
+    add("my_openat", handle_openat64, true),
     add("get_fstat_index", handle_get_fstat_index, true),
     add("get_dirent_index", handle_get_dirent_index, true),
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
- 
-
 
 #undef addDNR
 #undef add
