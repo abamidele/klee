@@ -42,6 +42,7 @@
 
 #include "runtime/POSIX/posix.c"
 #include "runtime/FreeStanding/FreeStanding.cpp"
+#include "runtime/Runtest/intrinsics.c"
 
 #include "remill/Arch/Runtime/Intrinsics.h"
 #include "remill/Arch/Runtime/Intrinsics.cpp"

@@ -75,6 +75,7 @@ AddressSpace::AddressSpace(void)
       min_addr(std::numeric_limits<uint64_t>::max()),
       addr_mask(GetAddressMask()),
       invalid(MappedRange::CreateInvalid(0, addr_mask)),
+      symbolic_memory(new klee::AddressSpace()),
       is_dead(false) {
   maps.push_back(invalid);
   CreatePageToRangeMap();

@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "Native/Memory/MappedRange.h"
+#include "Core/AddressSpace.h"
 
 struct Memory {};
 
@@ -182,6 +183,11 @@ class AddressSpace : public Memory {
 
   // Set of lifted trace heads observed for this code version.
   std::unordered_set<uint64_t> trace_heads;
+
+  /* an instance of klee's address space to handle symbolic writes and reads
+   __remill_read_memory_N and __remill_write_memory_N */
+ public:
+  std::unique_ptr<klee::AddressSpace> symbolic_memory;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.

@@ -204,6 +204,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
 
+    
 #undef addDNR
 #undef add
     };
@@ -614,14 +615,28 @@ void SpecialFunctionHandler::handle__remill_read_32(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
   auto mem = executor.Memory(mem_uint);
+  for(auto &pairs: mem->symbolic_memory->objects){
+    if ( pairs.first->address == addr_uint ) {
+      auto symbol = pairs.first->name;
+      for ( auto& sym_pairs: state.symbolics ){
+        if (symbol == sym_pairs.first->name){
+          auto writable_object = state.addressSpace.getWriteable(sym_pairs.first, state.addressSpace.findObject(sym_pairs.first));
+          auto value_val = writable_object->read(0, 32);
+          executor.bindLocal(
+           target, state, value_val);
+        }
+      }
+      return;
+    }
+  }
   uint32_t value_uint = ~static_cast<uint32_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR)
+    LOG(ERROR) 
         << "Failed 4-byte read from address 0x" << addr_uint
         << " in address space " << mem_uint;
-  }
-  executor.bindLocal(
-      target, state, ConstantExpr::create(value_uint, Expr::Int32));
+  } 
+   executor.bindLocal(
+           target, state, ConstantExpr::create(value_uint, Expr::Int32));
 }
 
 
@@ -704,16 +719,36 @@ void SpecialFunctionHandler::handle__remill_write_32(
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
-  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+  uint32_t value_uint;
   auto mem = executor.Memory(mem_uint);
-  if (mem->TryWrite(addr_uint, static_cast<uint32_t>(value_uint))) {
-    executor.bindLocal(target, state, mem_val);
+  if (isa<ConstantExpr>(value_val)) {
+    value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+    if (mem->TryWrite(addr_uint, static_cast<uint32_t>(value_uint))) {
+        executor.bindLocal(target, state, mem_val);
+    } else {
+        LOG(ERROR)
+          << "Failed 4-byte write of 0x" << std::hex << value_uint
+          << " to address 0x" << addr_uint << " in address space " << mem_uint;
+      }
   } else {
-    LOG(ERROR)
-        << "Failed 4-byte write of 0x" << std::hex << value_uint
-        << " to address 0x" << addr_uint << " in address space " << mem_uint;
-    executor.bindLocal(target, state, Expr::createPointer(0));
+    // value is symbolic
+      auto re = dyn_cast<ReadExpr>(value_val->getKid(0));
+      auto symbol = re->updates.root->name;
+      for(auto &pairs: state.symbolics){
+        if (pairs.first->name == symbol){
+          auto new_mem = new MemoryObject(addr_uint);
+          new_mem->setName(symbol);
+          auto obj_state = new ObjectState(new_mem);
+          mem->symbolic_memory->objects = 
+              mem->symbolic_memory->objects.insert(
+                      std::make_pair(new_mem, obj_state));
+          auto writable_object = state.addressSpace.getWriteable(pairs.first, 
+                                                            state.addressSpace.findObject(pairs.first));
+          writable_object->write(0,value_val);
+        }
+    }
   }
+    executor.bindLocal(target, state, Expr::createPointer(0));
 }
 
 void SpecialFunctionHandler::handle__remill_write_16(

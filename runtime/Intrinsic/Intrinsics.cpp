@@ -16,11 +16,11 @@
 
 extern "C" {
 
-#include "klee_choose.c"
+//#include "klee_choose.c"
 #include "klee_div_zero_check.c"
 #include "klee_int.c"
 #include "klee_overshift_check.c"
-#include "klee_range.c"
+//#include "klee_range.c"
 
 
 }  // extern C

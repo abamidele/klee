@@ -69,11 +69,11 @@ void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
 
   if (rand_init) {
     if (!strcmp(name,"syscall_a0")) {
-      unsigned long long *v = array;
+      unsigned long long *v = (unsigned long long *)array;
       assert(nbytes == 8);
       *v = rand() % 69;
     } else {
-      char *c = array;
+      char *c = (char *)array;
       size_t i;
       for (i=0; i<nbytes; i++)
         c[i] = rand_byte();

@@ -690,7 +690,7 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
       << "State size is " << state.size();
 
   auto task = new vTask;
-  setInhibitForking(true);  //  inhibits forking; for concrete interpretation
+  setInhibitForking(false);  //  inhibits forking; for concrete interpretation
   task->first_func = kmodule->module->getFunction("main");
   CHECK(task->first_func)
       << "vmill entrypoint is not in the bitcode";

@@ -303,7 +303,7 @@ class Executor : public Interpreter {
   /// for pointers to invalid locations (either out of bounds or
   /// address inside the middle of objects).
   ///
-  /// \param results[out] A list of ((MemoryObject,ObjectState),
+  /// \paramresults[out] A list of ((MemoryObject,ObjectState),
   /// state) pairs for each object the given address can point to the
   /// beginning of.
   typedef std::vector<
