@@ -1888,8 +1888,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         // FIXME: Find a way that we don't have this hidden dependency.
         assert(
             bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
-        ref<Expr> cond = eval(ki, 0, state).value;
 
+        ref<Expr> cond = eval(ki, 0, state).value;
         cond = optimizer.optimizeExpr(cond, false);
         Executor::StatePair branches = fork(state, cond, false);
 

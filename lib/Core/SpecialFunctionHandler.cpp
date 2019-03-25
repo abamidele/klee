@@ -575,6 +575,27 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
   auto mem = executor.Memory(mem_uint);
+  for(auto &pairs: mem->symbolic_memory->objects){
+    if ( pairs.first->address <= addr_uint
+            && ( ((pairs.first->size * 8) + pairs.first->address)
+                >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address) / 8;
+      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+      LOG(INFO) << "offset on read is " << offset;
+      auto symbol = pairs.first->name;
+      for ( auto &sym_pairs: state.symbolics ){
+        if (symbol == sym_pairs.first->name){
+          LOG(INFO) << "symbol name is " << symbol;
+          auto readable_object = 
+              state.addressSpace.findObject(sym_pairs.first);
+          auto value_val = readable_object->read(offset, 8);
+          executor.bindLocal(target, state, value_val);
+        }
+      }
+      return;
+    }
+  }
+
   uint8_t value_uint = ~static_cast<uint8_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
     LOG(ERROR)
@@ -595,6 +616,28 @@ void SpecialFunctionHandler::handle__remill_read_16(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
   auto mem = executor.Memory(mem_uint);
+  
+  for(auto &pairs: mem->symbolic_memory->objects){
+    if ( pairs.first->address <= addr_uint
+            && ( ((pairs.first->size * 8) + pairs.first->address)
+                >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address) / 8;
+      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+      LOG(INFO) << "offset on read is " << offset;
+      auto symbol = pairs.first->name;
+      for ( auto &sym_pairs: state.symbolics ){
+        if (symbol == sym_pairs.first->name){
+          LOG(INFO) << "symbol name is " << symbol;
+          auto readable_object = 
+              state.addressSpace.findObject(sym_pairs.first);
+          auto value_val = readable_object->read(offset, 16);
+          executor.bindLocal(target, state, value_val);
+        }
+      }
+      return;
+    }
+  }
+
   uint16_t value_uint = ~static_cast<uint16_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
     LOG(ERROR)
@@ -616,19 +659,26 @@ void SpecialFunctionHandler::handle__remill_read_32(
 
   auto mem = executor.Memory(mem_uint);
   for(auto &pairs: mem->symbolic_memory->objects){
-    if ( pairs.first->address == addr_uint ) {
+    if ( pairs.first->address <= addr_uint
+            && ( ((pairs.first->size * 8) + pairs.first->address)
+                >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address) / 8;
+      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+      LOG(INFO) << "offset on read is " << offset;
       auto symbol = pairs.first->name;
-      for ( auto& sym_pairs: state.symbolics ){
+      for ( auto &sym_pairs: state.symbolics ){
         if (symbol == sym_pairs.first->name){
-          auto writable_object = state.addressSpace.getWriteable(sym_pairs.first, state.addressSpace.findObject(sym_pairs.first));
-          auto value_val = writable_object->read(0, 32);
-          executor.bindLocal(
-           target, state, value_val);
+          LOG(INFO) << "symbol name is " << symbol;
+          auto readable_object = 
+              state.addressSpace.findObject(sym_pairs.first);
+          auto value_val = readable_object->read(offset, 32);
+          executor.bindLocal(target, state, value_val);
         }
       }
       return;
     }
   }
+
   uint32_t value_uint = ~static_cast<uint32_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
     LOG(ERROR) 
@@ -649,6 +699,29 @@ void SpecialFunctionHandler::handle__remill_read_64(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
   auto mem = executor.Memory(mem_uint);
+  for(auto &pairs: mem->symbolic_memory->objects){
+    if ( pairs.first->address <= addr_uint
+            && ( ((pairs.first->size * 8) + pairs.first->address)
+                >= addr_uint)) {
+      //  TODO(sai) adjust for 32 bit binaries in macro
+      int offset = (addr_uint - pairs.first->address) / 8;
+
+      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+      LOG(INFO) << "offset on read is " << offset;
+      auto symbol = pairs.first->name;
+      for ( auto &sym_pairs: state.symbolics ){
+        if (symbol == sym_pairs.first->name){
+          LOG(INFO) << "symbol name is " << symbol;
+          auto readable_object = 
+              state.addressSpace.findObject(sym_pairs.first);
+          auto value_val = readable_object->read(offset, 64);
+          executor.bindLocal(target, state, value_val);
+        }
+      }
+      return;
+    }
+  }
+
   uint64_t value_uint = ~static_cast<uint64_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
     LOG(ERROR)
@@ -738,12 +811,15 @@ void SpecialFunctionHandler::handle__remill_write_32(
         if (pairs.first->name == symbol){
           auto new_mem = new MemoryObject(addr_uint);
           new_mem->setName(symbol);
+          new_mem->size = pairs.first->size;
           auto obj_state = new ObjectState(new_mem);
           mem->symbolic_memory->objects = 
               mem->symbolic_memory->objects.insert(
                       std::make_pair(new_mem, obj_state));
-          auto writable_object = state.addressSpace.getWriteable(pairs.first, 
-                                                            state.addressSpace.findObject(pairs.first));
+          auto writable_object = state.addressSpace.getWriteable(
+                  pairs.first, state.addressSpace.findObject(
+                      pairs.first));
+
           writable_object->write(0,value_val);
         }
     }
