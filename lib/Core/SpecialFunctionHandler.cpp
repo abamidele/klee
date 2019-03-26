@@ -747,6 +747,8 @@ void SpecialFunctionHandler::handle__remill_write_64(
       LOG(ERROR) << "Failed 8-byte write of 0x" << std::hex << value_uint
                  << " to address 0x" << addr_uint << " in address space "
                  << mem_uint;
+      
+      executor.bindLocal(target, state, Expr::createPointer(0));
     }
   } else {
     // value is symbolic
@@ -767,7 +769,6 @@ void SpecialFunctionHandler::handle__remill_write_64(
       }
     }
   }
-  executor.bindLocal(target, state, Expr::createPointer(0));
 }
 
 void SpecialFunctionHandler::handle__remill_write_32(
@@ -788,6 +789,8 @@ void SpecialFunctionHandler::handle__remill_write_32(
       LOG(ERROR) << "Failed 4-byte write of 0x" << std::hex << value_uint
                  << " to address 0x" << addr_uint << " in address space "
                  << mem_uint;
+      
+      executor.bindLocal(target, state, Expr::createPointer(0));
     }
   } else {
     // value is symbolic
@@ -808,7 +811,6 @@ void SpecialFunctionHandler::handle__remill_write_32(
       }
     }
   }
-  executor.bindLocal(target, state, Expr::createPointer(0));
 }
 
 void SpecialFunctionHandler::handle__remill_write_16(
@@ -829,6 +831,8 @@ void SpecialFunctionHandler::handle__remill_write_16(
       LOG(ERROR) << "Failed 2-byte write of 0x" << std::hex << value_uint
                  << " to address 0x" << addr_uint << " in address space "
                  << mem_uint;
+      
+      executor.bindLocal(target, state, Expr::createPointer(0));
     }
   } else {
     // value is symbolic
@@ -849,7 +853,6 @@ void SpecialFunctionHandler::handle__remill_write_16(
       }
     }
   }
-  executor.bindLocal(target, state, Expr::createPointer(0));
 }
 
 void SpecialFunctionHandler::handle__remill_write_8(
@@ -871,6 +874,7 @@ void SpecialFunctionHandler::handle__remill_write_8(
       LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << value_uint
                  << " to address 0x" << addr_uint << " in address space "
                  << mem_uint;
+      executor.bindLocal(target, state, Expr::createPointer(0));
     }
   } else {
     // value is symbolic
@@ -891,8 +895,6 @@ void SpecialFunctionHandler::handle__remill_write_8(
       }
     }
   }
-
-  executor.bindLocal(target, state, Expr::createPointer(0));
 }
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {

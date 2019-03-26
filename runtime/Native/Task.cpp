@@ -470,7 +470,6 @@ extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
 
 extern "C" int __kleemill_concretize_int(int *symint);
-/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -484,33 +483,13 @@ int main(int argc, char *argv[3], char *envp[]) {
   memcpy(&memory, argv[2], sizeof(memory));
 
   State *state = reinterpret_cast<State *>(argv[1]);
-  int32_t a;
-  klee_make_symbolic(&a, sizeof(a), "a");
-  //for (int i=0; i < 4; ++i){
-  //  puts(array + i);
-  //}
-  if(a > 0){
-      //int b = klee_get_value_i32(a);
-      auto mem1 = __remill_write_memory_32(memory, state->gpr.rsp.aword,a);
-      auto sym_bytes = __remill_read_memory_32(memory, state->gpr.rsp.aword);
-      auto b = klee_get_value_i32(sym_bytes);
-      printf("a at this value is: %d\n", b);
-      return 1;
-  } else if (a == 0) {
-      printf("a at this value is: %d\n", a);
-      return 0;
-  } else {
-      //int b = klee_get_value_i32(a);
-      auto mem1 =__remill_write_memory_32(memory, state->gpr.rsp.aword,a);
-      auto sym_bytes = __remill_read_memory_32(memory, state->gpr.rsp.aword);
-      auto b = klee_get_value_i32(sym_bytes);
-      printf("a at this value is: %d\n", b);
-      return -1;
-  }
+  Task *task = __kleemill_create_task(state, memory);
+
+  __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
+
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -543,6 +522,7 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 */
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -553,10 +533,10 @@ int main(int argc, char *argv[3], char *envp[]) {
   Memory *memory = nullptr;
   memcpy(&memory, argv[2], sizeof(memory));
   State *state = reinterpret_cast<State *>(argv[1]);
-  int16_t a;
+  int32_t a;
   klee_make_symbolic(&a, sizeof(a), "a");
-  __remill_write_memory_16(memory, state->gpr.rsp.aword,a);
-  int sym_bytes = __remill_read_memory_8(memory, state->gpr.rsp.aword);
+  __remill_write_memory_32(memory, state->gpr.rsp.aword,a);
+  int sym_bytes = __remill_read_memory_16(memory, state->gpr.rsp.aword + 8);
   if(sym_bytes > 0) {
       auto b = klee_get_value_i32(sym_bytes);
       printf("a at this value is: %d\n", b);
@@ -572,4 +552,5 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+*/
 }  // extern C
