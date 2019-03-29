@@ -55,11 +55,13 @@
 #include "Native/Memory/Snapshot.h"
 #include "Native/Workspace/Workspace.h"
 
+#include <iostream>
 DEFINE_uint64(breakpoint, 0, "Address of where to inject a breakpoint.");
+DEFINE_bool(dynamic, false, "Bool set if the snapshotted binary is dynamic");
 DECLARE_string(arch);
 DECLARE_string(os);
 
-DEFINE_bool(verbose, false, "Enable verbose logging?");
+DEFINE_bool(verbose, true, "Enable verbose logging?");
 
 namespace klee {
 namespace native {
@@ -337,13 +339,33 @@ static void RunUntilInTracee(pid_t pid) {
 }
 
 // Set a breakpoint on an address within the tracee.
+static void ReadTraceePageMaps(pid_t pid, klee::native::snapshot::AddressSpace *memory);
+
 static void RunUntilBreakpoint(pid_t pid) {
   LOG(INFO)
       << "Setting breakpoint at " << std::hex << FLAGS_breakpoint;
 
+  if (FLAGS_dynamic){
+    LOG(INFO) << "calculating binary base for breakpoint offset";
+    klee::native::snapshot::AddressSpace init_memory;
+    ReadTraceePageMaps(pid, &init_memory);
+    for (const auto &info : init_memory.page_ranges()) {
+      std::cout << info.name() << "\n";
+      if ((info.kind() == klee::native::snapshot::kFileBackedPageRange)
+              && (info.can_exec())) {
+          printf("the base of the binary is %lx\n", info.base());
+          printf("the limit of the binary is %lx\n", info.limit());
+          FLAGS_breakpoint += info.base();
+          printf("the new breakpoint is at %lx\n", FLAGS_breakpoint);
+          break;
+      }
+    }
+  }
+
   errno = 0;
   auto old_text_word = ptrace(PTRACE_PEEKTEXT, pid, FLAGS_breakpoint, 0);
   auto has_err = 0 != errno;
+
 
   // Add in an `int3`.
   auto new_text_word = (old_text_word & (~0xFFL)) | 0xCCL;

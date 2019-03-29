@@ -31,7 +31,6 @@ inline static void LogGPR64(char *&os, addr_t val, const char *reg_name){
 }
 
 Memory * __remill_log_state(State *state, Memory *memory){
- /*
  char buff[512];
  auto os = &buff[0];
  LogGPR64(os, state->gpr.rip.aword, "RIP");
@@ -54,7 +53,6 @@ Memory * __remill_log_state(State *state, Memory *memory){
  os[0] = '\n';
  os[1] = 0;
  puts(buff);
- */
  return memory;
 }
 
@@ -469,7 +467,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
 
-extern "C" int __kleemill_concretize_int(int *symint);
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -489,7 +486,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -536,7 +532,7 @@ int main(int argc, char *argv[3], char *envp[]) {
   int32_t a;
   klee_make_symbolic(&a, sizeof(a), "a");
   __remill_write_memory_32(memory, state->gpr.rsp.aword,a);
-  int sym_bytes = __remill_read_memory_16(memory, state->gpr.rsp.aword + 8);
+  int sym_bytes = __remill_read_memory_32(memory, state->gpr.rsp.aword );
   if(sym_bytes > 0) {
       auto b = klee_get_value_i32(sym_bytes);
       printf("a at this value is: %d\n", b);
