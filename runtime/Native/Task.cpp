@@ -31,6 +31,8 @@ inline static void LogGPR64(char *&os, addr_t val, const char *reg_name){
 }
 
 Memory * __remill_log_state(State *state, Memory *memory){
+    //__kleemill_get_lifted_function(memory, state->gpr.rip.aword);
+ /*
  char buff[512];
  auto os = &buff[0];
  LogGPR64(os, state->gpr.rip.aword, "RIP");
@@ -53,6 +55,7 @@ Memory * __remill_log_state(State *state, Memory *memory){
  os[0] = '\n';
  os[1] = 0;
  puts(buff);
+ */
  return memory;
 }
 
@@ -128,7 +131,6 @@ Memory *__kleemill_at_unhandled_hypercall(State &state, addr_t ret_addr,
 Memory * __remill_missing_block(State &state, addr_t pc, Memory *memory) {
 
   auto &task = reinterpret_cast<Task &>(state);
-  //puts("MISSING BLOCK");
   if (CanContinue(task.location)) {
     //puts("MISSING CAN CONTINUE");
     task.status = kTaskStatusResumable;

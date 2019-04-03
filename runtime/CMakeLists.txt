@@ -34,7 +34,8 @@ endfunction()
 #add_runtime_helper(linux x86_avx 32)
 
 add_runtime_helper(linux amd64 64)
-#add_runtime_helper(linux amd64_avx 64)
+add_runtime_helper(linux amd64_avx 64)
+add_runtime_helper(linux amd64_avx512 64)
 
 #add_runtime_helper(linux aarch64 64)
 
