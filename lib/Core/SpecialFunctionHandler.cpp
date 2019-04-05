@@ -844,7 +844,8 @@ void SpecialFunctionHandler::handle__remill_write_16(
         new_mem->setName(symbol);
         new_mem->size = pairs.first->size;
         auto obj_state = new ObjectState(new_mem);
-        mem->symbolic_memory->objects = mem->symbolic_memory->objects.insert(
+        mem->symbolic_memory->objects = mem->
+            symbolic_memory->objects.insert(
             std::make_pair(new_mem, obj_state));
         auto writable_object = state.addressSpace.getWriteable(
             pairs.first, state.addressSpace.findObject(pairs.first));
@@ -878,15 +879,18 @@ void SpecialFunctionHandler::handle__remill_write_8(
     }
   } else {
     // value is symbolic
-    auto re = dyn_cast<ReadExpr>(value_val->getKid(0));
+    
+    auto re = dyn_cast<ReadExpr>(value_val);
     auto symbol = re->updates.root->name;
     for (auto &pairs : state.symbolics) {
       if (pairs.first->name == symbol) {
         auto new_mem = new MemoryObject(addr_uint);
         new_mem->setName(symbol);
         new_mem->size = pairs.first->size;
+
         auto obj_state = new ObjectState(new_mem);
-        mem->symbolic_memory->objects = mem->symbolic_memory->objects.insert(
+        mem->symbolic_memory->objects = 
+            mem->symbolic_memory->objects.insert(
             std::make_pair(new_mem, obj_state));
         auto writable_object = state.addressSpace.getWriteable(
             pairs.first, state.addressSpace.findObject(pairs.first));
