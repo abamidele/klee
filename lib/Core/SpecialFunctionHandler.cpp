@@ -60,6 +60,7 @@
 #include "remill/BC/Util.h"
 
 #include <fstream>
+#include <algorithm>
 
 using namespace llvm;
 using namespace klee;
@@ -194,10 +195,25 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_index", handle_get_dirent_index, true),
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
+    add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
 
 #undef addDNR
 #undef add
 };
+
+
+void SpecialFunctionHandler::handle_klee_init_remill_mem(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+    LOG(INFO) << "Initialized klee's concrete address space";
+    auto memory_val = executor.toUnique(state, arguments[0]);
+    auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
+    
+    auto mem = executor.Memory(memory_uint);
+    state.concreteMemory = 
+        std::unique_ptr<klee::native::AddressSpace>(new klee::native::AddressSpace(*mem));
+}
+
 
 void SpecialFunctionHandler::handle__kleemill_log_state(
     ExecutionState &state, KInstruction *target,
@@ -393,10 +409,11 @@ void SpecialFunctionHandler::handle__kleemill_can_read_byte(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
+  LOG(INFO) << "addressspace num is " << mem_uint;
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   bool can_read = mem->CanRead(addr_uint);
 
@@ -410,10 +427,12 @@ void SpecialFunctionHandler::handle__kleemill_can_write_byte(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
+  LOG(INFO) << "addressspace num is " << mem_uint;
+
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   bool can_write = mem->CanWrite(addr_uint);
 
@@ -428,13 +447,15 @@ void SpecialFunctionHandler::handle__kleemill_free_memory(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
+  LOG(INFO) << "addressspace num is " << mem_uint;
+
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
 
   auto size_val = executor.toUnique(state, arguments[2]);
   auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   mem->RemoveMap(where_uint, size_uint);
 
@@ -447,6 +468,8 @@ void SpecialFunctionHandler::handle__kleemill_allocate_memory(
 
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+
+  LOG(INFO) << "addressspace num is " << mem_uint;
 
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
@@ -461,7 +484,7 @@ void SpecialFunctionHandler::handle__kleemill_allocate_memory(
   auto offset_val = executor.toUnique(state, arguments[4]);
   auto offset_uint = llvm::dyn_cast<ConstantExpr>(offset_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   mem->AddMap(where_uint, size_uint, name_char, offset_uint);
   executor.bindLocal(target, state, mem_val);
 }
@@ -472,6 +495,8 @@ void SpecialFunctionHandler::handle__kleemill_protect_memory(
 
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+
+  LOG(INFO) << "addressspace num is " << mem_uint;
 
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
@@ -491,7 +516,7 @@ void SpecialFunctionHandler::handle__kleemill_protect_memory(
   auto can_exec_uint =
       llvm::dyn_cast<ConstantExpr>(can_exec_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   mem->SetPermissions(where_uint, size_uint, static_cast<bool>(can_read_uint),
                       static_cast<bool>(can_write_uint),
@@ -506,10 +531,11 @@ void SpecialFunctionHandler::handle__kleemill_is_mapped_address(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
+  LOG(INFO) << "addressspace num is " << mem_uint;
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   bool is_mapped = mem->IsMapped(where_uint);
 
@@ -524,6 +550,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
+  LOG(INFO) << "addressspace num is " << mem_uint;
   auto base_val = executor.toUnique(state, arguments[1]);
   auto base_uint = llvm::dyn_cast<ConstantExpr>(base_val)->getZExtValue();
 
@@ -533,7 +560,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
   auto size_val = executor.toUnique(state, arguments[3]);
   auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   uint64_t hole = 0;
   if (mem->FindHole(base_uint, limit_uint, size_uint, &hole)) {
@@ -552,12 +579,15 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   for (auto &pairs : mem->symbolic_memory->objects) {
     if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size * 8) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address) / 8;
-      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address);
+      LOG(INFO) << "addr read from is " << std::hex << addr_uint 
+          << std::dec;
+
+      LOG(INFO) << "mo size is " << pairs.first->size;
       LOG(INFO) << "offset on read is " << offset;
       auto symbol = pairs.first->name;
       for (auto &sym_pairs : state.symbolics) {
@@ -565,6 +595,7 @@ void SpecialFunctionHandler::handle__remill_read_8(
           LOG(INFO) << "symbol name is " << symbol;
           auto readable_object = state.addressSpace.findObject(sym_pairs.first);
           auto value_val = readable_object->read(offset, 8);
+          LOG(INFO) << value_val -> getWidth();
           executor.bindLocal(target, state, value_val);
         }
       }
@@ -590,13 +621,16 @@ void SpecialFunctionHandler::handle__remill_read_16(
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
 
   for (auto &pairs : mem->symbolic_memory->objects) {
     if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size * 8) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address) / 8;
-      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address);
+      LOG(INFO) << "addr read from is " << std::hex << addr_uint 
+          << std::dec;
+
+      LOG(INFO) << "mo size is " << pairs.first->size;
       LOG(INFO) << "offset on read is " << offset;
       auto symbol = pairs.first->name;
       for (auto &sym_pairs : state.symbolics) {
@@ -623,18 +657,23 @@ void SpecialFunctionHandler::handle__remill_read_16(
 void SpecialFunctionHandler::handle__remill_read_32(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  LOG(INFO) << "hit the read 32 handler";
 
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
+  LOG(INFO) << "before symbolic pair check";
   for (auto &pairs : mem->symbolic_memory->objects) {
     if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size * 8) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address) / 8;
-      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
+      int offset = (addr_uint - pairs.first->address);
+
+      LOG(INFO) << "addr read from is " << std::hex << addr_uint << std::dec;
+
+      LOG(INFO) << "mo size is " << pairs.first->size;
       LOG(INFO) << "offset on read is " << offset;
       auto symbol = pairs.first->name;
       for (auto &sym_pairs : state.symbolics) {
@@ -666,14 +705,20 @@ void SpecialFunctionHandler::handle__remill_read_64(
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   for (auto &pairs : mem->symbolic_memory->objects) {
     if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size * 8) + pairs.first->address) >= addr_uint)) {
+        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
       //  TODO(sai) adjust for 32 bit binaries in macro
-      int offset = (addr_uint - pairs.first->address) / 8;
+      //
+      //
+      LOG(INFO) << "addr read from is " << std::hex << addr_uint 
+          << std::dec;
 
-      LOG(INFO) << "mo size is " << pairs.first->size * 8;
+      LOG(INFO) << "pair size " << pairs.first->size/8;
+      int offset = (addr_uint - pairs.first->address);
+
+      LOG(INFO) << "mo size is " << pairs.first->size;
       LOG(INFO) << "offset on read is " << offset;
       auto symbol = pairs.first->name;
       for (auto &sym_pairs : state.symbolics) {
@@ -714,11 +759,12 @@ void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
     std::vector<ref<Expr>> &arguments) {
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  LOG(INFO) << "addressspace num is " << mem_uint;
 
   auto pc_val = executor.toUnique(state, arguments[1]);
   auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   auto func = executor.GetLiftedFunction(mem, pc_uint);
 
   // LOG(INFO)
@@ -738,8 +784,9 @@ void SpecialFunctionHandler::handle__remill_write_64(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
   auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
+    LOG(INFO) << "CONCRETE CASE";
     value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
     if (mem->TryWrite(addr_uint, value_uint)) {
       executor.bindLocal(target, state, mem_val);
@@ -752,6 +799,7 @@ void SpecialFunctionHandler::handle__remill_write_64(
     }
   } else {
     // value is symbolic
+    LOG(INFO) << "SYMBOLIC CASE";
     auto re = dyn_cast<ReadExpr>(value_val->getKid(0));
     auto symbol = re->updates.root->name;
     for (auto &pairs : state.symbolics) {
@@ -760,8 +808,10 @@ void SpecialFunctionHandler::handle__remill_write_64(
         new_mem->setName(symbol);
         new_mem->size = pairs.first->size;
         auto obj_state = new ObjectState(new_mem);
-        mem->symbolic_memory->objects = mem->symbolic_memory->objects.insert(
+        mem->symbolic_memory->objects = 
+            mem->symbolic_memory->objects.insert(
             std::make_pair(new_mem, obj_state));
+
         auto writable_object = state.addressSpace.getWriteable(
             pairs.first, state.addressSpace.findObject(pairs.first));
 
@@ -780,7 +830,7 @@ void SpecialFunctionHandler::handle__remill_write_32(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
   uint32_t value_uint;
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
     value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
     if (mem->TryWrite(addr_uint, static_cast<uint32_t>(value_uint))) {
@@ -794,8 +844,10 @@ void SpecialFunctionHandler::handle__remill_write_32(
     }
   } else {
     // value is symbolic
+    LOG(INFO) << "hit symbolic 32";
     auto re = dyn_cast<ReadExpr>(value_val->getKid(0));
     auto symbol = re->updates.root->name;
+    LOG(INFO) << "symbol name is " << symbol;
     for (auto &pairs : state.symbolics) {
       if (pairs.first->name == symbol) {
         auto new_mem = new MemoryObject(addr_uint);
@@ -806,11 +858,14 @@ void SpecialFunctionHandler::handle__remill_write_32(
             std::make_pair(new_mem, obj_state));
         auto writable_object = state.addressSpace.getWriteable(
             pairs.first, state.addressSpace.findObject(pairs.first));
-
+        LOG(INFO) << "Before write";
         writable_object->write(0, value_val);
+        //  TODO(sai) check for writable offsets ??
+        LOG(INFO) << "After write";
       }
     }
   }
+  LOG(INFO) << "end of handler execution";
 }
 
 void SpecialFunctionHandler::handle__remill_write_16(
@@ -822,7 +877,7 @@ void SpecialFunctionHandler::handle__remill_write_16(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
   auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
     value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
     if (mem->TryWrite(addr_uint, static_cast<uint16_t>(value_uint))) {
@@ -866,7 +921,7 @@ void SpecialFunctionHandler::handle__remill_write_8(
   auto value_val = executor.toUnique(state, arguments[2]);
   auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
 
-  auto mem = executor.Memory(mem_uint);
+  auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
     value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
     if (mem->TryWrite(addr_uint, static_cast<uint8_t>(value_uint))) {
@@ -1540,6 +1595,7 @@ void SpecialFunctionHandler::handleDefineFixedObject(
 void SpecialFunctionHandler::handleMakeSymbolic(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  LOG(INFO) << "yaaay hit klee_make_symbolic handler";
   std::string name;
 
   if (arguments.size() != 3) {

@@ -26,12 +26,16 @@ static linux_task *gLastTask = nullptr;
 
 static pid_t gNextTid = kProcessId;
 
+// Initialize klee's concrete remill AddressSpace
+extern "C" void klee_init_remill_memory(Memory *mem);
+
 // Initialize the emulated Linux operating system.
-extern "C" void __kleemill_init(void) {
+extern "C" void __kleemill_init(Memory *mem) {
   gNextTid = kProcessId;
   gTaskList = nullptr;
   gLastTask = nullptr;
-  //klee_init_fds(0,0,0,0,1,0);
+  klee_init_remill_memory(mem);
+  //klee_init_fds(0,0,20,0,1,0);
 }
 
 // Tear down the emulated Linux operating system.

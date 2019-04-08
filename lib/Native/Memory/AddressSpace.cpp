@@ -92,6 +92,7 @@ AddressSpace::AddressSpace(const AddressSpace &parent)
       page_is_writable(parent.page_is_writable),
       page_is_executable(parent.page_is_executable),
       trace_heads(parent.trace_heads),
+      symbolic_memory(new klee::AddressSpace(*parent.symbolic_memory)),
       is_dead(parent.is_dead) {
 
   unsigned i = 0;

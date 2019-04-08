@@ -112,7 +112,6 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
                    int save_all_writes_flag, unsigned max_failures) {
   unsigned k;
   char name[7] = "?-data";
-  /*
   struct stat64 s;
 
   stat64(".", &s);
@@ -153,7 +152,6 @@ void klee_init_fds(unsigned n_files, unsigned file_length,
     __exe_fs.stdout_writes = 0;
   }
   else __exe_fs.sym_stdout = NULL;
-  */
   __exe_fs.sym_stdin = NULL;
   __exe_fs.max_failures = max_failures;
   __exe_fs.sym_stdout = NULL;

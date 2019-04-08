@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include <poll.h>
+#include <stdio.h>
 
 namespace {
 
@@ -30,7 +31,16 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   }
 
   auto bytes_read = new uint8_t[size];
-  auto num_bytes = read(fd, bytes_read, size);
+  static int symbolic_count = 0;
+  int num_bytes;
+  if (fd == 11){
+    num_bytes = size;
+    char num[100];
+    sprintf(num, "%d", symbolic_count++);
+    klee_make_symbolic(bytes_read, size, num);
+  } else {
+    num_bytes = read(fd, bytes_read, size);
+  }
 
   //if (fd == 5 && size == 832) {
   //  for (int i=0; i < num_bytes; ++i){
@@ -67,6 +77,7 @@ static Memory *SysRead(Memory *memory, State *state,
 
   size_t num_read_bytes = 0;
   auto err = DoRead(memory, fd, buf, size, &num_read_bytes);
+  puts("got passed DoRead in read syscall");
   if (err) {
     STRACE_ERROR(read, "Error reading %" PRIuADDR " bytes from fd=%d: %s",
                  size, fd, strerror(err));

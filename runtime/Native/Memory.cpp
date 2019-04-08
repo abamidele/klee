@@ -66,12 +66,8 @@ Memory *CopyToMemory(Memory *memory, addr_t addr,
                      const void *data, size_t size) {
   auto data_bytes = reinterpret_cast<const uint8_t *>(data);
   for (size_t i = 0; i < size; ++i) {
-    //if (size == 832){
-    //  printf("addr=%x, byte=%x \n", 
-    //          addr+static_cast<addr_t>(i), 
-    //          data_bytes[i]);
-    //  }
-    memory = __remill_write_memory_8(
+    puts("during mem writes");
+    __remill_write_memory_8(
         memory, addr + static_cast<addr_t>(i), data_bytes[i]);
   }
   return memory;

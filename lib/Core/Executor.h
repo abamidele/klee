@@ -521,6 +521,7 @@ class Executor : public Interpreter {
                           const ModuleOptions &opts) override;
 
   native::AddressSpace *Memory(uintptr_t index);
+  native::AddressSpace *Memory(klee::ExecutionState &state );
 
   llvm::Function *GetLiftedFunction(native::AddressSpace *memory, uint64_t addr);
 

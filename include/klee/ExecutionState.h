@@ -19,6 +19,7 @@
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
 #include "klee/Internal/Module/KInstIterator.h"
+#include "../../lib/Native/Memory/AddressSpace.h"
 
 #include <map>
 #include <set>
@@ -152,6 +153,8 @@ public:
 
   // The numbers of times this state has run through Executor::stepInstruction
   std::uint64_t steppedInstructions;
+
+  std::unique_ptr<klee::native::AddressSpace> concreteMemory;
 
 private:
   ExecutionState() : ptreeNode(0) {}

@@ -202,6 +202,7 @@ class SpecialFunctionHandler {
   HANDLER(handle__my_readdir);
   HANDLER(handle_get_dirent_index);
   HANDLER(handle_get_dirent_name);
+  HANDLER(handle_klee_init_remill_mem);
 
 #undef HANDLER
 };
