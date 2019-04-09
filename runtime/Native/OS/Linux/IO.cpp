@@ -33,7 +33,7 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   auto bytes_read = new uint8_t[size];
   static int symbolic_count = 0;
   int num_bytes;
-  if (fd == 11){
+  if (fd == 0){
     num_bytes = size;
     char num[100];
     sprintf(num, "%d", symbolic_count++);
@@ -57,7 +57,7 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
                           static_cast<size_t>(num_bytes));
   }
 
-  delete[] bytes_read;
+  //delete[] bytes_read;
   return err;
 }
 
@@ -77,7 +77,6 @@ static Memory *SysRead(Memory *memory, State *state,
 
   size_t num_read_bytes = 0;
   auto err = DoRead(memory, fd, buf, size, &num_read_bytes);
-  puts("got passed DoRead in read syscall");
   if (err) {
     STRACE_ERROR(read, "Error reading %" PRIuADDR " bytes from fd=%d: %s",
                  size, fd, strerror(err));

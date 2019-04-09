@@ -129,6 +129,7 @@ static void SetDomainName(const struct utsname &info,
 }
 
 // Emulate the `uname` system calls.
+/*
 template <typename T, typename ABI>
 static Memory *SysUname(Memory *memory, State *state,
                         const ABI &syscall) {
@@ -172,7 +173,7 @@ static Memory *SysUname(Memory *memory, State *state,
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 }
-
+*/
 // Emulate an `getuid` system call.
 template <typename ABI>
 static Memory *SysGetUserId(Memory *memory, State *state,

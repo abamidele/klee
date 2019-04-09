@@ -65,6 +65,8 @@
 #include <sstream>
 #include <string>
 
+#include <glog/logging.h>
+
 using namespace llvm;
 using namespace klee;
 
@@ -322,9 +324,12 @@ static bool valueIsOnlyCalled(const Value *v) {
   for (auto it = v->use_begin(), ie = v->use_end(); it != ie; ++it) {
     auto user = *it;
 #else
+  //v->dump();
   for (auto user : v->users()) {
 #endif
-    if (const auto *instr = dyn_cast<Instruction>(user)) {
+    if (!user) {
+      return true;
+    } else if (const auto *instr = dyn_cast_or_null<Instruction>(user)) {
       // Make sure the instruction is a call or invoke.
       CallSite cs(const_cast<Instruction *>(instr));
       if (!cs) return false;
@@ -333,12 +338,12 @@ static bool valueIsOnlyCalled(const Value *v) {
       // not an argument.
       if (cs.hasArgument(v))
         return false;
-    } else if (const auto *ce = dyn_cast<ConstantExpr>(user)) {
+    } else if (const auto *ce = dyn_cast_or_null<ConstantExpr>(user)) {
       if (ce->getOpcode() == Instruction::BitCast)
         if (valueIsOnlyCalled(ce))
           continue;
       return false;
-    } else if (const auto *ga = dyn_cast<GlobalAlias>(user)) {
+    } else if (const auto *ga = dyn_cast_or_null<GlobalAlias>(user)) {
       if (v == ga->getAliasee() && !valueIsOnlyCalled(ga))
         return false;
     } else if (isa<BlockAddress>(user)) {
@@ -353,6 +358,7 @@ static bool valueIsOnlyCalled(const Value *v) {
 }
 
 bool klee::functionEscapes(const Function *f) {
+  //LOG(INFO) << f -> getName().str();
   return !valueIsOnlyCalled(f);
 }
 

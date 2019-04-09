@@ -201,7 +201,7 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 56: return SysCloneA(memory, state, syscall);
     case 60: return SysExit(memory, state, syscall);
     case 62: return SysKill(memory, state, syscall);
-    case 63: return SysUname<linux_new_utsname>(memory, state, syscall);
+    //case 63: return SysUname<linux_new_utsname>(memory, state, syscall);
     case 78: return SysGetDirEntries64(memory, state, syscall);
     case 97: return SysGetRlimit<linux_rlimit>(memory, state, syscall);
     case 102: return SysGetUserId(memory, state, syscall);
@@ -215,7 +215,7 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     //case 47: return SysGetGroupId(memory, state, syscall);
     //case 49: return SysGetEffectiveUserId(memory, state, syscall);
     //case 50: return SysGetEffectiveGroupId(memory, state, syscall);
-    case 59: return SysUname<linux_oldold_utsname>(memory, state, syscall);
+    //case 59: return SysUname<linux_oldold_utsname>(memory, state, syscall);
     case 64: return SysGetParentProcessId(memory, state, syscall);
     case 65: return SysGetProcessGroupId(memory, state, syscall);
     case 74: return SysSetHostName(memory, state, syscall);

@@ -589,61 +589,12 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   guide.verify_input = false;
   guide.eliminate_dead_stores = true; // false;
 
-  //LOG(INFO)
-  //    << "Optimizing lifted traces";
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
-    // Adding additional debugging instrumentation to remill functions
-    //
-    /*
-    llvm::IRBuilder<> debug_builder(lifted_entry.second->getContext());
-    auto kleemill_log = holding_module -> getFunction("__kleemill_log_state");
-    for (auto &block: *lifted_entry.second){
-      for (auto &ins: block){
-        switch(ins.getOpcode()) {
-            case (Instruction::Call): {
-            auto call_inst = llvm::dyn_cast<CallInst>(&ins);
-            auto func = call_inst->getCalledFunction();
-            auto state_ptr = 
-                llvm::dyn_cast<Value>(call_inst->getArgOperand(0));
-            if (func->getName().str().compare(0,4,"sub_")){
-              for (auto &block: *func){
-                for (auto &ins: block){
-                  debug_builder.SetInsertPoint(&ins);
-                  LOG(INFO) << "INSERT POINT";
-                  debug_builder.CreateCall(kleemill_log, state_ptr);
-                }
-              }
-             }
-              break;
-            }
-        }
-      }
-    }
-    */
   }
-  /*
-  for (auto& func: *holding_module){
-    for (auto& block: func){
-      for (auto &ins: block){
-        switch(ins.getOpcode()){
-          case (Instruction::Load): {
-            auto load_ins = llvm::dyn_cast<LoadInst>(&ins);
-            load_ins->setVolatile(true);
-            break;
-          }
-          case (Instruction::Store): {
-            auto store_ins = llvm::dyn_cast<StoreInst>(&ins);
-            store_ins->setVolatile(true);
-            break;
-          }
-        }
-      }
-    }
-  }
-  */
+
 
   kmodule->instrument(holding_module.get(), opts);
   specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
@@ -668,9 +619,6 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
   }
-  //new_lifted_traces[addr] -> dump();
-  //exit(0);
-  //remill::StoreModuleIRToFile(traces_module,  "logging_trace.bc");
   return new_lifted_traces[addr];
 }
 
