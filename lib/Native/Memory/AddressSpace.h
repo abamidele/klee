@@ -25,6 +25,7 @@
 
 #include "Native/Memory/MappedRange.h"
 #include "Core/AddressSpace.h"
+#include "klee/Expr.h"
 
 struct Memory {};
 
@@ -33,6 +34,7 @@ namespace native {
 
 using CodeVersion = uint64_t;
 using PC = uint64_t;
+static const uint8_t symbolic_byte = 0xff;
 
 // Basic memory implementation.
 class AddressSpace : public Memory {
@@ -187,7 +189,8 @@ class AddressSpace : public Memory {
   /* an instance of klee's address space to handle symbolic writes and reads
    __remill_read_memory_N and __remill_write_memory_N */
  public:
-  std::unique_ptr<klee::AddressSpace> symbolic_memory;
+  
+  std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.

@@ -386,4 +386,43 @@ Memory *__remill_sync_hyper_call(X86State &state, Memory *mem,
   return mem;
 }
 
+Memory * __remill_write_memory_8(Memory *mem, addr_t addr, uint8_t val);
+uint8_t __remill_read_memory_8(Memory *mem, addr_t addr);
+ 
+Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
+  mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));
+  mem = __remill_write_memory_8(mem, addr+1, static_cast<uint8_t>(val >> 8));
+  return mem;
+}
+
+uint16_t __remill_read_memory_16(Memory *mem, addr_t addr) {
+  uint8_t b0 = __remill_read_memory_8(mem, addr);
+  uint8_t b1 = __remill_read_memory_8(mem, addr + 1);
+  return (static_cast<uint16_t>(b1) << static_cast<uint16_t>(8)) | b0;
+}
+
+Memory * __remill_write_memory_32(Memory *mem, addr_t addr, uint32_t val) {
+  mem = __remill_write_memory_16(mem, addr, static_cast<uint16_t>(val));
+  mem = __remill_write_memory_16(mem, addr+2, static_cast<uint16_t>(val >> 16));
+  return mem;
+}
+
+uint32_t __remill_read_memory_32(Memory *mem, addr_t addr) {
+  uint16_t b0 = __remill_read_memory_16(mem, addr);
+  uint16_t b1 = __remill_read_memory_16(mem, addr + 2);
+  return (static_cast<uint32_t>(b1) << static_cast<uint32_t>(16)) | b0;
+}
+
+Memory * __remill_write_memory_64(Memory *mem, addr_t addr, uint64_t val) {
+  mem = __remill_write_memory_32(mem, addr, static_cast<uint32_t>(val));
+  mem = __remill_write_memory_32(mem, addr + 4, static_cast<uint32_t>(val >> 32));
+  return mem;
+}
+
+uint64_t __remill_read_memory_64(Memory *mem, addr_t addr) {
+  uint32_t b0 = __remill_read_memory_32(mem, addr);
+  uint32_t b1 = __remill_read_memory_32(mem, addr + 4);
+  return (static_cast<uint64_t>(b1) << static_cast<uint64_t>(32))| b0;
+}
+
 }  // extern C

@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-
+#include <glog/logging.h>
 #include "AddressSpace.h"
 #include "CoreStats.h"
 #include "Memory.h"
@@ -38,7 +38,7 @@ const ObjectState *AddressSpace::findObject(const MemoryObject *mo) const {
 ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
                                         const ObjectState *os) {
   assert(!os->readOnly);
-
+  //LOG(INFO) << os;
   if (cowKey==os->copyOnWriteOwner) {
     return const_cast<ObjectState*>(os);
   } else {

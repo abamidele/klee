@@ -129,7 +129,6 @@ public:
     // Casting,
     ZExt,
     SExt,
-
     // Bit
     Not,
 

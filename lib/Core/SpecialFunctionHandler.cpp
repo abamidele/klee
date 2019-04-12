@@ -178,14 +178,15 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
         handle__kleemill_find_unmapped_address, true),
     add("__kleemill_log_state", handle__kleemill_log_state, false),
 
-    add("__remill_write_memory_64", handle__remill_write_64, true),
-    add("__remill_write_memory_32", handle__remill_write_32, true),
-    add("__remill_write_memory_16", handle__remill_write_16, true),
+    //add("__remill_write_memory_64", handle__remill_write_64, true),
+    //add("__remill_write_memory_32", handle__remill_write_32, true),
+    //add("__remill_write_memory_16", handle__remill_write_16, true),
     add("__remill_write_memory_8", handle__remill_write_8, true),
-    add("__remill_read_memory_64", handle__remill_read_64, true),
-    add("__remill_read_memory_32", handle__remill_read_32, true),
-    add("__remill_read_memory_16", handle__remill_read_16, true),
+    //add("__remill_read_memory_64", handle__remill_read_64, true),
+    //add("__remill_read_memory_32", handle__remill_read_32, true),
+    //add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_memory_8", handle__remill_read_8, true),
+    
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check, false),
     add("my_fstat", handle__fstat64, true),
@@ -579,35 +580,31 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
   auto mem = executor.Memory(state);
-  for (auto &pairs : mem->symbolic_memory->objects) {
-    if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address);
-      auto symbol = pairs.first->name;
-      for (auto &sym_pairs : state.symbolics) {
-        if (symbol == sym_pairs.first->name) {
-          auto readable_object = state.addressSpace.findObject(sym_pairs.first);
-          auto value_val = readable_object->read(offset, 8);
-          executor.bindLocal(target, state, value_val);
-        }
-      }
-      return;
-    }
-  }
-
   uint8_t value_uint = ~static_cast<uint8_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {
     LOG(ERROR) << "Failed 1-byte read from address 0x" << addr_uint
                << " in address space " << mem_uint;
   }
-  executor.bindLocal(target, state,
-                     ConstantExpr::create(value_uint, Expr::Int8));
+  
+  if (value_uint == klee::native::symbolic_byte) {
+    //LOG(INFO) << "concrete byte was equal to symbolic byte";
+    auto sym_pair = mem->symbolic_memory.find(addr_uint);
+    if (sym_pair != mem->symbolic_memory.end()){
+        //LOG(INFO) << "proceed with symbolic read because addr existed in space";
+        executor.bindLocal(target, state, sym_pair->second);
+        return;
+    } 
+  }
+  //LOG(INFO) << "concrete read";
+  executor.bindLocal(target, state, 
+              ConstantExpr::create(value_uint, Expr::Int8));
 }
 
 void SpecialFunctionHandler::handle__remill_read_16(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
@@ -638,11 +635,14 @@ void SpecialFunctionHandler::handle__remill_read_16(
   }
   executor.bindLocal(target, state,
                      ConstantExpr::create(value_uint, Expr::Int16));
+ */
 }
 
 void SpecialFunctionHandler::handle__remill_read_32(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
@@ -674,16 +674,18 @@ void SpecialFunctionHandler::handle__remill_read_32(
   }
   executor.bindLocal(target, state,
                      ConstantExpr::create(value_uint, Expr::Int32));
+  */
 }
 
 void SpecialFunctionHandler::handle__remill_read_64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-
   auto mem = executor.Memory(state);
   for (auto &pairs : mem->symbolic_memory->objects) {
     if (pairs.first->address <= addr_uint &&
@@ -713,6 +715,7 @@ void SpecialFunctionHandler::handle__remill_read_64(
   }
   executor.bindLocal(target, state,
                      ConstantExpr::create(value_uint, Expr::Int64));
+  */
 }
 
 void SpecialFunctionHandler::handle__llvm_ctpop(
@@ -750,6 +753,8 @@ void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
 void SpecialFunctionHandler::handle__remill_write_64(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
@@ -791,11 +796,14 @@ void SpecialFunctionHandler::handle__remill_write_64(
       }
     }
   }
+  */
 }
 
 void SpecialFunctionHandler::handle__remill_write_32(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
@@ -833,11 +841,14 @@ void SpecialFunctionHandler::handle__remill_write_32(
       }
     }
   }
+  */
 }
 
 void SpecialFunctionHandler::handle__remill_write_16(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+
+  /*
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
@@ -876,51 +887,47 @@ void SpecialFunctionHandler::handle__remill_write_16(
       }
     }
   }
+  */
 }
 
 void SpecialFunctionHandler::handle__remill_write_8(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
-  auto value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-
+  
   auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
-    value_uint = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-    if (mem->TryWrite(addr_uint, static_cast<uint8_t>(value_uint))) {
-      executor.bindLocal(target, state, mem_val);
-    } else {
-      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << value_uint
-                 << " to address 0x" << addr_uint << " in address space "
-                 << mem_uint;
+    //LOG(INFO) << "Concrete write 8";
+    auto val = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+    if (val == klee::native::symbolic_byte) {
+      //LOG(INFO) << "remove symbolic byte from memory";
+      mem->symbolic_memory.erase(addr_uint);
+    }
+
+    if (!mem->TryWrite(addr_uint, static_cast<uint8_t>(val))) {
+      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << val
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
       executor.bindLocal(target, state, Expr::createPointer(0));
+      return ;
     }
+  
   } else {
-    // value is symbolic
-    
-    auto re = dyn_cast<ReadExpr>(value_val);
-    auto symbol = re->updates.root->name;
-    for (auto &pairs : state.symbolics) {
-      if (pairs.first->name == symbol) {
-        auto new_mem = new MemoryObject(addr_uint);
-        new_mem->setName(symbol);
-        new_mem->size = 1;//pairs.first->size;
-
-        auto obj_state = new ObjectState(new_mem);
-        mem->symbolic_memory->objects = 
-            mem->symbolic_memory->objects.insert(
-            std::make_pair(new_mem, obj_state));
-        auto writable_object = state.addressSpace.getWriteable(
-            pairs.first, state.addressSpace.findObject(pairs.first));
-
-        writable_object->write(0, value_val);
-      }
+    if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)){
+      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << klee::native::symbolic_byte
+        << " to address 0x" << addr_uint << " in address space " << mem_uint;
+      executor.bindLocal(target, state, Expr::createPointer(0));
+      return ;
     }
+    //LOG(INFO) << "added symbolic byte to symbolic address space";
+    mem->symbolic_memory[addr_uint] = value_val;
   }
+
+  executor.bindLocal(target, state, mem_val);
 }
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {

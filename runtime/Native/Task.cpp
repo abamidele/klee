@@ -489,6 +489,8 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+
+
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -503,14 +505,14 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_init(memory);
 
   State *state = reinterpret_cast<State *>(argv[1]);
-  int32_t a;
+  int64_t a;
   
   klee_make_symbolic(&a, sizeof(a), "a");
 
-  __remill_write_memory_32(memory, state->gpr.rsp.aword,a);
+  __remill_write_memory_64(memory, state->gpr.rsp.aword,a);
   puts("Back in runtime after mem write");
-  int32_t sym_bytes = __remill_read_memory_16(
-			memory, state->gpr.rsp.aword + 2);
+  int16_t sym_bytes = __remill_read_memory_16(
+			memory, state->gpr.rsp.aword + 6);
   puts("After mem read");
   if(sym_bytes > 0) {
       auto b = klee_get_value_i32(sym_bytes);
@@ -528,7 +530,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 */
-
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -542,10 +543,11 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   __kleemill_init(memory);
   State *state = reinterpret_cast<State *>(argv[1]);
-  int32_t a;
+  int64_t a;
   klee_make_symbolic(&a, sizeof(a), "a");
-  __remill_write_memory_32(memory, state->gpr.rsp.aword, a);
-  int sym_bytes = __remill_read_memory_32(memory, state->gpr.rsp.aword);
+  __remill_write_memory_64(memory, state->gpr.rsp.aword, a);
+  int8_t sym_bytes = __remill_read_memory_8(memory, state->gpr.rsp.aword+4);
+ 
   if(sym_bytes > 0) {
       auto b = klee_get_value_i32(sym_bytes);
       printf("a at this value is: %d\n", b);
@@ -562,4 +564,5 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 */
+
 }

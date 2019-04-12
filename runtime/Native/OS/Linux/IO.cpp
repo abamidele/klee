@@ -57,7 +57,7 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
                           static_cast<size_t>(num_bytes));
   }
 
-  //delete[] bytes_read;
+  delete[] bytes_read;
   return err;
 }
 

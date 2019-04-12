@@ -150,6 +150,7 @@ class MemoryObject {
 class ObjectState {
  private:
   friend class AddressSpace;
+  friend class SpecialFunctionHandler;
   unsigned copyOnWriteOwner;  // exclusively for AddressSpace
 
   friend class ObjectHolder;
