@@ -119,7 +119,6 @@ add_library(${PROJECT_NAME} STATIC
   lib/Module/Optimize.cpp
   lib/Module/PhiCleaner.cpp
   lib/Module/RaiseAsm.cpp
-  lib/Module/Scalarizer.cpp
 
   lib/Solver/AssignmentValidatingSolver.cpp
   lib/Solver/CachingSolver.cpp
@@ -162,6 +161,10 @@ add_library(${PROJECT_NAME} STATIC
   lib/Native/Util/AreaAllocator.cpp
   lib/Native/Util/ZoneAllocator.cpp
   lib/Native/Workspace/Workspace.cpp
+
+  lib/Module/OptNone.cpp
+  third_party/sqlite/shell.c
+  third_party/sqlite/sqlite3.c
 )
 
 
@@ -183,7 +186,7 @@ string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
 list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
 list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
 
-set(LLVM_LIBRARIES LLVMCodeGen LLVMAsmPrinter LLVMRuntimeDyld LLVMExecutionEngine LLVMMCJIT LLVMTarget LLVMX86AsmParser LLVMX86AsmPrinter LLVMX86CodeGen LLVMAArch64AsmParser LLVMAArch64AsmPrinter LLVMAArch64CodeGen)
+set(LLVM_LIBRARIES LLVMCodeGen LLVMAsmPrinter LLVMRuntimeDyld LLVMExecutionEngine LLVMMCJIT LLVMTarget LLVMX86AsmParser LLVMX86AsmPrinter LLVMX86CodeGen LLVMAArch64AsmParser LLVMAArch64AsmPrinter LLVMAArch64CodeGen dl)
 list(APPEND PROJECT_LIBRARIES ${LLVM_LIBRARIES})
 list(APPEND PROJECT_DEFINITIONS ${LLVM_DEFINITIONS})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${LLVM_INCLUDE_DIRS})

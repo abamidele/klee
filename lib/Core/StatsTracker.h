@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <set>
+#include <sqlite3.h>
 
 namespace llvm {
 class BranchInst;
@@ -38,8 +39,16 @@ class StatsTracker {
   Executor &executor;
   std::string objectFilename;
 
-  std::unique_ptr<llvm::raw_fd_ostream> statsFile, istatsFile;
+  std::unique_ptr<llvm::raw_fd_ostream> istatsFile;
+  ::sqlite3 *statsFile = nullptr;
+  ::sqlite3_stmt *transactionBeginStmt = nullptr;
+  ::sqlite3_stmt *transactionEndStmt = nullptr;
+  ::sqlite3_stmt *insertStmt = nullptr;
+  std::uint32_t statsCommitEvery;
+  std::uint32_t statsWriteCount = 0;
+  std::uint32_t CommitEvery = 0;
   time::Point startWallTime;
+
 
   unsigned numBranches;
   unsigned fullBranches, partialBranches;
@@ -62,6 +71,12 @@ class StatsTracker {
   StatsTracker(Executor &_executor, std::string _objectFilename,
                bool _updateMinDistToUncovered);
   ~StatsTracker() = default;
+
+  StatsTracker(const StatsTracker &other) = delete;
+  StatsTracker(StatsTracker &&other) noexcept = delete;
+  StatsTracker &operator=(const StatsTracker &other) = delete;
+  StatsTracker &operator=(StatsTracker &&other) noexcept = delete;
+
 
   // called after a new StackFrame has been pushed (for callpath tracing)
   void framePushed(ExecutionState &es, StackFrame *parentFrame);

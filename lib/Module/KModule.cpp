@@ -12,18 +12,20 @@
 #define DEBUG_TYPE "KModule"
 
 #include "Passes.h"
+#include "llvm/Transforms/Scalar.h"
 
 #include "klee/Config/Version.h"
 #include "klee/Internal/Module/Cell.h"
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
-#include "klee/Internal/Module/LLVMPassManager.h"
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Support/ModuleUtil.h"
 #include "klee/Interpreter.h"
 #include "klee/OptionCategories.h"
+
+
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(4, 0)
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -36,22 +38,8 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
+#include "llvm/IR/LegacyPassManager.h"
 
-#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/Linker.h"
-#include "llvm/Support/CallSite.h"
-#else
-#include "llvm/IR/CallSite.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Linker/Linker.h"
-#endif
-
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/raw_os_ostream.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Transforms/Scalar.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(8, 0)
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #endif
@@ -258,7 +246,7 @@ void KModule::instrument(llvm::Module *mod,
   // invariant transformations that we will end up doing later so that
   // optimize is seeing what is as close as possible to the final
   // module.
-  LegacyLLVMPassManagerTy pm;
+  legacy::PassManager pm;
   pm.add(new RaiseAsmPass());
 
   // This pass will scalarize as much code as possible so that the Executor
@@ -325,7 +313,7 @@ void KModule::optimiseAndPrepare(
   InstructionOperandTypeCheckPass *operandTypeCheckPass =
        new InstructionOperandTypeCheckPass();
 
-  LegacyLLVMPassManagerTy pm3;
+  legacy::PassManager pm3;
   pm3.add(createCFGSimplificationPass());
   switch(SwitchType) {
     case eSwitchTypeInternal:
@@ -339,7 +327,6 @@ void KModule::optimiseAndPrepare(
   }
   pm3.add(new IntrinsicCleanerPass(*targetData));
   pm3.add(new PhiCleanerPass());
-  pm3.add(operandTypeCheckPass);
   pm3.run(*mod);
 
   // Enforce the operand type invariants that the Executor expects.  This
