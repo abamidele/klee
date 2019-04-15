@@ -127,13 +127,11 @@ void CopyX86TraceeState(pid_t pid, pid_t tid, int64_t memory_id,
                 "Remill X86 FPU state structure doesn't match the OS.");
 
   ptrace(PTRACE_GETFPREGS, tid, NULL, &(state.x87));
-  auto &st = state.st;
-  auto &mmx = state.mmx;
 
   // Opportunistic copying of MMX regs.
   for (size_t i = 0; i < 8; ++i) {
     if (static_cast<uint16_t>(0xFFFFU) == state.x87.fxsave64.st[i].infinity) {
-      mmx.elems[i].val.qwords.elems[0] = state.x87.fxsave64.st[i].mmx;
+      state.mmx.elems[i].val.qwords.elems[0] = state.x87.fxsave64.st[i].mmx;
     }
   }
 
@@ -141,7 +139,7 @@ void CopyX86TraceeState(pid_t pid, pid_t tid, int64_t memory_id,
   for (size_t i = 0; i < 8; ++i) {
     auto entry = *reinterpret_cast<long double *>(
         &(state.x87.fxsave64.st[i].st));
-    st.elems[i].val = static_cast<double>(entry);
+    state.st.elems[i].val = static_cast<double>(entry);
   }
 
   auto thread_info = program->add_tasks();

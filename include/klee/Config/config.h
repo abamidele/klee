@@ -7,7 +7,7 @@
 #define HAVE_SYS_CAPABILITY_H 1
 
 /* LLVM major version number */
-#define LLVM_VERSION_MAJOR 7
+//#define LLVM_VERSION_MAJOR 7
 
 /* klee-uclibc is supported */
 #define SUPPORT_KLEE_UCLIBC 1
@@ -16,5 +16,7 @@
 
 /* Configuration type of KLEE's runtime libraries */
 #define RUNTIME_CONFIGURATION "Release+Debug+Asserts"
+
+#include "remill/BC/Version.h"
 
 #endif
