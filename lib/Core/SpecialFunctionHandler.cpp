@@ -577,7 +577,23 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+  uint64_t addr_uint;
+  if (!llvm::isa<klee::ConstantExpr>(addr_val)) {
+    Executor::ExactResolutionList options;
+    executor.resolveExact(state, addr_val, options, "address options");
+    for (auto &opt: options){
+      auto mo = opt.first.first;
+      mo->getBaseExpr()->dump();
+    }
+    //LOG(INFO) << "before const expr";
+    //auto addr_concr = state.constraints.simplifyExpr(addr_val);
+    //ref<klee::ConstantExpr> address = executor.toConstant(state, addr_val, "resolveOne failure");
+    //LOG(INFO) << "after const expr";
+    //addr_uint = address->getZExtValue();
+    exit(0);
+  } else {
+    addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
+  }
 
   auto mem = executor.Memory(state);
   uint8_t value_uint = ~static_cast<uint8_t>(0);

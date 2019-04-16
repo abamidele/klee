@@ -18,7 +18,7 @@ cmake_minimum_required(VERSION 3.2)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 
-FindAndSelectClangCompiler()
+#FindAndSelectClangCompiler()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
@@ -26,10 +26,10 @@ set(KLEEMILL_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
-  set(PROJECT_CXXFLAGS
-    ${GLOBAL_CXXFLAGS} -pedantic  -Werror -Wno-conversion -Wno-shorten-64-to-32 -Wno-sign-compare -Wno-unused-value
-    -Wno-unreachable-code-return 
-  )
+    #  set(PROJECT_CXXFLAGS
+    #${GLOBAL_CXXFLAGS} -pedantic  -Werror -Wno-conversion -Wno-shorten-64-to-32 -Wno-sign-compare -Wno-unused-value
+    #-Wno-unreachable-code-return 
+    #)
 endif()
 
 # protobuf
