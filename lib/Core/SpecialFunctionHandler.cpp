@@ -185,7 +185,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     //add("__remill_read_memory_64", handle__remill_read_64, true),
     //add("__remill_read_memory_32", handle__remill_read_32, true),
     //add("__remill_read_memory_16", handle__remill_read_16, true),
-    add("__remill_read_memory_8", handle__remill_read_8, true),
+    add("__remill_read_8", handle__remill_read_8, true),
     
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check, false),
@@ -197,7 +197,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
-
+    add("__remill_concretize_addr", handle__remill_concretize_addr, true)
 #undef addDNR
 #undef add
 };
@@ -570,6 +570,11 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
   }
 }
 
+void SpecialFunctionHandler::handle__remill_concretize_addr(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+}
+
 void SpecialFunctionHandler::handle__remill_read_8(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
@@ -577,24 +582,7 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
-  uint64_t addr_uint;
-  if (!llvm::isa<klee::ConstantExpr>(addr_val)) {
-    Executor::ExactResolutionList options;
-    executor.resolveExact(state, addr_val, options, "address options");
-    for (auto &opt: options){
-      auto mo = opt.first.first;
-      mo->getBaseExpr()->dump();
-    }
-    //LOG(INFO) << "before const expr";
-    //auto addr_concr = state.constraints.simplifyExpr(addr_val);
-    //ref<klee::ConstantExpr> address = executor.toConstant(state, addr_val, "resolveOne failure");
-    //LOG(INFO) << "after const expr";
-    //addr_uint = address->getZExtValue();
-    exit(0);
-  } else {
-    addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
-  }
-
+  uint64_t addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
   auto mem = executor.Memory(state);
   uint8_t value_uint = ~static_cast<uint8_t>(0);
   if (!mem->TryRead(addr_uint, &value_uint)) {

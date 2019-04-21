@@ -170,7 +170,7 @@ MappedRangeBase::MappedRangeBase(
       parent(nullptr) {}
 
 MappedRangeBase::~MappedRangeBase(void) {
-  CHECK(!data.base);
+  //CHECK(!data.base);
 }
 
 void MappedRangeBase::InvalidateCodeVersion(void) {

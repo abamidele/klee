@@ -387,7 +387,18 @@ Memory *__remill_sync_hyper_call(X86State &state, Memory *mem,
 }
 
 Memory * __remill_write_memory_8(Memory *mem, addr_t addr, uint8_t val);
-uint8_t __remill_read_memory_8(Memory *mem, addr_t addr);
+
+extern "C" uint8_t __remill_read_8(Memory *mem, addr_t addr);
+extern "C" uint64_t __remill_concretize_addr(addr_t addr);
+ 
+uint8_t __remill_read_memory_8(Memory *mem, addr_t addr){
+  uint64_t concr_addr = 0;
+  if (klee_is_symbolic(addr)) {
+      concr_addr = klee_get_value_i64(addr);
+      klee_assume(addr == concr_addr);
+  }
+  return __remill_read_8(mem, addr);
+}
  
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
   mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));
