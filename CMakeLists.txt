@@ -26,10 +26,17 @@ set(KLEEMILL_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
+<<<<<<< HEAD
     #  set(PROJECT_CXXFLAGS
     #${GLOBAL_CXXFLAGS} -pedantic  -Werror -Wno-conversion -Wno-shorten-64-to-32 -Wno-sign-compare -Wno-unused-value
     #-Wno-unreachable-code-return 
     #)
+=======
+  #set(PROJECT_CXXFLAGS
+  #  ${GLOBAL_CXXFLAGS} -pedantic  -Werror -Wno-conversion -Wno-shorten-64-to-32 -Wno-sign-compare -Wno-unused-value
+  #  -Wno-unreachable-code-return 
+  #)
+>>>>>>> f3adfb1ceec1d0199a889f28b63b0e484e2b04e8
 endif()
 
 # protobuf

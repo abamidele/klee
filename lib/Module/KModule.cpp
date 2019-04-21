@@ -12,7 +12,7 @@
 #define DEBUG_TYPE "KModule"
 
 #include "Passes.h"
-#include "llvm/Transforms/Scalar.h"
+#include "remill/BC/Compat/ScalarTransforms.h"
 
 #include "klee/Config/Version.h"
 #include "klee/Internal/Module/Cell.h"
@@ -45,10 +45,6 @@
 #endif
 
 #include "llvm/Transforms/Utils/Cloning.h"
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(7, 0)
-#include "llvm/Transforms/Utils.h"
-#endif
 
 #include <sstream>
 #include "remill/BC/Util.h"

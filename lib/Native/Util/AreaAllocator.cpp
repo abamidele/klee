@@ -85,6 +85,18 @@ AreaAllocator::AreaAllocator(AreaAllocationPerms perms,
     }
   }
 
+  // Go reserved the address space backing the area allocation.
+  auto ret = mmap(nullptr  /* preferred_base */, 8ULL << 30ULL, PROT_NONE,
+       MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS, -1, 0);
+  const auto err = errno;
+  CHECK_NE(MAP_FAILED, ret)
+      << "Unable to map preferred base " << preferred_base << ": "
+      << strerror(err);
+
+  if (preferred_base != ret) {
+    preferred_base = ret;
+  }
+
   // TODO(pag): Try to support `MAP_HUGETLB | MAP_HUGE_2MB`.
 }
 
