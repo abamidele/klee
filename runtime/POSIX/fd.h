@@ -10,7 +10,7 @@
 #ifndef __EXE_FD__
 #define __EXE_FD__
 
-#include "klee/Config/config.h"
+//#include "klee/Config/config.h"
 
 #ifndef _LARGEFILE64_SOURCE
 #error "_LARGEFILE64_SOURCE should be defined"
