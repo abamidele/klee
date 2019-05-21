@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Memory.h"
-
+#include <glog/logging.h>
 #include "klee/ExecutionState.h"
 
 #include "klee/Expr.h"
@@ -72,17 +72,17 @@ ExecutionState::ExecutionState(KFunction *kf) :
 
     weight(1),
     depth(0),
-
     instsSinceCovNew(0),
     coveredNew(false),
     forkDisabled(false),
     ptreeNode(0),
-    steppedInstructions(0){
-  pushFrame(0, kf);
+    steppedInstructions(0), 
+    sym_addr_index(0) {
+    pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), ptreeNode(0) {}
+    : constraints(assumptions), ptreeNode(0), sym_addr_index(0) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -97,8 +97,6 @@ ExecutionState::~ExecutionState() {
   for (auto cur_mergehandler: openMergeStack){
     cur_mergehandler->removeOpenState(this);
   }
-
-
   while (!stack.empty()) popFrame();
 }
 
@@ -128,8 +126,9 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
-    concreteMemory(new klee::native::AddressSpace(*state.concreteMemory))
-{
+    concreteMemory(new klee::native::AddressSpace(*state.concreteMemory)),
+    sym_addrs(state.sym_addrs),
+    sym_addr_index(state.sym_addr_index) {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
 

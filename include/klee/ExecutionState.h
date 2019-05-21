@@ -156,6 +156,10 @@ public:
 
   std::unique_ptr<klee::native::AddressSpace> concreteMemory;
 
+  std::vector<uint64_t> sym_addrs;
+  
+  std::uint64_t sym_addr_index;
+
 private:
   ExecutionState() : ptreeNode(0) {}
 

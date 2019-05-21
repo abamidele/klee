@@ -11,6 +11,7 @@
 #define KLEE_SPECIALFUNCTIONHANDLER_H
 
 #include <iterator>
+#include <unordered_set>
 #include <map>
 #include <vector>
 #include <string>
@@ -27,7 +28,9 @@ struct stat;
 
 namespace klee {
 class Executor;
+class Ref;
 class Expr;
+class ConstantExpr;
 class ExecutionState;
 struct KInstruction;
 template<typename T> class ref;
@@ -43,6 +46,8 @@ class SpecialFunctionHandler {
       std::vector<ref<Expr> > &arguments);
   typedef std::map<const llvm::Function*, std::pair<Handler, bool> > handlers_ty;
   std::vector<uint64_t> fstat_vector;
+  std::vector<uint64_t> sym_addrs;
+  
   struct dirent dirent_entry;
   std::string entry_name;
 
@@ -120,7 +125,11 @@ class SpecialFunctionHandler {
   void set_up_fstat_struct(struct stat *info);
   void set_up_dirent_struct(struct dirent *info);
 
-
+std::unordered_set<uint8_t>
+    import_concrete_memory(ExecutionState &state, uint64_t min_uint, uint64_t max_uint);
+  
+  ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
+ 
   /* Handlers */
 
 #define HANDLER(name) void name(ExecutionState &state, \
@@ -203,7 +212,9 @@ class SpecialFunctionHandler {
   HANDLER(handle_get_dirent_index);
   HANDLER(handle_get_dirent_name);
   HANDLER(handle_klee_init_remill_mem);
-  HANDLER(handle__remill_concretize_addr);
+  HANDLER(handle__remill_symbolize_read);
+  HANDLER(handle__remill_symbolic_address);
+  HANDLER(handle__remill_assert_address);
 #undef HANDLER
 };
 }  // End klee namespace

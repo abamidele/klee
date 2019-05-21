@@ -2944,6 +2944,7 @@ void Executor::updateStates(ExecutionState *current) {
     processTree->remove(es->ptreeNode);
     delete es;
   }
+
   removedStates.clear();
 
   if (searcher) {
@@ -3180,15 +3181,39 @@ void Executor::run(ExecutionState &initialState) {
   std::vector<ExecutionState *> newStates(states.begin(), states.end());
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
-  while (!states.empty() && !haltExecution) {
-    ExecutionState &state = searcher->selectState();
-    KInstruction *ki = state.pc;
-    stepInstruction(state);
-    executeInstruction(state, ki);
-    processTimers(&state, maxInstructionTime);
-    checkMemoryUsage();
-    updateStates(&state);
+  //while (!haltExecution || !pendingAddresses.empty()) {
+    LOG(INFO) << "state size is " << states.size();
+    while (!states.empty() && !haltExecution) {
+      ExecutionState &state = searcher->selectState();
+      KInstruction *ki = state.pc;
+      stepInstruction(state);
+      executeInstruction(state, ki);
+      processTimers(&state, maxInstructionTime);
+      checkMemoryUsage();
+      updateStates(&state);
+    }
+
+    // remove vector and index stuff from memory and constructors
+    /*
+    LOG(INFO) << "pending address size is " << pendingAddresses.size();
+    if (!pendingAddresses.empty()){
+      auto state_info = pendingAddresses.front();
+      LOG(INFO) << "next val is " << state_info -> next_val;
+      LOG(INFO) << "state ptr is" << state_info->state;
+      haltExecution = false;
+      
+      //addedStates.push_back(state_info->state);
+      //searcher->addState(state_info->state, nullptr);
+      //states.insert(state_info->state);
+      pendingAddresses.pop_front();
+      updateStates(state_info->state);
+    } else {
+      LOG(INFO) << "hit halt execution halt case";
+      haltExecution = true;
+    }
   }
+  */
+  // TODO(sai) delete all the pendingAddresses
 
   delete searcher;
   searcher = 0;
@@ -3281,7 +3306,6 @@ void Executor::terminateState(ExecutionState &state) {
                                                          &state);
   if (it == addedStates.end()) {
     state.pc = state.prevPC;
-
     removedStates.push_back(&state);
   } else {
     // never reached searcher, just delete immediately

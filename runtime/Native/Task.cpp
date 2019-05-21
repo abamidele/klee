@@ -468,7 +468,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
-
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -490,7 +489,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 
-
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
@@ -505,11 +503,26 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_init(memory);
 
   State *state = reinterpret_cast<State *>(argv[1]);
-  int64_t a;
+  uint64_t a;
+  __remill_write_memory_8(memory, state->gpr.rsp.aword, 0x41);
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + 1, 0x42);
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + 2, 0x43);
   
   klee_make_symbolic(&a, sizeof(a), "a");
+  klee_assume(a < 4);
 
-  __remill_write_memory_64(memory, state->gpr.rsp.aword,a);
+  uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + a);
+  printf("res was %d\n", res);
+  
+  if (res == 0x41) {
+    puts("YAAAY you got case 1");
+  } else if (res == 0x42) {
+    puts("YAAAY you got case 2");
+  } else {
+    puts("YAAAY you got case 3");
+  }
+
+ // __remill_write_memory_64(memory, state->gpr.rsp.aword,a);
   puts("Back in runtime after mem write");
   int16_t sym_bytes = __remill_read_memory_16(
 			memory, state->gpr.rsp.aword + 6);
@@ -529,7 +542,8 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
+
+  */
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {

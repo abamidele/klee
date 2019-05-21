@@ -92,6 +92,17 @@ class vTask {
   std::vector<std::string> envp;
 };
 
+/*
+struct StateInfo {
+  ExecutionState *state;
+  uint64_t min_val;
+  uint64_t max_val;
+  uint64_t next_val;
+  ref<Expr> ret_val;
+  ref<Expr> symbol;
+};
+*/
+
 template<class T> class ref;
 
 /// \todo Add a context object to keep track of data only live
@@ -172,6 +183,8 @@ class Executor : public Interpreter {
   std::vector<MergeHandler *> mergeGroups;
   std::vector<std::shared_ptr<native::AddressSpace>> memories;
   std::deque<vTask *> tasks;
+  std::set<uint64_t> visited_addrs;
+  //std::deque<StateInfo *> pendingAddresses;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction

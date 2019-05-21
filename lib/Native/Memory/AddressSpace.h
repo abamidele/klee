@@ -189,6 +189,10 @@ class AddressSpace : public Memory {
   /* an instance of klee's address space to handle symbolic writes and reads
    __remill_read_memory_N and __remill_write_memory_N */
  public:
+
+  // TODO(sai) add symbolic memory addr2symbol set and move this to mapped range 
+  // would potentially be better if both symbolic mem and addr2symbol set where
+  // in own overarching object
   
   std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
 
