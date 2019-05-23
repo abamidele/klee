@@ -204,11 +204,18 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     //add("__remill_symbolize_read", handle__remill_symbolize_read, true),
     add("__remill_state_fork", handle__remill_symbolic_address, true), 
     add("__remill_assert_next_generated_address",
-            handle__remill_assert_address, false)
+            handle__remill_assert_address, false), 
+    add("symbolic_stdin", handle__symbolic_stdin, true),
 
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle__symbolic_stdin(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+    executor.bindLocal(target, state, ConstantExpr::create( executor.symbolicStdin, Expr::Bool));
+}
 
 ref<Expr> SpecialFunctionHandler::runtime_read_8(
         ExecutionState &state, uint64_t addr_uint) {
@@ -264,64 +271,18 @@ void SpecialFunctionHandler::handle__remill_assert_address(
         constraints.push_back(constr);
         bytes.insert(byte_ref);
       }
-      if (constraints.size() == 3) {
-        for(auto i: bytes){
+      if (constraints.size() == 1) {
+        for(auto i: bytes) {
           i -> dump();
         }
-        exit(0);
+        //exit(0);
         break;
       }
     }
   }
 
   executor.branch(state, constraints, branches);
-  // rewrite in runtime with klee assume I guess
-  // get_min
-  // create my own execution states and bind ranges locally in my own sense
-  // in the runtime derive my own constraint adding 
-  
-  // prepare the next one
-  // if (!(min_uint == max_uint)) {
-    //auto *es = new ExecutionState(state);//state.branch();
-    //ExecutionState *es  = new ExecutionState(state);
-    //falseState = trueState->branch();
-    //std::vector<ref<Expr> > conditions;
-    //std::vector<ExecutionState*> branches;
 
-    //conditions.push_back(UgtExpr::create(addr, ConstantExpr::create(min_uint, 64 )));
-    //executor.branch(state, conditions, branches);
-    //auto pair = executor.fork(state,UgtExpr::create(addr, ConstantExpr::create(min_uint, 64 )), false );
-    //if (pair.first) {
-    //  LOG(INFO) << "first exists";
-   // }
-
-    //if (pair.second) {
-    //  LOG(INFO) << "second exists";
-    //}
-    
-    //executor.updateStates(&state);
-
-    //LOG(INFO) << executor.states.size();
-    //LOG(INFO) << &state;
-    //LOG(INFO) << pair.second;
-
-    //executor.addConstraint(*es, 
-    //        UgtExpr::create(addr, ConstantExpr::create(min_uint, 64 )));
-    //executor.states.insert(es);
-    //executor.searcher->addState(es);
-    //executor.updateStates(&state);
-    //executor.addedStates.push_back(falseState);
-    //LOG(INFO) << "next val is " << prev_info->next_val;
-    //std::vector<ExecutionState *> branches;
-    //std::vector<ref<Expr>> conditions;
-    //conditions.push_back(UgtExpr::create(addr, ConstantExpr::create(min_uint, 64 )));
-    //for (auto &s : branches){
-    //  executor.transferToBasicBlock(,,*s)
-   // }
-    //executor.branch(state, conditions, branches);
-    //executor.pendingAddresses.push_front(info);
-    //executor.addedStates.push_back(es);
-  //}
 }
 
 void SpecialFunctionHandler::handle__remill_symbolic_address(

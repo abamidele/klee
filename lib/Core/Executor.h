@@ -280,6 +280,8 @@ class Executor : public Interpreter {
   /// Optimizes expressions
   ExprOptimizer optimizer;
 
+  bool symbolicStdin;
+
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
 
@@ -387,7 +389,9 @@ class Executor : public Interpreter {
   /// which also manages propagation of implied values,
   /// validity checks, and seed patching.
   void addConstraint(ExecutionState &state, ref<Expr> condition);
-
+  
+  void setSymbolicStdin(bool isSymbolic) override;
+  
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);

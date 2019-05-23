@@ -215,6 +215,7 @@ std::unordered_set<uint8_t>
   HANDLER(handle__remill_symbolize_read);
   HANDLER(handle__remill_symbolic_address);
   HANDLER(handle__remill_assert_address);
+  HANDLER(handle__symbolic_stdin);
 #undef HANDLER
 };
 }  // End klee namespace

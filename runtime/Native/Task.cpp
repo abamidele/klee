@@ -22,6 +22,8 @@ Task *gCurrent = nullptr;
 
 extern "C" {
 
+bool symbolic_stdin();
+
 LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
 
 void __kleemill_log_state(State *state);
@@ -474,7 +476,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   } else if (strcmp("klee-exec", argv[0])) {
     return EXIT_FAILURE;
   }
-
 
   Memory *memory = nullptr;
   memcpy(&memory, argv[2], sizeof(memory));

@@ -65,6 +65,7 @@
 
 DECLARE_string(os);
 DECLARE_string(arch);
+DEFINE_bool(symbolic_stdin, false, "bool set if stdin is symbolic");
 
 class NativeHandler : public klee::InterpreterHandler {
  public:
@@ -203,7 +204,7 @@ int main(int argc, char **argv, char **envp) {
   executor->setModule(loaded_modules, module_options);
 
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
-
+  executor->setSymbolicStdin(FLAGS_symbolic_stdin);
   executor->Run();
 
   // TODO(pag,sai): Freeing the `executor` causes a segfault.

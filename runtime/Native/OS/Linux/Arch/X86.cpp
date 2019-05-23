@@ -394,57 +394,10 @@ extern "C" bool __remill_state_fork(addr_t addr, uint8_t byte);
 extern "C" void __remill_assert_next_generated_address(addr_t address, uint8_t byte);
 
 uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
-  if (!klee_is_symbolic(addr)){
-    return __remill_read_8(mem, addr);
-  }
-  uint8_t symbolic_byte;
-  klee_make_symbolic(&symbolic_byte, sizeof(symbolic_byte), nullptr);
-
-  if (!__remill_state_fork(addr, symbolic_byte)) {
-    return __remill_read_8(
-            mem, klee_get_value_i64(addr));
-  } 
-
-  __remill_assert_next_generated_address(addr, symbolic_byte);
-  klee_assume(symbolic_byte == 
-          __remill_read_8(mem, klee_get_value_i64(addr)));
-  /*
-  if(__remill_assert_next_generated_address(addr)) {
-    klee_assume(symbolic_byte == __remill_read_8(mem,
-                klee_get_value_i64(addr)));
-  } else {
-    puts("klee silent exit");
-    klee_silent_exit(0);
-  }
-  */
-  return symbolic_byte;
+  auto concr_addr = klee_get_value_i64(addr);
+  klee_assume( addr == concr_addr);
+  return __remill_read_8(mem, concr_addr);
 }
- 
-/*
-uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
-  if (klee_is_symbolic(addr)) {
-    uint8_t symbolic_byte;
-    static char *id = "1";
-    klee_make_symbolic(&symbolic_byte, sizeof(symbolic_byte), id );
-    int size = __remill_handle_symbolic_address(addr);
-    if (size == 0) {
-      return __remill_read_8(mem, addr);
-    } else {
-    for (int i=0; i<size; ++i) {
-      auto opt = __remill_get_sym_addr(i);
-      if (addr == opt) {
-        symbolic_byte = __remill_read_8(mem, i);
-      }
-    }
-    //auto new_addr = klee_get_value_i64(addr);
-    klee_assume(addr);
-    klee_assume(symbolic_byte);
-    return symbolic_byte;
-    }
-  }
-  return __remill_read_8(mem, addr);
-}
-*/ 
 
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
   mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));

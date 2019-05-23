@@ -131,6 +131,7 @@ class Interpreter {
   // supply a tree stream writer which the interpreter will use
   // to record the symbolic path (as a stream of '0' and '1' bytes).
   virtual void setSymbolicPathWriter(TreeStreamWriter *tsw) = 0;
+  virtual void setSymbolicStdin(bool isSymbolic) = 0;
 
   // supply a test case to replay from. this can be used to drive the
   // interpretation down a user specified path. use null to reset.

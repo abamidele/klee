@@ -419,7 +419,8 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       inhibitForking(false),
       haltExecution(false),
       ivcEnabled(false),
-      debugLogBuffer(debugBufferString) {
+      debugLogBuffer(debugBufferString),
+      symbolicStdin(false){
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -549,6 +550,7 @@ native::AddressSpace *Executor::Memory(uintptr_t index) {
   return memories[index].get();
 }
 
+
 native::AddressSpace *Executor::Memory(klee::ExecutionState &state ) {
   return state.concreteMemory.get();
 }
@@ -630,6 +632,10 @@ vTask *Executor::NextTask(void) {
     tasks.pop_front();
     return task;
   }
+}
+
+void Executor::setSymbolicStdin(bool isSymbolic) {
+  symbolicStdin = isSymbolic;
 }
 
 void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
@@ -3181,7 +3187,6 @@ void Executor::run(ExecutionState &initialState) {
   std::vector<ExecutionState *> newStates(states.begin(), states.end());
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
-  //while (!haltExecution || !pendingAddresses.empty()) {
     LOG(INFO) << "state size is " << states.size();
     while (!states.empty() && !haltExecution) {
       ExecutionState &state = searcher->selectState();
@@ -3192,29 +3197,6 @@ void Executor::run(ExecutionState &initialState) {
       checkMemoryUsage();
       updateStates(&state);
     }
-
-    // remove vector and index stuff from memory and constructors
-    /*
-    LOG(INFO) << "pending address size is " << pendingAddresses.size();
-    if (!pendingAddresses.empty()){
-      auto state_info = pendingAddresses.front();
-      LOG(INFO) << "next val is " << state_info -> next_val;
-      LOG(INFO) << "state ptr is" << state_info->state;
-      haltExecution = false;
-      
-      //addedStates.push_back(state_info->state);
-      //searcher->addState(state_info->state, nullptr);
-      //states.insert(state_info->state);
-      pendingAddresses.pop_front();
-      updateStates(state_info->state);
-    } else {
-      LOG(INFO) << "hit halt execution halt case";
-      haltExecution = true;
-    }
-  }
-  */
-  // TODO(sai) delete all the pendingAddresses
-
   delete searcher;
   searcher = 0;
 
