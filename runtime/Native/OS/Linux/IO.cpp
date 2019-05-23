@@ -33,7 +33,7 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   }
 
   auto bytes_read = new uint8_t[size];
-  static int symbolic_count = 0;
+  static int symbolic_count;
   int num_bytes;
   if (symbolic_stdin()){
     if (fd == 0){
