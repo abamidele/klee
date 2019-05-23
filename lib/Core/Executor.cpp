@@ -68,7 +68,13 @@
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+
+#if LLVM_VERSION_CODE < LLVM_VERSION(8, 0)
 #include <llvm/IR/TypeBuilder.h>
+#else
+
+#endif
+
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
