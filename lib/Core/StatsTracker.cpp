@@ -42,7 +42,7 @@
 
 #include <fstream>
 #include <unistd.h>
-#include <sqlite3.h>
+#include "sqlite/sqlite3.h" //  sqlite dir is in the third_party directory
 
 #include "glog/logging.h"
 

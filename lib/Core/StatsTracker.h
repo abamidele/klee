@@ -14,7 +14,7 @@
 
 #include <memory>
 #include <set>
-#include <sqlite3.h>
+#include "sqlite/sqlite3.h" // sqlite dir is in the third_party directory
 
 namespace llvm {
 class BranchInst;
