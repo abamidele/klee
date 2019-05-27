@@ -54,9 +54,9 @@ state is saved.
 Usage: `./klee-snapshot-[llvm-version-number] --workspace_dir [PATH TO WORKSPACE DIR]  [FLAGS] -- [PATH TO BINARY]`
 
 FLAGS:
+
     * `--arch` 
         OPTIONS [`amd64`, `amd64_avx`, `amd64_avx512`, aarch64]
-        Any architecture that remill can lift klee can run.
     
     * `--dynamic`   
         bool that represents if the binary is dynamically linked. Set to false by default.
@@ -77,6 +77,7 @@ Lifts code and runs it in the `KLEE`'s executor from a workspace directory with 
 Usage: `./klee-exec-[llvm-version-number] --workspace_dir [PATH TO WORKSPACE DIR]`
 
 FLAGS:
+
     * `--symbolic_stdin`
         bool that makes inputs to `stdin` automatic and symbolic
 
@@ -86,8 +87,8 @@ FLAGS:
 2. `./klee-exec-7.0 --workspace_dir ws --symbolic_stdin`
 
 * Static Binary
-1. `./klee-snapshot-7.0 --workspace_dir ws --breakpoint 0x555555555555 --arch amd64` -- ./a.out`
-2. `./klee-exec-7.0 --workspace_dir ws
+1. `./klee-snapshot-7.0 --workspace_dir ws --breakpoint 0x555555555555 --arch amd64 -- ./a.out`
+2. `./klee-exec-7.0 --workspace_dir ws`
 
 # Additional Information
 An important thing to note is that if your native cpu supports sse instructions, and you decide to 
