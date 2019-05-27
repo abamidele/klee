@@ -55,21 +55,21 @@ Usage: `./klee-snapshot-[llvm-version-number] --workspace_dir [PATH TO WORKSPACE
 
 FLAGS:
 
-    * `--arch` 
-        OPTIONS [`amd64`, `amd64_avx`, `amd64_avx512`, aarch64]
+    * --arch 
+        OPTIONS [amd64, amd64_avx, amd64_avx512, aarch64]
     
-    * `--dynamic`   
+    * --dynamic   
         bool that represents if the binary is dynamically linked. Set to false by default.
     
-    * `--breakpoint`    
-        virtual address where snapshot is taken during execution. If the `--dynamic` flag is
+    * --breakpoint
+        virtual address where snapshot is taken during execution. If the --dynamic flag is
         specified then a virtual offset is expected. It is recommended that for dynamic binaries a
         disassembler is used to find an area of interest in the program and that virtual offset is 
         inputted. 
     
-    * `--verbose`
+    * --verbose
     
-    * `--os`
+    * --os
 
 ## Executing
 Lifts code and runs it in the `KLEE`'s executor from a workspace directory with snapshot information.
@@ -78,12 +78,12 @@ Usage: `./klee-exec-[llvm-version-number] --workspace_dir [PATH TO WORKSPACE DIR
 
 FLAGS:
 
-    * `--symbolic_stdin`
-        bool that makes inputs to `stdin` automatic and symbolic
+    * --symbolic_stdin
+        bool that makes inputs to stdin automatic and symbolic
 
 ## Example after build:
 * Dynamic Binary
-1. `./klee-snapshot-7.0 --workspace_dir ws --dynamic --breakpoint 0x1337 --arch amd64_avx` -- ./a.out`
+1. `./klee-snapshot-7.0 --workspace_dir ws --dynamic --breakpoint 0x1337 --arch amd64_avx -- ./a.out`
 2. `./klee-exec-7.0 --workspace_dir ws --symbolic_stdin`
 
 * Static Binary
