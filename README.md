@@ -1,7 +1,7 @@
 KLEEMILL 
 =============================
 
-# KLEE Symbolic Virtual Machine
+## KLEE Symbolic Virtual Machine
 
 [![Build Status](https://travis-ci.org/klee/klee.svg?branch=master)](https://travis-ci.org/klee/klee)
 [![Coverage](https://codecov.io/gh/klee/klee/branch/master/graph/badge.svg)](https://codecov.io/gh/klee/klee)
@@ -27,7 +27,7 @@ arguments.
 
 For further information, see the [webpage](http://klee.github.io/).
 
-# Build Instructions 
+## Build Instructions 
 
 Build instructions (assuming you have typical KLEE dependencies like z3 installed). This assumes you're on either Ubuntu 18.04 or 16.04, but should work for 14.04 too.
 
@@ -90,7 +90,7 @@ FLAGS:
 1. `./klee-snapshot-7.0 --workspace_dir ws --breakpoint 0x555555555555 --arch amd64 -- ./a.out`
 2. `./klee-exec-7.0 --workspace_dir ws`
 
-# Additional Information
+## Additional Information
 An important thing to note is that if your native cpu supports sse instructions, and you decide to 
 snapshot after cpuid is called natively, then you must specify an avx option for the architecture of the snapshot.
 otherwise those kinds of instructions won't lift. If you encounter any problems or desire
