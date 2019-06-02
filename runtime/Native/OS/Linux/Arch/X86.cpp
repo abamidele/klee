@@ -390,62 +390,72 @@ Memory * __remill_write_memory_8(Memory *mem, addr_t addr, uint8_t val);
 
 extern "C" uint8_t __remill_read_8(Memory *mem, addr_t addr);
 extern "C" uint64_t __remill_symbolize_read(addr_t addr);
-extern "C" bool __remill_state_fork(addr_t addr, uint8_t byte);
-extern "C" void __remill_assert_next_generated_address(addr_t address, uint8_t byte);
+extern "C" bool __remill_check_range(addr_t addr );
+
+extern "C" void __remill_search_symbolic_memory(addr_t address);
+extern "C" void __remill_search_symbolic_byte(uint8_t byte);
+
+extern "C" uint64_t __remill_get_min_address(addr_t address);
+
+extern "C" uint64_t __remill_get_max_address(addr_t address); // not implemented
+extern "C" void __remill_search_symbolic_byte_array(addr_t start, addr_t end); // not implemented
+
+ 
 
 uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
   if (!klee_is_symbolic(addr)){
     return __remill_read_8(mem, addr);
   }
-  uint8_t symbolic_byte;
-  klee_make_symbolic(&symbolic_byte, sizeof(symbolic_byte), nullptr);
 
-  if (!__remill_state_fork(addr, symbolic_byte)) {
+  if (!__remill_check_range(addr)) {
     return __remill_read_8(
             mem, klee_get_value_i64(addr));
   } 
+  
+  __remill_search_symbolic_memory(addr);
+  uint64_t concr_addr = __remill_get_min_address(addr);
+  printf("----> th concrete address is %ld\n", concr_addr);
+  //printf("concrete address:  %ld\n", concr_addr);
+  // combine both conditions into call to remill search symbolic byte
 
-  __remill_assert_next_generated_address(addr, symbolic_byte);
-  klee_assume(symbolic_byte == 
-          __remill_read_8(mem, klee_get_value_i64(addr)));
-  /*
-  if(__remill_assert_next_generated_address(addr)) {
-    klee_assume(symbolic_byte == __remill_read_8(mem,
-                klee_get_value_i64(addr)));
+  auto byte = __remill_read_8(mem, concr_addr);
+  if (!__remill_check_range(addr)){
+
+    if (klee_is_symbolic(byte)) {
+      // klee_assume(byte <= '9'); // temp assumption for testing
+      // klee_assume(byte >= '0'); // temp assumption for testing
+      __remill_search_symbolic_byte(byte);
+      uint8_t res = static_cast<uint8_t>(klee_get_value_i32(byte));
+      printf("sym byte translated to %d \n", res);
+      __remill_write_memory_8(mem, concr_addr, res);
+      /* write is a hacky way to make the symbolic byte concrete in
+       * the respective state's address space */
+      return __remill_read_8(mem, concr_addr);
+    }
   } else {
-    puts("klee silent exit");
-    klee_silent_exit(0);
+      puts("hit the range case");
+      uint64_t max_addr = __remill_get_max_address(addr);
+
+      __remill_search_symbolic_byte_array(concr_addr, max_addr);
+      //  deploy branches in batches
+      puts("passed ExpANSIONNNN");
+      /*
+      for (uint64_t curr = concr_addr; curr <= max_addr; ++curr ) {
+          puts("HIT THE LOOP");
+          auto sym_byte = __remill_read_8(mem, curr);
+          puts("AFTER SYM BYTE READ");
+          uint8_t res = static_cast<uint8_t>(klee_get_value_i32(sym_byte));
+          puts("after concretization");
+          __remill_write_memory_8(mem, curr, res);
+          puts("after write :)");
+      }
+      */
+      return __remill_read_8(mem, concr_addr);
   }
-  */
-  return symbolic_byte;
+
+  return byte;
 }
  
-/*
-uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
-  if (klee_is_symbolic(addr)) {
-    uint8_t symbolic_byte;
-    static char *id = "1";
-    klee_make_symbolic(&symbolic_byte, sizeof(symbolic_byte), id );
-    int size = __remill_handle_symbolic_address(addr);
-    if (size == 0) {
-      return __remill_read_8(mem, addr);
-    } else {
-    for (int i=0; i<size; ++i) {
-      auto opt = __remill_get_sym_addr(i);
-      if (addr == opt) {
-        symbolic_byte = __remill_read_8(mem, i);
-      }
-    }
-    //auto new_addr = klee_get_value_i64(addr);
-    klee_assume(addr);
-    klee_assume(symbolic_byte);
-    return symbolic_byte;
-    }
-  }
-  return __remill_read_8(mem, addr);
-}
-*/ 
-
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
   mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));
   mem = __remill_write_memory_8(mem, addr+1, static_cast<uint8_t>(val >> 8));

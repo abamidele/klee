@@ -125,11 +125,24 @@ class SpecialFunctionHandler {
   void set_up_fstat_struct(struct stat *info);
   void set_up_dirent_struct(struct dirent *info);
 
-std::unordered_set<uint8_t>
-    import_concrete_memory(ExecutionState &state, uint64_t min_uint, uint64_t max_uint);
-  
   ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
- 
+
+  void runtime_write_8(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val);
+
+  std::vector<uint8_t> generate_concrete_array(
+          ExecutionState &state, bool new_array, uint64_t start, 
+          uint64_t stop);
+
+  ref<Expr> build_array_expr(
+          ExecutionState &state, 
+          const std::vector<uint8_t>& concrete_array,
+          uint64_t start);
+
+  
+  //void __remill_search_byte(
+  //  ExecutionState &state, ref<Expr> byte_val);
+
+
   /* Handlers */
 
 #define HANDLER(name) void name(ExecutionState &state, \
@@ -215,6 +228,13 @@ std::unordered_set<uint8_t>
   HANDLER(handle__remill_symbolize_read);
   HANDLER(handle__remill_symbolic_address);
   HANDLER(handle__remill_assert_address);
+  HANDLER(handle__remill_assert_byte);
+  HANDLER(handle__remill_min_address);
+  HANDLER(handle__remill_max_address);
+  HANDLER(handle__remill_search_byte);
+  HANDLER(handle__remill_search_byte_array);
+ 
+ 
 #undef HANDLER
 };
 }  // End klee namespace

@@ -31,8 +31,9 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   }
 
   auto bytes_read = new uint8_t[size];
-  static int symbolic_count = 0;
+  static int symbolic_count;
   int num_bytes;
+  
   if (fd == 0){
     num_bytes = size;
     char num[100];
@@ -41,13 +42,6 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   } else {
     num_bytes = read(fd, bytes_read, size);
   }
-
-  //if (fd == 5 && size == 832) {
-  //  for (int i=0; i < num_bytes; ++i){
-  //    printf("%x  ", bytes_read[i]);
-  //  }
-  //   printf("\n*******************BYTES DUMPED****************************\n");
-  //}
 
   auto err = errno;
   if (-1 != num_bytes) {
