@@ -406,35 +406,49 @@ uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
   if (!klee_is_symbolic(addr)){
     return __remill_read_8(mem, addr);
   }
-
-  if (!__remill_check_range(addr)) {
-    return __remill_read_8(
-            mem, klee_get_value_i64(addr));
+  uint64_t min = __remill_get_min_address(addr);
+  puts("BEFORE FIRST MAX ADDRESS");
+  uint64_t max = __remill_get_max_address(addr);
+ 
+  puts("BEFORE INITITAL RANGE CHECK");
+  if (! (max - min)) {
+    puts("DURING THE RANGE CHECK BEFORE THE READ");
+    uint8_t val = static_cast<uint8_t>(__remill_read_8(mem, min));
+    puts("AFTER THE ASSIGNMENT");
+    klee_print_expr("val that could be stale: ", val);
+    return val;
   } 
-  
+  puts("AFTER INITIAL RANGE CHECK");
+
+  puts("before memory search");
   __remill_search_symbolic_memory(addr);
+  puts("after memory search");
+
   uint64_t concr_addr = __remill_get_min_address(addr);
   printf("----> th concrete address is %ld\n", concr_addr);
   //printf("concrete address:  %ld\n", concr_addr);
   // combine both conditions into call to remill search symbolic byte
 
   auto byte = __remill_read_8(mem, concr_addr);
-  if (!__remill_check_range(addr)){
+  uint64_t max_addr = __remill_get_max_address(addr);
+
+  puts("BEFORE THE RANGE CHECK");
+  if (! (max_addr - concr_addr)){
 
     if (klee_is_symbolic(byte)) {
+      puts("single byte case");
       // klee_assume(byte <= '9'); // temp assumption for testing
       // klee_assume(byte >= '0'); // temp assumption for testing
       __remill_search_symbolic_byte(byte);
-      uint8_t res = static_cast<uint8_t>(klee_get_value_i32(byte));
-      printf("sym byte translated to %d \n", res);
-      __remill_write_memory_8(mem, concr_addr, res);
+      //uint8_t res = static_cast<uint8_t>(klee_get_value_i32(byte));
+      //printf("sym byte translated to %d \n", res);
+      //__remill_write_memory_8(mem, concr_addr, res);
       /* write is a hacky way to make the symbolic byte concrete in
        * the respective state's address space */
-      return __remill_read_8(mem, concr_addr);
+      //return __remill_read_8(mem, concr_addr);
     }
   } else {
       puts("hit the range case");
-      uint64_t max_addr = __remill_get_max_address(addr);
 
       __remill_search_symbolic_byte_array(concr_addr, max_addr);
       //  deploy branches in batches
@@ -450,7 +464,7 @@ uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
           puts("after write :)");
       }
       */
-      return __remill_read_8(mem, concr_addr);
+      // return __remill_read_8(mem, concr_addr);
   }
 
   return byte;

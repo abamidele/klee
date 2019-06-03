@@ -330,7 +330,7 @@ void SpecialFunctionHandler::handle__remill_search_byte_array(
   ExecutionState &state, KInstruction *target,
   std::vector<ref<Expr>> &arguments) {
   // unconstrained or uninstrumented byte range branching
-  static uint64_t batch_size = 10;
+  static uint64_t batch_size = 1;
 
   auto min = llvm::dyn_cast<klee::ConstantExpr>(executor.toUnique(state, arguments[0]));
   auto max = llvm::dyn_cast<klee::ConstantExpr>(executor.toUnique(state, arguments[1]));
@@ -358,9 +358,7 @@ void SpecialFunctionHandler::handle__remill_search_byte_array(
           build_array_expr(state, concrete_array, min_uint));
   }
 
-  // exit(0);
   executor.branch(state, constraints, branches);
-
 }
 
 std::vector<uint8_t> SpecialFunctionHandler::generate_concrete_array(
@@ -422,6 +420,7 @@ ref<Expr> SpecialFunctionHandler::build_array_expr(
   
   auto sym_mem = executor.Memory(state) -> symbolic_memory;
   ExprBuilder *builder = createDefaultExprBuilder();
+  LOG(INFO) << "concreter_array len is " << concrete_array.size();
 
   auto expr = builder -> Eq(sym_mem.find(start)->second, 
                 ConstantExpr::create( concrete_array[0], 8));
@@ -432,6 +431,7 @@ ref<Expr> SpecialFunctionHandler::build_array_expr(
     expr = builder -> And(eq, expr);
   }
   expr->dump();
+  delete builder;
   return expr;
 }
 

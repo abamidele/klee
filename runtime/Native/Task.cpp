@@ -468,8 +468,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
-
-/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -489,7 +487,7 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -536,15 +534,17 @@ int main(int argc, char *argv[3], char *envp[]) {
   uint8_t sum = res + byte2 + byte3;
 
   if (sum >= 8) {
-    printf("YOU WINN \n");
+  
+    printf("YOU WINN sum was %d\n", static_cast<uint8_t>(klee_get_value_i32(sum)));
   } else {
-    printf("YOU LOSE \n");
+    printf("YOU LOSEE sum was %d\n", static_cast<uint8_t>(klee_get_value_i32(sum)));
   }
 
  __kleemill_fini();
   return EXIT_SUCCESS;
 }
- 
+*/
+
 // __remill_write_memory_64(memory, state->gpr.rsp.aword,a);
  /*
   puts("Back in runtime after mem write");
