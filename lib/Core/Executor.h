@@ -92,16 +92,20 @@ class vTask {
   std::vector<std::string> envp;
 };
 
-/*
-struct StateInfo {
-  ExecutionState *state;
+struct MemoryAccessContinuation {
+  ExecutionState &state;
+  ref<Expr> addr;
+  bool is_read;
   uint64_t min_val;
   uint64_t max_val;
   uint64_t next_val;
-  ref<Expr> ret_val;
-  ref<Expr> symbol;
+
+  MemoryAccessContinuation( ExecutionState &state, ref<Expr> addr, bool is_read,
+          uint64_t min_val, uint64_t max_val, uint64_t next_val):
+      state(state), addr(addr), is_read(is_read), min_val(min_val), 
+      max_val(max_val), next_val(next_val) {}
+
 };
-*/
 
 template<class T> class ref;
 
@@ -184,7 +188,7 @@ class Executor : public Interpreter {
   std::vector<std::shared_ptr<native::AddressSpace>> memories;
   std::deque<vTask *> tasks;
   std::set<uint64_t> visited_addrs;
-  //std::deque<StateInfo *> pendingAddresses;
+  std::deque<MemoryAccessContinuation *> pendingAddresses;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction

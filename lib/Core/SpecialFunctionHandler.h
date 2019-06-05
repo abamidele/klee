@@ -17,6 +17,7 @@
 #include <string>
 #include <deque>
 #include <dirent.h>
+#include "SpecialFunctionHandler.h"
 
 namespace llvm {
 class Function;
@@ -138,6 +139,8 @@ class SpecialFunctionHandler {
           const std::vector<uint8_t>& concrete_array,
           uint64_t start);
 
+  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
+
   
   //void __remill_search_byte(
   //  ExecutionState &state, ref<Expr> byte_val);
@@ -209,10 +212,13 @@ class SpecialFunctionHandler {
   HANDLER(handle__remill_write_f32);
   HANDLER(handle__remill_write_16);
   HANDLER(handle__remill_write_8);
-  HANDLER(handle__remill_read_64);
-  HANDLER(handle__remill_read_32);
-  HANDLER(handle__remill_read_16);
+
   HANDLER(handle__remill_read_8);
+  
+  //HANDLER(handle__remill_read_64);
+  //HANDLER(handle__remill_read_32);
+  //HANDLER(handle__remill_read_16);
+  //HANDLER(handle__remill_read_8);
   
   HANDLER(handle__llvm_ctpop);
 
@@ -233,6 +239,7 @@ class SpecialFunctionHandler {
   HANDLER(handle__remill_max_address);
   HANDLER(handle__remill_search_byte);
   HANDLER(handle__remill_search_byte_array);
+  HANDLER(handle__remill_get_array_option);
  
  
 #undef HANDLER

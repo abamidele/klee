@@ -392,83 +392,47 @@ extern "C" uint8_t __remill_read_8(Memory *mem, addr_t addr);
 extern "C" uint64_t __remill_symbolize_read(addr_t addr);
 extern "C" bool __remill_check_range(addr_t addr );
 
-extern "C" void __remill_search_symbolic_memory(addr_t address);
+extern "C" addr_t __remill_search_symbolic_memory(addr_t address, addr_t min, addr_t max);
 extern "C" void __remill_search_symbolic_byte(uint8_t byte);
 
 extern "C" uint64_t __remill_get_min_address(addr_t address);
 
 extern "C" uint64_t __remill_get_max_address(addr_t address); // not implemented
-extern "C" void __remill_search_symbolic_byte_array(addr_t start, addr_t end); // not implemented
+extern "C" void __remill_search_symbolic_byte_array(
+        addr_t start, addr_t end); // not implemented
+//extern "C" bool __remill_search_symbolic_byte_array(addr_t start ); // not implemented
+extern "C" char *__remill_get_array_option(bool new_str, addr_t start, addr_t stop);
+extern "C" uint8_t __remill_read_memory_8(Memory *mem, addr_t addr);
 
- 
-
-uint8_t __remill_read_memory_8(Memory *mem, addr_t addr) {
+/*
+{
   if (!klee_is_symbolic(addr)){
     return __remill_read_8(mem, addr);
   }
+
   uint64_t min = __remill_get_min_address(addr);
-  puts("BEFORE FIRST MAX ADDRESS");
   uint64_t max = __remill_get_max_address(addr);
  
-  puts("BEFORE INITITAL RANGE CHECK");
-  if (! (max - min)) {
-    puts("DURING THE RANGE CHECK BEFORE THE READ");
-    uint8_t val = static_cast<uint8_t>(__remill_read_8(mem, min));
-    puts("AFTER THE ASSIGNMENT");
-    klee_print_expr("val that could be stale: ", val);
-    return val;
+  if (!(max - min)) {
+    klee_assume(addr == min);
+    return __remill_read_8(mem, min);
   } 
-  puts("AFTER INITIAL RANGE CHECK");
-
-  puts("before memory search");
-  __remill_search_symbolic_memory(addr);
-  puts("after memory search");
-
-  uint64_t concr_addr = __remill_get_min_address(addr);
-  printf("----> th concrete address is %ld\n", concr_addr);
-  //printf("concrete address:  %ld\n", concr_addr);
-  // combine both conditions into call to remill search symbolic byte
-
-  auto byte = __remill_read_8(mem, concr_addr);
-  uint64_t max_addr = __remill_get_max_address(addr);
-
-  puts("BEFORE THE RANGE CHECK");
-  if (! (max_addr - concr_addr)){
-
-    if (klee_is_symbolic(byte)) {
-      puts("single byte case");
-      // klee_assume(byte <= '9'); // temp assumption for testing
-      // klee_assume(byte >= '0'); // temp assumption for testing
-      __remill_search_symbolic_byte(byte);
-      //uint8_t res = static_cast<uint8_t>(klee_get_value_i32(byte));
-      //printf("sym byte translated to %d \n", res);
-      //__remill_write_memory_8(mem, concr_addr, res);
-      /* write is a hacky way to make the symbolic byte concrete in
-       * the respective state's address space */
-      //return __remill_read_8(mem, concr_addr);
+  // does not support symbolic addrs
+  if (__kleemill_is_mapped_address(mem, min)) {
+    auto next_addr = __remill_search_symbolic_memory(addr, min, max);
+  // eventually want to jump back here with the 2nd case in the fork
+    if (next_addr != min) {
+      __remill_add_state_continuation(min);
     }
-  } else {
-      puts("hit the range case");
 
-      __remill_search_symbolic_byte_array(concr_addr, max_addr);
-      //  deploy branches in batches
-      puts("passed ExpANSIONNNN");
-      /*
-      for (uint64_t curr = concr_addr; curr <= max_addr; ++curr ) {
-          puts("HIT THE LOOP");
-          auto sym_byte = __remill_read_8(mem, curr);
-          puts("AFTER SYM BYTE READ");
-          uint8_t res = static_cast<uint8_t>(klee_get_value_i32(sym_byte));
-          puts("after concretization");
-          __remill_write_memory_8(mem, curr, res);
-          puts("after write :)");
-      }
-      */
-      // return __remill_read_8(mem, concr_addr);
-  }
+    printf("the next address is %ld min was %ld\n", next_addr, min);
+ } else {
+    // TODO(sai) handle unmapped addresses
+ }
 
-  return byte;
+  return __remill_read_8(mem, min);
 }
+*/
  
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
   mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));

@@ -191,7 +191,6 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     //add("__remill_read_memory_32", handle__remill_read_32, true),
     //add("__remill_read_memory_16", handle__remill_read_16, true),
     add("__remill_read_8", handle__remill_read_8, true),
-    
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check, false),
     add("my_fstat", handle__fstat64, true),
@@ -205,7 +204,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     //add("__remill_symbolize_read", handle__remill_symbolize_read, true),
     add("__remill_check_range", handle__remill_symbolic_address, true), 
     add("__remill_search_symbolic_memory",
-            handle__remill_assert_address, false),
+            handle__remill_assert_address, true),
     add("__remill_get_min_address", handle__remill_min_address, true),
     add("__remill_get_max_address", handle__remill_max_address, true),
     
@@ -214,6 +213,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     
     add("__remill_search_symbolic_byte_array", 
             handle__remill_search_byte_array, false),
+    add("__remill_get_array_option", 
+            handle__remill_get_array_option, true),
  
 
 
@@ -221,6 +222,23 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 #undef addDNR
 #undef add
 };
+
+
+void SpecialFunctionHandler::handle__remill_get_array_option( ExecutionState &state, 
+        KInstruction *target, std::vector<ref<Expr>> &arguments) {
+  
+  auto new_str = arguments[0];
+  auto min  = arguments[1];
+  auto max = arguments[2];
+
+  auto new_uint = llvm::dyn_cast<ConstantExpr>(new_str) 
+      -> getZExtValue();
+  auto max_uint = llvm::dyn_cast<ConstantExpr>(max)
+      -> getZExtValue();
+  auto min_uint = llvm::dyn_cast<ConstantExpr>(min)
+      -> getZExtValue();
+
+}
 
 
 void SpecialFunctionHandler::handle__remill_min_address(
@@ -383,7 +401,11 @@ std::vector<uint8_t> SpecialFunctionHandler::generate_concrete_array(
       max = stop;
 
       for (auto curr=start; curr<=stop; ++curr){
-        auto byte_expr = mem->symbolic_memory.find(curr)->second;
+        auto byte_expr_pair = mem->symbolic_memory.find(curr);
+        if (byte_expr_pair == mem ->symbolic_memory.end()){
+          LOG(FATAL) << "out of bounds error in array concretization";
+        }
+        auto byte_expr = byte_expr_pair->second;
         // should add err checking but currently assume start/stop are symbolid
         auto range = solver->getRange(state, byte_expr);
         concrete_array.push_back(
@@ -441,63 +463,54 @@ void SpecialFunctionHandler::handle__remill_assert_address(
     std::vector<ref<Expr>> &arguments) {
   
   auto addr = executor.toUnique(state, arguments[0]);
-
-  //auto prev_info = executor.pendingAddresses.front();
-  // concretize state
-  auto range = executor.solver->getRange(state, addr);
-  auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-  auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
+  auto min = llvm::dyn_cast<klee::ConstantExpr>(arguments[1]);
+  auto max = llvm::dyn_cast<klee::ConstantExpr>(arguments[2]);
 
   auto min_uint = min->getZExtValue();
   auto max_uint = max->getZExtValue();
 
-  std::vector<ref<Expr>> constraints;
-  std::vector<ExecutionState*> branches;
-  
   auto mem = executor.Memory(state);
   uint64_t curr = min_uint;
-  
-  LOG(INFO) << "in symbolic memory search where max is " << max_uint;
-  while ( curr <= max_uint ){
+  // find min and max
+ // is current mapped?
+ // if not TODO()continue
+ // if not mapped handle it later
+ // take curr and round it up to the next page boundary
+ // ask is curr satisfiable
+ // if not sat continue
+ // if sat
+
+ // in first address == current -> state that returns out
+ // second address > current copy current and save with injected assumption of the address
+ // save executionstate and also save the arguments to this method and the address size so we 
+ // can callback and pass in the right arguments
+ // assert  that address == current
+ // bindlocal the next sat address
+
+  while ( curr <= max_uint ) {
+    ++curr;
     LOG(INFO) << "curr at this iteration is " << curr;
     ref<Expr> constr = EqExpr::create(addr, ConstantExpr::create(curr, 64));
-    bool res;
-    bool success __attribute__((unused)) =
-      executor.solver->mustBeFalse(state, constr, res);
-    if (!res) {
-      auto sym_byte = mem->symbolic_memory.find(curr);  
-      if ( sym_byte != mem->symbolic_memory.end() ) {
-        auto range_max = ++curr;
-        while( (mem->symbolic_memory.find(range_max) !=
-               mem->symbolic_memory.end()) && (range_max < max_uint) ) {
-          ++range_max;
-        }
-        --range_max;
-        // range max is 1 higher then the last size in the range
-        // also have z3 abort error
-        //LOG(INFO) << "curr is " << curr;
-        LOG(INFO) << "range max is " << range_max;
-        if ( range_max !=  curr ) {
-          LOG(INFO) << "creating the range cmp expression";
-          ExprBuilder *builder = createDefaultExprBuilder();
-          // addr >= curr && addr <= range_max;
-          ref<Expr> lhs = builder -> Uge(addr, ConstantExpr::create(curr,64));
-          ref<Expr> rhs = builder -> Ule(addr, ConstantExpr::create(range_max , 64 ));
-          constr = builder -> And(lhs, rhs); 
-          curr = range_max;
-          delete builder;
-        }
+    if (mem->IsMapped(curr)) {
+      LOG(INFO) << "is mapped";
+      bool res;
+      (void) executor.solver->mayBeTrue(state, constr, res);
+      LOG(INFO) << "after solver query";
+      if (res) {
+        LOG(INFO) <<  curr << " is a valid address";
+        executor.bindLocal(target, state, ConstantExpr::create(curr, 64));
+        return;
+      } else {
+        LOG(INFO) << "is not a valid query";
       }
-     // constraints.push_back(constr); maybe this should go here?
+    } else {
+     LOG(ERROR) << "address: " << curr << " is not mapped";
+    // TODO(sai) properly handled unmapped addresses
     }
-    
-    constraints.push_back(constr);
-    ++curr;
   }
 
-  executor.branch(state, constraints, branches);
+  executor.bindLocal(target, state, ConstantExpr::create(min_uint, 64));
 }
-
 
 void SpecialFunctionHandler::handle__remill_symbolic_address(
     ExecutionState &state, KInstruction *target,
@@ -912,6 +925,57 @@ void SpecialFunctionHandler::handle__remill_symbolize_read (
 
 }
 
+  // find min and max
+ // is current mapped?
+ // if not TODO()continue
+ // if not mapped handle it later
+ // take curr and round it up to the next page boundary
+ // ask is curr satisfiable
+ // if not sat continue
+ // if sat
+
+ // in first address == current -> state that returns out
+ // second address > current copy current and save with injected assumption of the address
+ // save executionstate and also save the arguments to this method and the address size so we 
+ // can callback and pass in the right arguments
+ // assert  that address == current
+ // bindlocal the next sat address
+
+
+
+
+void SpecialFunctionHandler::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
+    auto min = mem_cont.min_val;
+    auto max = mem_cont.max_val;
+
+    auto curr = min;
+
+    while (curr != max){
+    ++curr;
+    ref<Expr> constr = EqExpr::create(addr, ConstantExpr::create(curr, 64));
+    if (mem->IsMapped(curr)) {
+      bool res;
+      (void) executor.solver->mayBeTrue(state, constr, res);
+      if (res) {
+        executor.bindLocal(target, state, ConstantExpr::create(curr, 64));
+        return;
+      } else {
+        LOG(INFO) << "is not a valid query";
+      }
+    } else {
+     LOG(ERROR) << "address: " << curr << " is not mapped";
+    // TODO(sai) properly handled unmapped addresses
+    }
+  }
+
+    // not quite finished with this function yet
+    // also commented out coede for the scheduling loop
+
+  pendingAddresses.push_front(&mem_cont);
+
+}
+
+
 void SpecialFunctionHandler::handle__remill_read_8(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
@@ -919,27 +983,29 @@ void SpecialFunctionHandler::handle__remill_read_8(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
-  uint64_t addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
   auto mem = executor.Memory(state);
-  uint8_t value_uint = ~static_cast<uint8_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 1-byte read from address 0x" << addr_uint
-               << " in address space " << mem_uint;
-  }
   
-  if (value_uint == klee::native::symbolic_byte) {
-    //LOG(INFO) << "concrete byte was equal to symbolic byte";
-    auto sym_pair = mem->symbolic_memory.find(addr_uint);
-    if (sym_pair != mem->symbolic_memory.end()){
-        //LOG(INFO) << "proceed with symbolic read because addr existed in space";
-        executor.bindLocal(target, state, sym_pair->second);
-        return;
-    } 
-  }
-  //LOG(INFO) << "concrete read";
-  executor.bindLocal(target, state, 
-              ConstantExpr::create(value_uint, Expr::Int8));
+  if (llvm::isa<ConstantExpr>(addr_val)) {
+    uint64_t addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
+    executor.bindLocal(target, state, runtime_read_8(state, addr_uint));
+  } else {
+    auto range = executor.solver->getRange(state, addr_val);
+    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
+    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
 
+    auto min_uint = min->getZExtValue();
+    auto max_uint = max->getZExtValue();
+
+    auto mem_cont = new MemoryAccessContinuation( state, addr_val, true, 
+            min_uint, max_uint, min_uint);
+    
+    scheduleMemContinutation(*mem_cont);
+    
+    auto constr = EqExpr::create(ConstantExpr::create(min, 64), addr);
+
+    executor.addConstraint(state, constr);
+    executor.bindLocal(target, state, runtime_read_8(state, min));
+  }
 }
 
 void SpecialFunctionHandler::handle__remill_read_16(

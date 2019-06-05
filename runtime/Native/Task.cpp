@@ -110,7 +110,6 @@ Memory * __remill_jump(State &state, addr_t pc, Memory *memory) {
 }
 
 Memory *__kleemill_at_error(State &state, addr_t ret_addr, Memory *memory) {
-
   auto task = reinterpret_cast<Task &>(state);
   task.status = kTaskStatusError;
   task.location = kTaskStoppedAtError;
@@ -468,6 +467,8 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
+
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -487,7 +488,8 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-/*
+*/
+
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -497,53 +499,37 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   Memory *memory = nullptr;
   memcpy(&memory, argv[2], sizeof(memory));
-
   __kleemill_init(memory);
-
   State *state = reinterpret_cast<State *>(argv[1]);
   uint64_t a;
-
-  uint8_t sym_byte1;
-  uint8_t sym_byte2;
-  uint8_t sym_byte3;
-
-  klee_make_symbolic(&sym_byte1, sizeof(sym_byte1), "sym_byte1");
-  klee_make_symbolic(&sym_byte2, sizeof(sym_byte2), "sym_byte2");
-  klee_make_symbolic(&sym_byte3, sizeof(sym_byte3), "sym_byte3");
-
- 
-  klee_assume(sym_byte1 <= 3);
-  klee_assume(sym_byte2 <= 3);
-  klee_assume(sym_byte3 <= 3);
+  uint8_t sym_byte1 = 0x41;
+  uint8_t sym_byte2 = 0x42;
+  uint8_t sym_byte3 = 0x43;
+  uint8_t sym_byte4 = 0x44;
   
   __remill_write_memory_8(memory, state->gpr.rsp.aword, sym_byte1);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 1, sym_byte2);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 2, sym_byte3);
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + 3, sym_byte4);
   
   klee_make_symbolic(&a, sizeof(a), "a");
-  klee_assume(a <= 2);
+  klee_assume(a <= 4);
 
   uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + a);
-  uint8_t byte2 = __remill_read_memory_8(memory, state->gpr.rsp.aword + 1);
-  uint8_t byte3 = __remill_read_memory_8(memory, state->gpr.rsp.aword + 2);
-
-  printf("%d %d %d\n", static_cast<uint8_t>(klee_get_value_i32(res)),
-          static_cast<uint8_t>(klee_get_value_i32(byte2)) ,
-          static_cast<uint8_t>(klee_get_value_i32(byte3)));
-
-  uint8_t sum = res + byte2 + byte3;
-
-  if (sum >= 8) {
   
-    printf("YOU WINN sum was %d\n", static_cast<uint8_t>(klee_get_value_i32(sum)));
+  if (res == 0x41) {
+    puts("A case");
+  } else if (res == 0x42){
+    puts("B case");
+  } else if (res == 0x43){
+    puts("C case");
   } else {
-    printf("YOU LOSEE sum was %d\n", static_cast<uint8_t>(klee_get_value_i32(sum)));
+    puts("D case");
   }
 
  __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
 
 // __remill_write_memory_64(memory, state->gpr.rsp.aword,a);
  /*
