@@ -1167,7 +1167,7 @@ void SpecialFunctionHandler::handle__remill_write_8(
     auto max_uint = max->getZExtValue();
     
     auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
-            min_uint - 1 , max_uint, min_uint + 1, mem_val);
+            min_uint, max_uint, min_uint + 1, mem_val);
 
     mem_cont->val_to_write = value_val;
     

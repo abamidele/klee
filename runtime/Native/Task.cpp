@@ -507,14 +507,14 @@ int main(int argc, char *argv[3], char *envp[]) {
   uint8_t sym_byte4 = 0x44;
 
   klee_make_symbolic(&a, sizeof(a), "a");
-  klee_assume(a <= 1);
+  klee_assume(a <= 3);
 
   __remill_write_memory_8(memory, state->gpr.rsp.aword + a, sym_byte1);
-  __remill_write_memory_8(memory, state->gpr.rsp.aword + 1, sym_byte2);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 2, sym_byte3);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 3, sym_byte4);
   
   uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + a);
+  printf("res: %d a: %d\n", res, klee_get_value_i32(a));
   
   if (res == 0x41) {
     puts("A case");
@@ -522,7 +522,7 @@ int main(int argc, char *argv[3], char *envp[]) {
     puts("B case");
   } else if (res == 0x43){
     puts("C case");
-  } else {
+  } else if (res == 0x44){
     puts("D case");
   }
 

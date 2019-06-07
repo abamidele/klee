@@ -3153,8 +3153,15 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
 
     auto constr = EqExpr::create(ConstantExpr::create(mem_cont.min_val, 64), mem_cont.addr);
     addConstraint(*current_state, constr);
-    bindLocal(current_state->prevPC, *current_state, 
+
+    if (mem_cont.is_read ){
+      bindLocal(current_state->prevPC, *current_state, 
             specialFunctionHandler->runtime_read_8(*current_state, mem_cont.min_val));
+    } else {
+      bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_write_8(
+              *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
+    }
 }
 
 
