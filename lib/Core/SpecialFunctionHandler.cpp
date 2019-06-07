@@ -190,7 +190,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     //add("__remill_read_memory_64", handle__remill_read_64, true),
     //add("__remill_read_memory_32", handle__remill_read_32, true),
     //add("__remill_read_memory_16", handle__remill_read_16, true),
-    add("__remill_read_8", handle__remill_read_8, true),
+    add("__remill_read_memory_8", handle__remill_read_8, true),
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check, false),
     add("my_fstat", handle__fstat64, true),
@@ -944,37 +944,6 @@ void SpecialFunctionHandler::handle__remill_symbolize_read (
 
 
 
-void SpecialFunctionHandler::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
-    auto min = mem_cont.min_val;
-    auto max = mem_cont.max_val;
-
-    auto curr = min;
-
-    while (curr != max){
-    ++curr;
-    ref<Expr> constr = EqExpr::create(addr, ConstantExpr::create(curr, 64));
-    if (mem->IsMapped(curr)) {
-      bool res;
-      (void) executor.solver->mayBeTrue(state, constr, res);
-      if (res) {
-        executor.bindLocal(target, state, ConstantExpr::create(curr, 64));
-        return;
-      } else {
-        LOG(INFO) << "is not a valid query";
-      }
-    } else {
-     LOG(ERROR) << "address: " << curr << " is not mapped";
-    // TODO(sai) properly handled unmapped addresses
-    }
-  }
-
-    // not quite finished with this function yet
-    // also commented out coede for the scheduling loop
-
-  pendingAddresses.push_front(&mem_cont);
-
-}
-
 
 void SpecialFunctionHandler::handle__remill_read_8(
     ExecutionState &state, KInstruction *target,
@@ -996,135 +965,13 @@ void SpecialFunctionHandler::handle__remill_read_8(
     auto min_uint = min->getZExtValue();
     auto max_uint = max->getZExtValue();
 
-    auto mem_cont = new MemoryAccessContinuation( state, addr_val, true, 
-            min_uint, max_uint, min_uint);
+    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
+            min_uint, max_uint, min_uint + 1);
     
-    scheduleMemContinutation(*mem_cont);
-    
-    auto constr = EqExpr::create(ConstantExpr::create(min, 64), addr);
-
-    executor.addConstraint(state, constr);
-    executor.bindLocal(target, state, runtime_read_8(state, min));
+    executor.scheduleMemContinuation(*mem_cont);
   }
 }
 
-void SpecialFunctionHandler::handle__remill_read_16(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-
-  /*
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-
-  auto mem = executor.Memory(state);
-
-  for (auto &pairs : mem->symbolic_memory->objects) {
-    if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address);
-      auto symbol = pairs.first->name;
-      for (auto &sym_pairs : state.symbolics) {
-        if (symbol == sym_pairs.first->name) {
-          auto readable_object = state.addressSpace.findObject(sym_pairs.first);
-          auto value_val = readable_object->read(offset, 16);
-          executor.bindLocal(target, state, value_val);
-        }
-      }
-      return;
-    }
-  }
-
-  uint16_t value_uint = ~static_cast<uint16_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 2-byte read from address 0x" << addr_uint
-               << " in address space " << mem_uint;
-  }
-  executor.bindLocal(target, state,
-                     ConstantExpr::create(value_uint, Expr::Int16));
- */
-}
-
-void SpecialFunctionHandler::handle__remill_read_32(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  /*
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-
-  auto mem = executor.Memory(state);
-  for (auto &pairs : mem->symbolic_memory->objects) {
-    if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
-      int offset = (addr_uint - pairs.first->address);
-
-
-      auto symbol = pairs.first->name;
-      for (auto &sym_pairs : state.symbolics) {
-        if (symbol == sym_pairs.first->name) {
-          auto readable_object = state.addressSpace.findObject(sym_pairs.first);
-          auto value_val = readable_object->read(offset, 32);
-          executor.bindLocal(target, state, value_val);
-        }
-      }
-      return;
-    }
-  }
-
-  uint32_t value_uint = ~static_cast<uint32_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 4-byte read from address 0x" << addr_uint
-               << " in address space " << mem_uint;
-  }
-  executor.bindLocal(target, state,
-                     ConstantExpr::create(value_uint, Expr::Int32));
-  */
-}
-
-void SpecialFunctionHandler::handle__remill_read_64(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  /*
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-  auto mem = executor.Memory(state);
-  for (auto &pairs : mem->symbolic_memory->objects) {
-    if (pairs.first->address <= addr_uint &&
-        (((pairs.first->size) + pairs.first->address) >= addr_uint)) {
-      //  TODO(sai) adjust for 32 bit binaries in macro
-      //
-      //
-
-      int offset = (addr_uint - pairs.first->address);
-
-      auto symbol = pairs.first->name;
-      for (auto &sym_pairs : state.symbolics) {
-        if (symbol == sym_pairs.first->name) {
-          auto readable_object = state.addressSpace.findObject(sym_pairs.first);
-          auto value_val = readable_object->read(offset, 64);
-          executor.bindLocal(target, state, value_val);
-        }
-      }
-      return;
-    }
-  }
-
-  uint64_t value_uint = ~static_cast<uint64_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 8-byte read from address 0x" << addr_uint
-               << " in address space " << mem_uint;
-  }
-  executor.bindLocal(target, state,
-                     ConstantExpr::create(value_uint, Expr::Int64));
-  */
-}
 
 void SpecialFunctionHandler::handle__llvm_ctpop(
     ExecutionState &state, KInstruction *target,

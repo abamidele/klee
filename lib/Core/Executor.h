@@ -93,18 +93,17 @@ class vTask {
 };
 
 struct MemoryAccessContinuation {
-  ExecutionState &state;
+  ExecutionState *state;
   ref<Expr> addr;
   bool is_read;
   uint64_t min_val;
   uint64_t max_val;
   uint64_t next_val;
 
-  MemoryAccessContinuation( ExecutionState &state, ref<Expr> addr, bool is_read,
+  MemoryAccessContinuation( ExecutionState *state, ref<Expr> addr, bool is_read,
           uint64_t min_val, uint64_t max_val, uint64_t next_val):
       state(state), addr(addr), is_read(is_read), min_val(min_val), 
       max_val(max_val), next_val(next_val) {}
-
 };
 
 template<class T> class ref;
@@ -291,6 +290,8 @@ class Executor : public Interpreter {
 
   void printFileLine(ExecutionState &state, KInstruction *ki,
                      llvm::raw_ostream &file);
+  
+  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
 
   void run(ExecutionState &initialState);
 

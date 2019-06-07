@@ -17,7 +17,7 @@
 #include <string>
 #include <deque>
 #include <dirent.h>
-#include "SpecialFunctionHandler.h"
+#include "Executor.h"
 
 namespace llvm {
 class Function;
@@ -139,9 +139,9 @@ class SpecialFunctionHandler {
           const std::vector<uint8_t>& concrete_array,
           uint64_t start);
 
-  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
 
   
+  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
   //void __remill_search_byte(
   //  ExecutionState &state, ref<Expr> byte_val);
 

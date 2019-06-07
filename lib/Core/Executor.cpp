@@ -3099,6 +3099,55 @@ void Executor::doDumpStates() {
   updateStates(nullptr);
 }
 
+void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
+    auto min = mem_cont.min_val;
+    auto max = mem_cont.max_val;
+
+    auto curr = min;
+    auto mem = Memory(*mem_cont.state);
+    auto current_state = mem_cont.state;
+    while (curr <= max) {
+    ++curr;
+    ref<Expr> constr = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr, 64));
+    if (mem->IsMapped(curr)) {
+      bool res;
+      (void) solver->mayBeTrue(*mem_cont.state, constr, res);
+      if (res) {
+       // possible copy issue
+        ExecutionState *new_state = mem_cont.state -> branch();
+        mem_cont.state = new_state;
+        mem_cont.next_val = curr;
+        LOG(INFO) << "next val in continuation is " << mem_cont.next_val;
+        //executor.bindLocal(mem_cont.state->prevPC, *mem_cont.state, runtime_read_8(*mem_cont.state, curr));
+        auto cond = UgeExpr::create(mem_cont.addr, ConstantExpr::create(mem_cont.next_val,64));
+        addConstraint(*mem_cont.state, cond);
+        bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_read_8(*mem_cont.state, curr ));
+        //pendingAddresses.push_front(&mem_cont);
+        break;
+      } else {
+        LOG(INFO) << "is not a valid query";
+      }
+    } else {
+     LOG(ERROR) << "address: " << curr << " is not mapped";
+    // TODO(sai) properly handled unmapped addresses
+    }
+  }
+    if (curr < max) {
+      auto new_mem_cont = new MemoryAccessContinuation(mem_cont.state, mem_cont.addr, true, 
+              curr, max, curr+1);
+      pendingAddresses.push_front(new_mem_cont);
+    }
+
+    auto constr = EqExpr::create(ConstantExpr::create(mem_cont.min_val, 64), mem_cont.addr);
+    addConstraint(*current_state, constr);
+    bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_read_8(*current_state, mem_cont.min_val));
+}
+
+
+
+
 void Executor::run(ExecutionState &initialState) {
   bindModuleConstants(kmodule->module.get());
 
@@ -3181,39 +3230,55 @@ void Executor::run(ExecutionState &initialState) {
   std::vector<ExecutionState *> newStates(states.begin(), states.end());
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
-  //while (!haltExecution || !pendingAddresses.empty()) {
-    LOG(INFO) << "state size is " << states.size();
-    while (!states.empty() && !haltExecution) {
-      ExecutionState &state = searcher->selectState();
-      KInstruction *ki = state.pc;
-      stepInstruction(state);
-      executeInstruction(state, ki);
-      processTimers(&state, maxInstructionTime);
-      checkMemoryUsage();
-      updateStates(&state);
-    }
+  LOG(INFO) << "state size is " << states.size();
 
-    // remove vector and index stuff from memory and constructors
-    /*
-    LOG(INFO) << "pending address size is " << pendingAddresses.size();
-    if (!pendingAddresses.empty()){
-      auto state_info = pendingAddresses.front();
-      LOG(INFO) << "next val is " << state_info -> next_val;
-      LOG(INFO) << "state ptr is" << state_info->state;
-      haltExecution = false;
-      
-      //addedStates.push_back(state_info->state);
-      //searcher->addState(state_info->state, nullptr);
-      //states.insert(state_info->state);
-      pendingAddresses.pop_front();
-      updateStates(state_info->state);
+  ExecutionState *state;
+  // TODO(sai) figure out how to properly put the execution state into the scheduler 
+  // TODO(sai) please clean up this code it has some inefficient checks 
+  while ((!states.empty() && !haltExecution) || 
+          (!pendingAddresses.empty())) {
+    if (!states.empty()){
+      state = &searcher->selectState();
+      KInstruction *ki = state->pc;
+      stepInstruction(*state);
+      executeInstruction(*state, ki);
+      processTimers(state, maxInstructionTime);
+      checkMemoryUsage();
+      updateStates(state);
     } else {
-      LOG(INFO) << "hit halt execution halt case";
-      haltExecution = true;
+      auto mem_cont = pendingAddresses.front();
+      pendingAddresses.pop_front();
+      state = mem_cont->state; 
+      // TODO(sai) figure out how to properly put the execution state into the scheduler 
+      if (mem_cont->is_read){
+       
+        LOG(INFO) << "in rewind case";
+        LOG(INFO) << "state size is " << states.size();
+        scheduleMemContinuation(*mem_cont);
+        //states.insert(mem_cont -> state);
+        //addedStates.push_back(mem_cont -> state);
+        //searcher -> addState(mem_cont -> state);
+        
+        while (state->prevPC != state->pc){
+          KInstruction *ki = state->pc;
+          stepInstruction(*state);
+          executeInstruction(*state, ki);
+          processTimers(state, maxInstructionTime);
+          checkMemoryUsage();
+        }
+
+        states.clear();
+        // delete mem_cont->state;
+        delete mem_cont;
+ 
+      } else {
+        // TODO(sai) handle write case
+        LOG(FATAL) << "hit unhandled write case";
+        state = nullptr;
+      }
+
     }
   }
-  */
-  // TODO(sai) delete all the pendingAddresses
 
   delete searcher;
   searcher = 0;
