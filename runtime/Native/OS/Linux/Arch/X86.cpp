@@ -404,36 +404,6 @@ extern "C" void __remill_search_symbolic_byte_array(
 extern "C" char *__remill_get_array_option(bool new_str, addr_t start, addr_t stop);
 extern "C" uint8_t __remill_read_memory_8(Memory *mem, addr_t addr);
 
-/*
-{
-  if (!klee_is_symbolic(addr)){
-    return __remill_read_8(mem, addr);
-  }
-
-  uint64_t min = __remill_get_min_address(addr);
-  uint64_t max = __remill_get_max_address(addr);
- 
-  if (!(max - min)) {
-    klee_assume(addr == min);
-    return __remill_read_8(mem, min);
-  } 
-  // does not support symbolic addrs
-  if (__kleemill_is_mapped_address(mem, min)) {
-    auto next_addr = __remill_search_symbolic_memory(addr, min, max);
-  // eventually want to jump back here with the 2nd case in the fork
-    if (next_addr != min) {
-      __remill_add_state_continuation(min);
-    }
-
-    printf("the next address is %ld min was %ld\n", next_addr, min);
- } else {
-    // TODO(sai) handle unmapped addresses
- }
-
-  return __remill_read_8(mem, min);
-}
-*/
- 
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
   mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));
   mem = __remill_write_memory_8(mem, addr+1, static_cast<uint8_t>(val >> 8));

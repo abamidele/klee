@@ -505,15 +505,15 @@ int main(int argc, char *argv[3], char *envp[]) {
   uint8_t sym_byte2 = 0x42;
   uint8_t sym_byte3 = 0x43;
   uint8_t sym_byte4 = 0x44;
-  
-  __remill_write_memory_8(memory, state->gpr.rsp.aword, sym_byte1);
+
+  klee_make_symbolic(&a, sizeof(a), "a");
+  klee_assume(a <= 1);
+
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + a, sym_byte1);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 1, sym_byte2);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 2, sym_byte3);
   __remill_write_memory_8(memory, state->gpr.rsp.aword + 3, sym_byte4);
   
-  klee_make_symbolic(&a, sizeof(a), "a");
-  klee_assume(a <= 4);
-
   uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + a);
   
   if (res == 0x41) {

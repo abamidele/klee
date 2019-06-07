@@ -128,7 +128,8 @@ class SpecialFunctionHandler {
 
   ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
 
-  void runtime_write_8(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val);
+  ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
+          ref<Expr> mem_ptr);
 
   std::vector<uint8_t> generate_concrete_array(
           ExecutionState &state, bool new_array, uint64_t start, 

@@ -540,6 +540,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   inst_lifter.reset(new remill::InstructionLifter(
       remill::GetTargetArch(), *intrinsics));
   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
+  pendingAddresses.reserve( 8192 );
 
   return kmodule->module.get();
 }
@@ -3099,7 +3100,7 @@ void Executor::doDumpStates() {
   updateStates(nullptr);
 }
 
-void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
+void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
     auto min = mem_cont.min_val;
     auto max = mem_cont.max_val;
 
@@ -3121,8 +3122,14 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
         //executor.bindLocal(mem_cont.state->prevPC, *mem_cont.state, runtime_read_8(*mem_cont.state, curr));
         auto cond = UgeExpr::create(mem_cont.addr, ConstantExpr::create(mem_cont.next_val,64));
         addConstraint(*mem_cont.state, cond);
-        bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+        if (mem_cont.is_read) {
+          bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
                 specialFunctionHandler->runtime_read_8(*mem_cont.state, curr ));
+        } else {
+          bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_write_8(*mem_cont.state, curr, 
+                  mem_cont.val_to_write, mem_cont.mem ));
+        }
         //pendingAddresses.push_front(&mem_cont);
         break;
       } else {
@@ -3134,9 +3141,14 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont){
     }
   }
     if (curr < max) {
-      auto new_mem_cont = new MemoryAccessContinuation(mem_cont.state, mem_cont.addr, true, 
-              curr, max, curr+1);
-      pendingAddresses.push_front(new_mem_cont);
+      auto new_mem_cont = new MemoryAccessContinuation(mem_cont.state, mem_cont.addr, 
+          mem_cont.is_read, curr, max, curr+1, mem_cont.mem);
+      
+      if (!mem_cont.is_read) {
+        new_mem_cont->val_to_write = mem_cont.val_to_write;
+      }
+      
+      pendingAddresses.push_back(new_mem_cont);
     }
 
     auto constr = EqExpr::create(ConstantExpr::create(mem_cont.min_val, 64), mem_cont.addr);
@@ -3246,37 +3258,28 @@ void Executor::run(ExecutionState &initialState) {
       checkMemoryUsage();
       updateStates(state);
     } else {
-      auto mem_cont = pendingAddresses.front();
-      pendingAddresses.pop_front();
+      auto mem_cont = pendingAddresses.back();
+      pendingAddresses.pop_back();
       state = mem_cont->state; 
       // TODO(sai) figure out how to properly put the execution state into the scheduler 
-      if (mem_cont->is_read){
-       
-        LOG(INFO) << "in rewind case";
-        LOG(INFO) << "state size is " << states.size();
-        scheduleMemContinuation(*mem_cont);
-        //states.insert(mem_cont -> state);
-        //addedStates.push_back(mem_cont -> state);
-        //searcher -> addState(mem_cont -> state);
-        
-        while (state->prevPC != state->pc){
-          KInstruction *ki = state->pc;
-          stepInstruction(*state);
-          executeInstruction(*state, ki);
-          processTimers(state, maxInstructionTime);
-          checkMemoryUsage();
-        }
-
-        states.clear();
-        // delete mem_cont->state;
-        delete mem_cont;
- 
-      } else {
-        // TODO(sai) handle write case
-        LOG(FATAL) << "hit unhandled write case";
-        state = nullptr;
+      LOG(INFO) << "in rewind case";
+      LOG(INFO) << "state size is " << states.size();
+      scheduleMemContinuation(*mem_cont);
+      //states.insert(mem_cont -> state);
+      //addedStates.push_back(mem_cont -> state);
+      //searcher -> addState(mem_cont -> state);
+      
+      while (state->prevPC != state->pc){
+        KInstruction *ki = state->pc;
+        stepInstruction(*state);
+        executeInstruction(*state, ki);
+        processTimers(state, maxInstructionTime);
+        checkMemoryUsage();
       }
 
+      states.clear();
+      // delete mem_cont->state;
+      delete mem_cont;
     }
   }
 

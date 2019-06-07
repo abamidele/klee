@@ -276,9 +276,9 @@ void SpecialFunctionHandler::handle__remill_max_address(
 }
 
 
-void SpecialFunctionHandler::runtime_write_8(
+ref<Expr> SpecialFunctionHandler::runtime_write_8(
         ExecutionState &state, uint64_t addr_uint, 
-        ref<Expr> value_val) {
+        ref<Expr> value_val, ref<Expr> mem_ptr) {
   
   auto mem = executor.Memory(state);
   if (isa<ConstantExpr>(value_val)) {
@@ -290,17 +290,18 @@ void SpecialFunctionHandler::runtime_write_8(
     if (!mem->TryWrite(addr_uint, static_cast<uint8_t>(val))) {
       LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << val
         << " to address 0x" << addr_uint << " in address space ";
-      return ;
+      return Expr::createPointer(0);
     }
   
   } else {
     if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)) {
       LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << klee::native::symbolic_byte
         << " to address 0x" << addr_uint << " in address space ";
-      return ;
+      return Expr::createPointer(0);
     }
     mem->symbolic_memory[addr_uint] = value_val;
   }
+  return mem_ptr;
 }
 
 ref<Expr> SpecialFunctionHandler::runtime_read_8(
@@ -966,7 +967,7 @@ void SpecialFunctionHandler::handle__remill_read_8(
     auto max_uint = max->getZExtValue();
 
     auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
-            min_uint, max_uint, min_uint + 1);
+            min_uint, max_uint, min_uint + 1, mem_val );
     
     executor.scheduleMemContinuation(*mem_cont);
   }
@@ -1152,37 +1153,26 @@ void SpecialFunctionHandler::handle__remill_write_8(
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
   auto addr_val = executor.toUnique(state, arguments[1]);
-  auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
   auto value_val = executor.toUnique(state, arguments[2]);
-  
-  auto mem = executor.Memory(state);
-  if (isa<ConstantExpr>(value_val)) {
-    //LOG(INFO) << "Concrete write 8";
-    auto val = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
-    if (val == klee::native::symbolic_byte) {
-      //LOG(INFO) << "remove symbolic byte from memory";
-      mem->symbolic_memory.erase(addr_uint);
-    }
-
-    if (!mem->TryWrite(addr_uint, static_cast<uint8_t>(val))) {
-      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << val
-        << " to address 0x" << addr_uint << " in address space " << mem_uint;
-      executor.bindLocal(target, state, Expr::createPointer(0));
-      return ;
-    }
-  
+ 
+  if (isa<ConstantExpr>(addr_val)){
+    auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
+    executor.bindLocal(target, state, runtime_write_8(state, addr_uint, value_val, mem_val));
   } else {
-    if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)){
-      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << klee::native::symbolic_byte
-        << " to address 0x" << addr_uint << " in address space " << mem_uint;
-      executor.bindLocal(target, state, Expr::createPointer(0));
-      return ;
-    }
-    //LOG(INFO) << "added symbolic byte to symbolic address space";
-    mem->symbolic_memory[addr_uint] = value_val;
-  }
+    auto range = executor.solver->getRange(state, addr_val);
+    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
+    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
+    
+    auto min_uint = min->getZExtValue();
+    auto max_uint = max->getZExtValue();
+    
+    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
+            min_uint - 1 , max_uint, min_uint + 1, mem_val);
 
-  executor.bindLocal(target, state, mem_val);
+    mem_cont->val_to_write = value_val;
+    
+    executor.scheduleMemContinuation(*mem_cont);
+  }
 }
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {

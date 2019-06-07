@@ -99,11 +99,13 @@ struct MemoryAccessContinuation {
   uint64_t min_val;
   uint64_t max_val;
   uint64_t next_val;
+  ref<Expr> mem;
+  ref<Expr> val_to_write;
 
   MemoryAccessContinuation( ExecutionState *state, ref<Expr> addr, bool is_read,
-          uint64_t min_val, uint64_t max_val, uint64_t next_val):
+          uint64_t min_val, uint64_t max_val, uint64_t next_val, ref<Expr> mem):
       state(state), addr(addr), is_read(is_read), min_val(min_val), 
-      max_val(max_val), next_val(next_val) {}
+      max_val(max_val), next_val(next_val), mem(mem) {}
 };
 
 template<class T> class ref;
@@ -187,7 +189,7 @@ class Executor : public Interpreter {
   std::vector<std::shared_ptr<native::AddressSpace>> memories;
   std::deque<vTask *> tasks;
   std::set<uint64_t> visited_addrs;
-  std::deque<MemoryAccessContinuation *> pendingAddresses;
+  std::vector<MemoryAccessContinuation *> pendingAddresses;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction
@@ -291,7 +293,7 @@ class Executor : public Interpreter {
   void printFileLine(ExecutionState &state, KInstruction *ki,
                      llvm::raw_ostream &file);
   
-  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
+  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont );
 
   void run(ExecutionState &initialState);
 
