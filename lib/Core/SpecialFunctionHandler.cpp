@@ -1215,18 +1215,12 @@ void SpecialFunctionHandler::handle__llvm_ctpop(
 void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
   auto pc_val = executor.toUnique(state, arguments[1]);
   auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val)->getZExtValue();
 
   auto mem = executor.Memory(state);
   auto func = executor.GetLiftedFunction(mem, pc_uint);
-
-  // LOG(INFO)
-  //    << "Indirect branch lookup " << std::hex << pc_uint << std::dec
-  //    << " in address space " << mem_uint;
 
   executor.bindLocal(target, state,
                      Expr::createPointer(reinterpret_cast<uintptr_t>(func)));
