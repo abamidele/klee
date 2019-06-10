@@ -3107,6 +3107,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   auto found = false;
 
   MemoryReadResult val;
+  ref<Expr> constr;
   while (min_addr <= curr_addr && curr_addr <= max_addr) {
     val = {};
     auto can_read = false;
@@ -3129,8 +3130,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
         break;
     }
 
-    ref<Expr> constr = EqExpr::create(
-        mem_cont.addr, ConstantExpr::create(curr_addr, 64));
+    constr = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr_addr, 64));
     bool res = false;
     (void) solver->mayBeTrue(*mem_cont.state, constr, res);
 
@@ -3162,8 +3162,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   mem_cont.state = curr_state->branch();
   mem_cont.next_addr = curr_addr + 1;
 
-  auto cond = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr_addr, 64));
-  addConstraint(*curr_state, cond);
+  addConstraint(*curr_state, constr);
 
   switch (mem_cont.kind) {
     case MemoryContinuationKind::kContinueRead8:
