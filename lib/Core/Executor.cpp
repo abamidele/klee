@@ -3105,12 +3105,16 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   const auto curr_state = mem_cont.state;
   const auto curr_mem = Memory(*curr_state, mem_cont.memory_index);
   auto found = false;
+  auto has_error = false;
 
   MemoryReadResult val;
   ref<Expr> constr;
-  while (min_addr <= curr_addr && curr_addr <= max_addr) {
+  uint64_t next_addr = curr_addr;
+  while (min_addr <= next_addr && next_addr <= max_addr) {
+    curr_addr = next_addr;
     val = {};
     auto can_read = false;
+
     switch (mem_cont.kind) {
       case MemoryContinuationKind::kContinueRead8:
       case MemoryContinuationKind::kContinueWrite8:
@@ -3134,26 +3138,37 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
     bool res = false;
     (void) solver->mayBeTrue(*mem_cont.state, constr, res);
 
+    // Not readable.
     if (!can_read) {
+      min_addr = curr_addr;
+
+      // Not readable, but satisfiable; this is a memory access violation.
       if (res) {
-        // TODO(sae,pag): Report error.
+        found = true;
+        has_error = true;
+        break;
+
+      // Not readable, not satisfiable, so round up to the next page boundary
+      // and keep looking.
+      } else {
+        next_addr = (curr_addr + 4096ULL) & ~4095ULL;
+        continue;
       }
-      min_addr = curr_addr;
-      curr_addr += 4096ULL;
-      curr_addr &= 4095ULL;
-      continue;
-    }
 
-    if (!res) {
+    // Readable but not satisfiable.
+    } else if (!res) {
       min_addr = curr_addr;
-      curr_addr += 1;
+      next_addr = curr_addr + 1;
       continue;
-    }
 
-    found = true;
-    break;
+    // Readable and satisfiable.
+    } else {
+      found = true;
+      break;
+    }
   }
 
+  // There are no more addresses to find.
   if (!found) {
     terminateState(*curr_state);
     return false;
@@ -3163,9 +3178,20 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   mem_cont.state = new ExecutionState(*curr_state);
   mem_cont.state->coveredNew = false;
   mem_cont.state->coveredLines.clear();
-
   mem_cont.next_addr = curr_addr + 1;
 
+  // If we found an error, report it immediately by terminating the state.
+  // This happens *after* forking the current state, so that the executor
+  // can go visit the next valid values for the addresss.
+  if (has_error) {
+    std::stringstream ss;
+    ss << "Failed 1-byte read from address 0x" << std::hex << curr_addr;
+    terminateStateOnError(*curr_state, ss.str(), Executor::ReportError);
+    return true;
+  }
+
+  // Add the constraint to our current state that the address must equal
+  // `curr_addr`.
   addConstraint(*curr_state, constr);
 
   switch (mem_cont.kind) {
