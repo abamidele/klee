@@ -126,11 +126,21 @@ class SpecialFunctionHandler {
   void set_up_fstat_struct(struct stat *info);
   void set_up_dirent_struct(struct dirent *info);
 
-  ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
 
+  ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
+  ref<Expr> runtime_read_16(ExecutionState &state, uint64_t addr_uint);
+  ref<Expr> runtime_read_32(ExecutionState &state, uint64_t addr_uint);
+  ref<Expr> runtime_read_64(ExecutionState &state, uint64_t addr_uint);
+  
   ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
           ref<Expr> mem_ptr);
-
+  ref<Expr> runtime_write_16(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
+          ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_32(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
+          ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_64(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
+          ref<Expr> mem_ptr);
+ 
   std::vector<uint8_t> generate_concrete_array(
           ExecutionState &state, bool new_array, uint64_t start, 
           uint64_t stop);
@@ -215,11 +225,9 @@ class SpecialFunctionHandler {
   HANDLER(handle__remill_write_8);
 
   HANDLER(handle__remill_read_8);
-  
-  //HANDLER(handle__remill_read_64);
-  //HANDLER(handle__remill_read_32);
-  //HANDLER(handle__remill_read_16);
-  //HANDLER(handle__remill_read_8);
+  HANDLER(handle__remill_read_16);
+  HANDLER(handle__remill_read_32);
+  HANDLER(handle__remill_read_64);
   
   HANDLER(handle__llvm_ctpop);
 

@@ -100,12 +100,13 @@ struct MemoryAccessContinuation {
   uint64_t max_val;
   uint64_t next_val;
   ref<Expr> mem;
+  int access_size;
   ref<Expr> val_to_write;
 
   MemoryAccessContinuation( ExecutionState *state, ref<Expr> addr, bool is_read,
-          uint64_t min_val, uint64_t max_val, uint64_t next_val, ref<Expr> mem):
+          uint64_t min_val, uint64_t max_val, uint64_t next_val, ref<Expr> mem, int access_size):
       state(state), addr(addr), is_read(is_read), min_val(min_val), 
-      max_val(max_val), next_val(next_val), mem(mem) {}
+      max_val(max_val), next_val(next_val), mem(mem), access_size(access_size) {}
 };
 
 template<class T> class ref;

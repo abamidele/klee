@@ -3102,7 +3102,7 @@ void Executor::doDumpStates() {
 
 void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
     auto min = mem_cont.min_val;
-    auto max = mem_cont.max_val;
+    auto max = mem_cont.max_val + 1;
 
     auto curr = min;
     auto mem = Memory(*mem_cont.state);
@@ -3123,14 +3123,57 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
         auto cond = UgeExpr::create(mem_cont.addr, ConstantExpr::create(mem_cont.next_val,64));
         addConstraint(*mem_cont.state, cond);
         if (mem_cont.is_read) {
-          bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+          switch(mem_cont.access_size) {
+            case 8: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
                 specialFunctionHandler->runtime_read_8(*mem_cont.state, curr ));
+              break;
+            }
+            case 16: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_read_16(*mem_cont.state, curr ));
+              break;
+            }
+            case 32: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_read_32(*mem_cont.state, curr ));
+              break;
+            }
+            case 64: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_read_64(*mem_cont.state, curr ));
+              break;
+            }
+          }
         } else {
-          bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+            switch(mem_cont.access_size) {
+            case 8: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
                 specialFunctionHandler->runtime_write_8(*mem_cont.state, curr, 
-                  mem_cont.val_to_write, mem_cont.mem ));
+                mem_cont.val_to_write, mem_cont.mem ));
+              break;
+            }
+            case 16: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_write_16(*mem_cont.state, curr, 
+                mem_cont.val_to_write, mem_cont.mem ));
+              break;
+            }
+            case 32: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_write_32(*mem_cont.state, curr, 
+                mem_cont.val_to_write, mem_cont.mem ));
+              break;
+            }
+            case 64: {
+              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
+                specialFunctionHandler->runtime_write_64(*mem_cont.state, curr, 
+                mem_cont.val_to_write, mem_cont.mem ));
+              break;
+            }
+          }
         }
-        //pendingAddresses.push_front(&mem_cont);
+        //pendingAddresses.push_back(&mem_cont);
         break;
       } else {
         LOG(INFO) << "is not a valid query";
@@ -3142,12 +3185,12 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
   }
     if (curr < max) {
       auto new_mem_cont = new MemoryAccessContinuation(mem_cont.state, mem_cont.addr, 
-          mem_cont.is_read, curr, max, curr+1, mem_cont.mem);
+          mem_cont.is_read, curr, max, curr+1, mem_cont.mem, mem_cont.access_size);
       
       if (!mem_cont.is_read) {
         new_mem_cont->val_to_write = mem_cont.val_to_write;
       }
-      
+
       pendingAddresses.push_back(new_mem_cont);
     }
 
@@ -3155,13 +3198,57 @@ void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
     addConstraint(*current_state, constr);
 
     if (mem_cont.is_read ){
-      bindLocal(current_state->prevPC, *current_state, 
+      switch(mem_cont.access_size) {
+        case 8: {
+          bindLocal(current_state->prevPC, *current_state, 
             specialFunctionHandler->runtime_read_8(*current_state, mem_cont.min_val));
+          break;
+        }
+        case 16: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_read_16(*current_state, mem_cont.min_val));
+          break;
+        }
+        case 32: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_read_32(*current_state, mem_cont.min_val));
+
+          break;
+        }
+        case 64: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_read_64(*current_state, mem_cont.min_val));
+          break;
+        }
+      }
     } else {
-      bindLocal(current_state->prevPC, *current_state, 
+      switch(mem_cont.access_size) {
+        case 8: {
+          bindLocal(current_state->prevPC, *current_state, 
             specialFunctionHandler->runtime_write_8(
-              *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
-    }
+            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
+          break;
+        }
+        case 16: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_write_16(
+            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
+          break;
+        }
+        case 32: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_write_32(
+            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
+          break;
+        }
+        case 64: {
+          bindLocal(current_state->prevPC, *current_state, 
+            specialFunctionHandler->runtime_write_64(
+            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
+          break;
+        }
+      }
+  }
 }
 
 
