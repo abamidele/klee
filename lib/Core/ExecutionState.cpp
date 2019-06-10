@@ -126,9 +126,14 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
-    concreteMemory(new klee::native::AddressSpace(*state.concreteMemory)),
     sym_addrs(state.sym_addrs),
     sym_addr_index(state.sym_addr_index) {
+
+  memories.reserve(state.memories.size());
+  for (const auto &other_memory : state.memories) {
+    memories.emplace_back(new klee::native::AddressSpace(*other_memory));
+  }
+
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
 

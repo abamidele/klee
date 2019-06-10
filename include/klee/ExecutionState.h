@@ -154,7 +154,7 @@ public:
   // The numbers of times this state has run through Executor::stepInstruction
   std::uint64_t steppedInstructions;
 
-  std::unique_ptr<klee::native::AddressSpace> concreteMemory;
+  std::vector<std::unique_ptr<native::AddressSpace>> memories;
 
   std::vector<uint64_t> sym_addrs;
   

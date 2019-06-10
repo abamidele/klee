@@ -92,21 +92,43 @@ class vTask {
   std::vector<std::string> envp;
 };
 
+enum class MemoryContinuationKind {
+  kContinueRead8,
+  kContinueRead16,
+  kContinueRead32,
+  kContinueRead64,
+
+  kContinueWrite8,
+  kContinueWrite16,
+  kContinueWrite32,
+  kContinueWrite64
+};
+
 struct MemoryAccessContinuation {
   ExecutionState *state;
-  ref<Expr> addr;
-  bool is_read;
-  uint64_t min_val;
-  uint64_t max_val;
-  uint64_t next_val;
-  ref<Expr> mem;
-  int access_size;
+  const ref<Expr> addr;
+  const uint64_t min_addr;
+  const uint64_t max_addr;
+  uint64_t next_addr;
+  const MemoryContinuationKind kind;
+
+  const uint64_t memory_index;
+  const ref<Expr> memory;
   ref<Expr> val_to_write;
 
-  MemoryAccessContinuation( ExecutionState *state, ref<Expr> addr, bool is_read,
-          uint64_t min_val, uint64_t max_val, uint64_t next_val, ref<Expr> mem, int access_size):
-      state(state), addr(addr), is_read(is_read), min_val(min_val), 
-      max_val(max_val), next_val(next_val), mem(mem), access_size(access_size) {}
+  MemoryAccessContinuation(ExecutionState *state, ref<Expr> addr,
+                           uint64_t min_val, uint64_t max_val,
+                           uint64_t next_val, uint64_t memory_index_,
+                           ref<Expr> memory_, MemoryContinuationKind kind_)
+      : state(state),
+        addr(addr),
+        min_addr(min_val),
+        max_addr(max_val),
+        next_addr(next_val),
+        memory_index(memory_index_),
+        memory(memory_),
+        kind(kind_) {
+  }
 };
 
 template<class T> class ref;
@@ -187,10 +209,9 @@ class Executor : public Interpreter {
   /// which ran into a klee_open_merge(), and not all states in the set have
   /// reached the corresponding klee_close_merge() yet.
   std::vector<MergeHandler *> mergeGroups;
-  std::vector<std::shared_ptr<native::AddressSpace>> memories;
   std::deque<vTask *> tasks;
   std::set<uint64_t> visited_addrs;
-  std::vector<MemoryAccessContinuation *> pendingAddresses;
+  std::vector<std::unique_ptr<MemoryAccessContinuation>> pendingAddresses;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction
@@ -294,7 +315,8 @@ class Executor : public Interpreter {
   void printFileLine(ExecutionState &state, KInstruction *ki,
                      llvm::raw_ostream &file);
   
-  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont );
+  // Returns `true` if it updated `mem_cont` in place, and `false` otherwise.
+  bool updateMemContinuation(MemoryAccessContinuation &mem_cont );
 
   void run(ExecutionState &initialState);
 
@@ -541,7 +563,8 @@ class Executor : public Interpreter {
   llvm::Module *setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
                           const ModuleOptions &opts) override;
 
-  native::AddressSpace *Memory(uintptr_t index);
+  native::AddressSpace *Memory(klee::ExecutionState &state,
+                               uintptr_t index);
   native::AddressSpace *Memory(klee::ExecutionState &state );
 
   llvm::Function *GetLiftedFunction(native::AddressSpace *memory, uint64_t addr);

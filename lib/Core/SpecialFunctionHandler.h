@@ -37,6 +37,27 @@ struct KInstruction;
 template<typename T> class ref;
 
 
+
+union MemoryReadResult {
+  uint64_t as_qword;
+  uint32_t as_dword;
+  uint16_t as_word;
+  uint8_t as_byte;
+  uint8_t as_bytes[8];
+};
+
+static_assert(sizeof(MemoryReadResult) == sizeof(uint64_t),
+              "Invalid packing of `union MemoryReadResult`.");
+
+static_assert(!__builtin_offsetof(MemoryReadResult, as_dword),
+              "Invalid packing of `union MemoryReadResult`.");
+
+static_assert(!__builtin_offsetof(MemoryReadResult, as_word),
+              "Invalid packing of `union MemoryReadResult`.");
+
+static_assert(!__builtin_offsetof(MemoryReadResult, as_byte),
+              "Invalid packing of `union MemoryReadResult`.");
+
 class SpecialFunctionHandler {
  private:
   //std::deque<ExecutionState&> jump_states;
@@ -127,19 +148,21 @@ class SpecialFunctionHandler {
   void set_up_dirent_struct(struct dirent *info);
 
 
-  ref<Expr> runtime_read_8(ExecutionState &state, uint64_t addr_uint);
-  ref<Expr> runtime_read_16(ExecutionState &state, uint64_t addr_uint);
-  ref<Expr> runtime_read_32(ExecutionState &state, uint64_t addr_uint);
-  ref<Expr> runtime_read_64(ExecutionState &state, uint64_t addr_uint);
-  
-  ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
-          ref<Expr> mem_ptr);
-  ref<Expr> runtime_write_16(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
-          ref<Expr> mem_ptr);
-  ref<Expr> runtime_write_32(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
-          ref<Expr> mem_ptr);
-  ref<Expr> runtime_write_64(ExecutionState &state, uint64_t addr_uint, ref<Expr> value_val,
-          ref<Expr> mem_ptr);
+  ref<Expr> runtime_read_memory(native::AddressSpace * mem,
+                                uint64_t addr_uint, uint64_t num_bytes,
+                                const MemoryReadResult &val);
+  ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint,
+                            ref<Expr> value_val, native::AddressSpace *mem,
+                            ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_16(ExecutionState &state, uint64_t addr_uint,
+                             ref<Expr> value_val, native::AddressSpace *mem,
+                             ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_32(ExecutionState &state, uint64_t addr_uint,
+                             ref<Expr> value_val, native::AddressSpace *mem,
+                             ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_64(ExecutionState &state, uint64_t addr_uint,
+                             ref<Expr> value_val, native::AddressSpace *mem,
+                             ref<Expr> mem_ptr);
  
   std::vector<uint8_t> generate_concrete_array(
           ExecutionState &state, bool new_array, uint64_t start, 
@@ -220,7 +243,6 @@ class SpecialFunctionHandler {
   
   HANDLER(handle__remill_write_64);
   HANDLER(handle__remill_write_32);
-  HANDLER(handle__remill_write_f32);
   HANDLER(handle__remill_write_16);
   HANDLER(handle__remill_write_8);
 

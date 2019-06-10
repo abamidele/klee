@@ -545,13 +545,13 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   return kmodule->module.get();
 }
 
-native::AddressSpace *Executor::Memory(uintptr_t index) {
-  DCHECK_LT(index, memories.size());
-  return memories[index].get();
+native::AddressSpace *Executor::Memory(klee::ExecutionState &state,
+                                       uintptr_t index) {
+  return state.memories[index].get();
 }
 
 native::AddressSpace *Executor::Memory(klee::ExecutionState &state ) {
-  return state.concreteMemory.get();
+  return state.memories[0].get();
 }
 
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
@@ -2932,14 +2932,11 @@ void Executor::updateStates(ExecutionState *current) {
   states.insert(addedStates.begin(), addedStates.end());
   addedStates.clear();
 
-  for (std::vector<ExecutionState *>::iterator it = removedStates.begin(), ie =
-      removedStates.end(); it != ie; ++it) {
-    ExecutionState *es = *it;
+  for (auto es : removedStates) {
     auto it2 = states.find(es);
     assert(it2 != states.end());
     states.erase(it2);
-    std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it3 = seedMap
-        .find(es);
+    auto it3 = seedMap.find(es);
     if (it3 != seedMap.end())
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
@@ -3100,158 +3097,132 @@ void Executor::doDumpStates() {
   updateStates(nullptr);
 }
 
-void Executor::scheduleMemContinuation(MemoryAccessContinuation &mem_cont ){
-    auto min = mem_cont.min_val;
-    auto max = mem_cont.max_val + 1;
+bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
+  auto min_addr = mem_cont.min_addr;
+  const auto max_addr = mem_cont.max_addr;
+  const auto curr_state = mem_cont.state;
+  auto curr_addr = mem_cont.next_addr;
+  const auto curr_state = mem_cont.state;
+  const auto curr_mem = Memory(*curr_state, mem_cont.memory_index);
+  auto found = false;
 
-    auto curr = min;
-    auto mem = Memory(*mem_cont.state);
-    auto current_state = mem_cont.state;
-    while (curr <= max) {
-    ++curr;
-    ref<Expr> constr = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr, 64));
-    if (mem->IsMapped(curr)) {
-      bool res;
-      (void) solver->mayBeTrue(*mem_cont.state, constr, res);
-      if (res) {
-       // possible copy issue
-        ExecutionState *new_state = mem_cont.state -> branch();
-        mem_cont.state = new_state;
-        mem_cont.next_val = curr;
-        LOG(INFO) << "next val in continuation is " << mem_cont.next_val;
-        //executor.bindLocal(mem_cont.state->prevPC, *mem_cont.state, runtime_read_8(*mem_cont.state, curr));
-        auto cond = UgeExpr::create(mem_cont.addr, ConstantExpr::create(mem_cont.next_val,64));
-        addConstraint(*mem_cont.state, cond);
-        if (mem_cont.is_read) {
-          switch(mem_cont.access_size) {
-            case 8: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_read_8(*mem_cont.state, curr ));
-              break;
-            }
-            case 16: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_read_16(*mem_cont.state, curr ));
-              break;
-            }
-            case 32: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_read_32(*mem_cont.state, curr ));
-              break;
-            }
-            case 64: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_read_64(*mem_cont.state, curr ));
-              break;
-            }
-          }
-        } else {
-            switch(mem_cont.access_size) {
-            case 8: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_write_8(*mem_cont.state, curr, 
-                mem_cont.val_to_write, mem_cont.mem ));
-              break;
-            }
-            case 16: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_write_16(*mem_cont.state, curr, 
-                mem_cont.val_to_write, mem_cont.mem ));
-              break;
-            }
-            case 32: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_write_32(*mem_cont.state, curr, 
-                mem_cont.val_to_write, mem_cont.mem ));
-              break;
-            }
-            case 64: {
-              bindLocal(mem_cont.state->prevPC, *mem_cont.state, 
-                specialFunctionHandler->runtime_write_64(*mem_cont.state, curr, 
-                mem_cont.val_to_write, mem_cont.mem ));
-              break;
-            }
-          }
-        }
-        //pendingAddresses.push_back(&mem_cont);
+  MemoryReadResult val;
+  while (min_addr <= curr_addr && curr_addr <= max_addr) {
+    val = {};
+    auto can_read = false;
+    switch (mem_cont.kind) {
+      case MemoryContinuationKind::kContinueRead8:
+      case MemoryContinuationKind::kContinueWrite8:
+        can_read = curr_mem->TryRead(curr_addr, &(val.as_byte));
         break;
-      } else {
-        LOG(INFO) << "is not a valid query";
-      }
-    } else {
-     LOG(ERROR) << "address: " << curr << " is not mapped";
-    // TODO(sai) properly handled unmapped addresses
-    }
-  }
-    if (curr < max) {
-      auto new_mem_cont = new MemoryAccessContinuation(mem_cont.state, mem_cont.addr, 
-          mem_cont.is_read, curr, max, curr+1, mem_cont.mem, mem_cont.access_size);
-      
-      if (!mem_cont.is_read) {
-        new_mem_cont->val_to_write = mem_cont.val_to_write;
-      }
-
-      pendingAddresses.push_back(new_mem_cont);
+      case MemoryContinuationKind::kContinueRead16:
+      case MemoryContinuationKind::kContinueWrite16:
+        can_read = curr_mem->TryRead(curr_addr, &(val.as_word));
+        break;
+      case MemoryContinuationKind::kContinueRead32:
+      case MemoryContinuationKind::kContinueWrite32:
+        can_read = curr_mem->TryRead(curr_addr, &(val.as_dword));
+        break;
+      case MemoryContinuationKind::kContinueRead64:
+      case MemoryContinuationKind::kContinueWrite64:
+        can_read = curr_mem->TryRead(curr_addr, &(val.as_qword));
+        break;
     }
 
-    auto constr = EqExpr::create(ConstantExpr::create(mem_cont.min_val, 64), mem_cont.addr);
-    addConstraint(*current_state, constr);
+    ref<Expr> constr = EqExpr::create(
+        mem_cont.addr, ConstantExpr::create(curr_addr, 64));
+    bool res = false;
+    (void) solver->mayBeTrue(*mem_cont.state, constr, res);
 
-    if (mem_cont.is_read ){
-      switch(mem_cont.access_size) {
-        case 8: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_read_8(*current_state, mem_cont.min_val));
-          break;
-        }
-        case 16: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_read_16(*current_state, mem_cont.min_val));
-          break;
-        }
-        case 32: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_read_32(*current_state, mem_cont.min_val));
+    if (!can_read) {
+      if (res) {
+        // TODO(sae,pag): Report error.
+      }
+      min_addr = curr_addr;
+      curr_addr += 4096ULL;
+      curr_addr &= 4095ULL;
+      continue;
+    }
 
-          break;
-        }
-        case 64: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_read_64(*current_state, mem_cont.min_val));
-          break;
-        }
-      }
-    } else {
-      switch(mem_cont.access_size) {
-        case 8: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_write_8(
-            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
-          break;
-        }
-        case 16: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_write_16(
-            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
-          break;
-        }
-        case 32: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_write_32(
-            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
-          break;
-        }
-        case 64: {
-          bindLocal(current_state->prevPC, *current_state, 
-            specialFunctionHandler->runtime_write_64(
-            *current_state, mem_cont.min_val, mem_cont.val_to_write, mem_cont.mem));
-          break;
-        }
-      }
+    if (!res) {
+      min_addr = curr_addr;
+      curr_addr += 1;
+      continue;
+    }
+
+    found = true;
+    break;
   }
+
+  if (!found) {
+    terminateState(*curr_state);
+    return false;
+  }
+
+  mem_cont.state = curr_state->branch();
+  mem_cont.next_addr = curr_addr + 1;
+
+  auto cond = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr_addr, 64));
+  addConstraint(*curr_state, cond);
+
+  switch (mem_cont.kind) {
+    case MemoryContinuationKind::kContinueRead8:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_read_memory(
+              curr_mem, curr_addr, 1, val));
+      break;
+    case MemoryContinuationKind::kContinueRead16:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_read_memory(
+              curr_mem, curr_addr, 2, val));
+      break;
+    case MemoryContinuationKind::kContinueRead32:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_read_memory(
+              curr_mem, curr_addr, 4, val));
+      break;
+    case MemoryContinuationKind::kContinueRead64:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_read_memory(
+              curr_mem, curr_addr, 8, val));
+      break;
+
+    case MemoryContinuationKind::kContinueWrite8:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_write_8(*mem_cont.state, curr_addr,
+                                                  mem_cont.val_to_write,
+                                                  curr_mem, mem_cont.memory));
+      break;
+    case MemoryContinuationKind::kContinueWrite16:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_write_16(*mem_cont.state, curr_addr,
+                                                   mem_cont.val_to_write,
+                                                   curr_mem, mem_cont.memory));
+      break;
+    case MemoryContinuationKind::kContinueWrite32:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_write_32(*mem_cont.state, curr_addr,
+                                                   mem_cont.val_to_write,
+                                                   curr_mem, mem_cont.memory));
+      break;
+    case MemoryContinuationKind::kContinueWrite64:
+      bindLocal(
+          curr_state->prevPC, *curr_state,
+          specialFunctionHandler->runtime_write_64(*mem_cont.state, curr_addr,
+                                                   mem_cont.val_to_write,
+                                                   curr_mem, mem_cont.memory));
+      break;
+  }
+
+  return true;
 }
-
-
 
 
 void Executor::run(ExecutionState &initialState) {
@@ -3338,44 +3309,32 @@ void Executor::run(ExecutionState &initialState) {
 
   LOG(INFO) << "state size is " << states.size();
 
-  ExecutionState *state;
-  // TODO(sai) figure out how to properly put the execution state into the scheduler 
-  // TODO(sai) please clean up this code it has some inefficient checks 
-  while ((!states.empty() && !haltExecution) || 
-          (!pendingAddresses.empty())) {
-    if (!states.empty()){
-      state = &searcher->selectState();
+  do {
+    while (!states.empty() && !haltExecution) {
+      auto state = &searcher->selectState();
       KInstruction *ki = state->pc;
       stepInstruction(*state);
       executeInstruction(*state, ki);
       processTimers(state, maxInstructionTime);
       checkMemoryUsage();
       updateStates(state);
-    } else {
-      auto mem_cont = pendingAddresses.back();
-      pendingAddresses.pop_back();
-      state = mem_cont->state; 
-      // TODO(sai) figure out how to properly put the execution state into the scheduler 
-      LOG(INFO) << "in rewind case";
-      LOG(INFO) << "state size is " << states.size();
-      scheduleMemContinuation(*mem_cont);
-      //states.insert(mem_cont -> state);
-      //addedStates.push_back(mem_cont -> state);
-      //searcher -> addState(mem_cont -> state);
-      
-      while (state->prevPC != state->pc){
-        KInstruction *ki = state->pc;
-        stepInstruction(*state);
-        executeInstruction(*state, ki);
-        processTimers(state, maxInstructionTime);
-        checkMemoryUsage();
-      }
-
-      states.clear();
-      // delete mem_cont->state;
-      delete mem_cont;
     }
-  }
+
+    while (!pendingAddresses.empty()) {
+      auto mem_cont = pendingAddresses.back().get();
+      LOG(INFO)
+          << "Using memory continuation " << std::hex << mem_cont->min_addr
+          << " <= " << mem_cont->next_addr << " <= "
+          << mem_cont->max_addr << std::dec;
+
+      auto state = mem_cont->state;
+      if (!updateMemContinuation(*mem_cont)) {
+        pendingAddresses.pop_back();
+      } else {
+        states.insert(state);
+      }
+    }
+  } while (!states.empty() && !haltExecution);
 
   delete searcher;
   searcher = 0;

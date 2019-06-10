@@ -277,110 +277,130 @@ void SpecialFunctionHandler::handle__remill_max_address(
    
 }
 
-ref<Expr> SpecialFunctionHandler::runtime_write_8(
-        ExecutionState &state, uint64_t addr_uint, 
-        ref<Expr> value_val, ref<Expr> mem_ptr) {
-  
-  auto mem = executor.Memory(state);
-  if (isa<ConstantExpr>(value_val)) {
-    auto val = llvm::dyn_cast<ConstantExpr>(value_val)->getZExtValue();
+ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
+                                                  uint64_t addr_uint,
+                                                  ref<Expr> value_val,
+                                                  native::AddressSpace *mem,
+                                                  ref<Expr> mem_ptr) {
+
+  if (auto const_val = llvm::dyn_cast<ConstantExpr>(value_val)) {
+    auto val = const_val->getZExtValue();
     if (val == klee::native::symbolic_byte) {
       mem->symbolic_memory.erase(addr_uint);
     }
 
     if (!mem->TryWrite(addr_uint, static_cast<uint8_t>(val))) {
-      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << val
-        << " to address 0x" << addr_uint << " in address space ";
+      LOG(ERROR)<< "Failed 1-byte write of 0x" << std::hex << val
+      << " to address 0x" << addr_uint << " in address space ";
       return Expr::createPointer(0);
     }
-  
+
+  } else if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)) {
+    std::stringstream ss;
+    ss << "Failed 1-byte write to address 0x" << std::hex << addr_uint;
+    executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
+
   } else {
-    if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)) {
-      LOG(ERROR) << "Failed 1-byte write of 0x" << std::hex << klee::native::symbolic_byte
-        << " to address 0x" << addr_uint << " in address space ";
-      return Expr::createPointer(0);
-    }
     mem->symbolic_memory[addr_uint] = value_val;
   }
+
   return mem_ptr;
 }
 
-ref<Expr> SpecialFunctionHandler::runtime_write_16(
-        ExecutionState &state, uint64_t addr_uint, 
-        ref<Expr> value_val, ref<Expr> mem_ptr) {
+ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
+                                                   uint64_t addr_uint,
+                                                   ref<Expr> value_val,
+                                                   native::AddressSpace *mem,
+                                                   ref<Expr> mem_ptr) {
 
-  ExprBuilder *builder = createDefaultExprBuilder();
-  auto byte1 = builder->Extract(value_val, 0,8);
-  auto byte2 = builder->Extract(value_val, 8,8);
-  (void) runtime_write_8(state, addr_uint, byte1, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 1, byte2, mem_ptr);
+  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
+  auto byte0 = builder->Extract(value_val, 0, 8);
+  auto byte1 = builder->Extract(value_val, 8, 8);
+  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
   return mem_ptr;
 }
 
-ref<Expr> SpecialFunctionHandler::runtime_write_32(
-        ExecutionState &state, uint64_t addr_uint, 
-        ref<Expr> value_val, ref<Expr> mem_ptr) {
-  
-  ExprBuilder *builder = createDefaultExprBuilder();
-  auto byte1 = builder->Extract(value_val, 0,16);
-  auto byte2 = builder->Extract(value_val, 16,16);
-  (void) runtime_write_16(state, addr_uint, byte1, mem_ptr);
-  (void) runtime_write_16(state, addr_uint + 2, byte2, mem_ptr);
+ref<Expr> SpecialFunctionHandler::runtime_write_32(ExecutionState &state,
+                                                   uint64_t addr_uint,
+                                                   ref<Expr> value_val,
+                                                   native::AddressSpace *mem,
+                                                   ref<Expr> mem_ptr) {
+  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
+  auto byte0 = builder->Extract(value_val, 0, 8);
+  auto byte1 = builder->Extract(value_val, 8, 8);
+  auto byte2 = builder->Extract(value_val, 16, 8);
+  auto byte3 = builder->Extract(value_val, 24, 8);
+  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
   return mem_ptr;
 }
 
-ref<Expr> SpecialFunctionHandler::runtime_write_64(
-        ExecutionState &state, uint64_t addr_uint, 
-        ref<Expr> value_val, ref<Expr> mem_ptr) {
-  
-  ExprBuilder *builder = createDefaultExprBuilder();
-  auto b1 = builder->Extract(value_val, 0,32);
-  auto b2 = builder->Extract(value_val, 32,32);
-  (void) runtime_write_32(state, addr_uint, b1, mem_ptr);
-  (void) runtime_write_32(state, addr_uint + 4, b2, mem_ptr);
+ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
+                                                   uint64_t addr_uint,
+                                                   ref<Expr> value_val,
+                                                   native::AddressSpace *mem,
+                                                   ref<Expr> mem_ptr) {
+  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
+  auto byte0 = builder->Extract(value_val, 0, 8);
+  auto byte1 = builder->Extract(value_val, 8, 8);
+  auto byte2 = builder->Extract(value_val, 16, 8);
+  auto byte3 = builder->Extract(value_val, 24, 8);
+  auto byte4 = builder->Extract(value_val, 32, 8);
+  auto byte5 = builder->Extract(value_val, 40, 8);
+  auto byte6 = builder->Extract(value_val, 48, 8);
+  auto byte7 = builder->Extract(value_val, 56, 8);
+  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 4, byte4, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 5, byte5, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 6, byte6, mem, mem_ptr);
+  (void) runtime_write_8(state, addr_uint + 7, byte7, mem, mem_ptr);
   return mem_ptr;
 }
 
-ref<Expr> SpecialFunctionHandler::runtime_read_8(
-        ExecutionState &state, uint64_t addr_uint) {
-  auto mem = executor.Memory(state);
-  uint8_t value_uint = ~static_cast<uint8_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 1-byte read from address 0x" << addr_uint;
+ref<Expr> SpecialFunctionHandler::runtime_read_memory(
+    native::AddressSpace *mem, uint64_t addr, uint64_t num_bytes,
+    const MemoryReadResult &val) {
+  bool any_symbolic = false;
+  bool all_symbolic = true;
+
+  ref<klee::Expr> symbolic_bytes[8] = {};
+  for (uint64_t i = 0; i < num_bytes; ++i) {
+    if (val.as_bytes[i] == klee::native::symbolic_byte) {
+      auto sym_pair = mem->symbolic_memory.find(addr + i);
+      if (sym_pair != mem->symbolic_memory.end()) {
+        symbolic_bytes[i] = sym_pair->second;
+        any_symbolic = true;
+      } else {
+        all_symbolic = false;
+      }
+    } else {
+      all_symbolic = false;
+    }
   }
-  if (value_uint == klee::native::symbolic_byte) {
-    auto sym_pair = mem->symbolic_memory.find(addr_uint);
-    if (sym_pair != mem->symbolic_memory.end()){
-        return sym_pair->second;
-    } 
+
+  if (!any_symbolic) {
+    return ConstantExpr::create(val.as_qword, num_bytes * 8);
   }
-  return ConstantExpr::create(value_uint, 8);
-}
 
-ref<Expr> SpecialFunctionHandler::runtime_read_16(
-        ExecutionState &state, uint64_t addr_uint) {
-    
-    ExprBuilder *builder = createDefaultExprBuilder();
-    auto byte1 = runtime_read_8(state, addr_uint);
-    auto byte2 = runtime_read_8(state, addr_uint + 1);
-    return builder->Concat(byte2, byte1);
-}
+  if (num_bytes == 1) {
+    return symbolic_bytes[0];
+  }
 
-ref<Expr> SpecialFunctionHandler::runtime_read_32(
-        ExecutionState &state, uint64_t addr_uint) {
-  
-  ExprBuilder *builder = createDefaultExprBuilder();
-  auto byte1 = runtime_read_16(state, addr_uint);
-  auto byte2 = runtime_read_16(state, addr_uint + 2);
-  return builder->Concat(byte2, byte1);
-}
+  if (!all_symbolic) {
+    for (uint64_t i = 0; i < num_bytes; ++i) {
+      if (symbolic_bytes[i].isNull()) {
+        symbolic_bytes[i] = ConstantExpr::create(val.as_bytes[i], 8);
+      }
+    }
+  }
 
-ref<Expr> SpecialFunctionHandler::runtime_read_64(
-        ExecutionState &state, uint64_t addr_uint) {
-  ExprBuilder *builder = createDefaultExprBuilder();
-  auto byte1 = runtime_read_32(state, addr_uint);
-  auto byte2 = runtime_read_32(state, addr_uint + 4);
-  return builder->Concat(byte2, byte1);
+  return ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
 }
 
 void SpecialFunctionHandler::handle__remill_search_byte(
@@ -594,17 +614,15 @@ void SpecialFunctionHandler::handle__remill_symbolic_address(
 
 
 void SpecialFunctionHandler::handle_klee_init_remill_mem(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-    LOG(INFO) << "Initialized klee's concrete address space";
-    auto memory_val = executor.toUnique(state, arguments[0]);
-    auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
-    
-    auto mem = executor.Memory(memory_uint);
-    state.concreteMemory = 
-        std::unique_ptr<klee::native::AddressSpace>(new klee::native::AddressSpace(*mem));
-}
+  ExecutionState &state, KInstruction *target,
+  std::vector<ref<Expr>> &arguments) {
+  LOG(INFO) << "Initialized klee's concrete address space";
+  auto memory_val = executor.toUnique(state, arguments[0]);
+  auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
 
+  auto mem = executor.Memory(state, memory_uint);
+  state.memories.emplace_back(new klee::native::AddressSpace(*mem));
+}
 
 void SpecialFunctionHandler::handle__kleemill_log_state(
     ExecutionState &state, KInstruction *target,
@@ -685,18 +703,22 @@ void SpecialFunctionHandler::handle_get_dirent_index(
       llvm::dyn_cast<ConstantExpr>(dirent_index_val)->getZExtValue();
   unsigned field;
   switch (index_uint) {
-  case 0: {
-    field = dirent_entry.d_ino;
-  }
-  case 1: {
-    field = dirent_entry.d_off;
-  }
-  case 2: {
-    field = dirent_entry.d_reclen;
-  }
-  case 3: {
-    field = dirent_entry.d_type;
-  }
+    case 0: {
+      field = dirent_entry.d_ino;
+      break;
+    }
+    case 1: {
+      field = dirent_entry.d_off;
+      break;
+    }
+    case 2: {
+      field = dirent_entry.d_reclen;
+      break;
+    }
+    case 3: {
+      field = dirent_entry.d_type;
+      break;
+    }
   }
   executor.bindLocal(target, state, ConstantExpr::create(field, Expr::Int64));
 }
@@ -918,14 +940,14 @@ void SpecialFunctionHandler::handle__kleemill_is_mapped_address(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
   //LOG(INFO) << "addressspace num is " << mem_uint;
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
+  auto mem = executor.Memory(state, mem_uint);
 
   bool is_mapped = mem->IsMapped(where_uint);
 
@@ -937,8 +959,8 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
 
   //LOG(INFO) << "addressspace num is " << mem_uint;
   auto base_val = executor.toUnique(state, arguments[1]);
@@ -950,7 +972,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
   auto size_val = executor.toUnique(state, arguments[3]);
   auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
+  auto mem = executor.Memory(state, mem_uint);
 
   uint64_t hole = 0;
   if (mem->FindHole(base_uint, limit_uint, size_uint, &hole)) {
@@ -989,216 +1011,89 @@ void SpecialFunctionHandler::handle__remill_symbolize_read (
 
 }
 
-void SpecialFunctionHandler::handle__remill_read_8(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
+#define HANDLE_READ(num_bits, num_bytes) \
+    void SpecialFunctionHandler::handle__remill_read_ ## num_bits( \
+        ExecutionState &state, KInstruction *target, \
+        std::vector<ref<Expr>> &arguments) { \
+      \
+      auto mem_val = executor.toUnique(state, arguments[0]); \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
+      auto memory = executor.Memory(state, mem_uint); \
+      auto addr_val = executor.toUnique(state, arguments[1]); \
+      \
+      if (auto const_addr = llvm::dyn_cast<klee::ConstantExpr>(addr_val)) { \
+        auto addr_uint = const_addr->getZExtValue(); \
+        MemoryReadResult result = {}; \
+        if (memory->TryRead(addr_uint, &(result.as_byte))) { \
+          executor.bindLocal( \
+              target, state, runtime_read_memory(memory, addr_uint, \
+                                                 num_bytes, result)); \
+        } else { \
+          std::stringstream ss; \
+          ss << "Can't read " << num_bytes << " from " \
+             << std::hex << addr_uint; \
+          executor.terminateStateOnError( \
+              state, ss.str(), Executor::ReportError); \
+        } \
+      } else { \
+        auto range = executor.solver->getRange(state, addr_val); \
+        auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first); \
+        auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second); \
+        auto min_uint = min->getZExtValue(); \
+        auto max_uint = max->getZExtValue(); \
+        auto mem_cont = new MemoryAccessContinuation( \
+            &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
+            MemoryContinuationKind::kContinueRead ## num_bits); \
+        executor.pendingAddresses.emplace_back(mem_cont); \
+        if (!executor.updateMemContinuation(*mem_cont)) { \
+          executor.pendingAddresses.pop_back(); \
+        } \
+      } \
+    }
 
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto mem = executor.Memory(state);
-  
-  if (llvm::isa<ConstantExpr>(addr_val)) {
-    uint64_t addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, runtime_read_8(state, addr_uint));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
+HANDLE_READ(8, 1)
+HANDLE_READ(16, 2)
+HANDLE_READ(32, 4)
+HANDLE_READ(64, 8)
+#undef HANDLE_READ
 
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
+#define HANDLE_WRITE(num_bits, num_bytes) \
+    void SpecialFunctionHandler::handle__remill_write_ ## num_bits ( \
+        ExecutionState &state, KInstruction *target, \
+        std::vector<ref<Expr>> &arguments) { \
+      \
+      auto mem_val = executor.toUnique(state, arguments[0]); \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
+      auto memory = executor.Memory(state, mem_uint); \
+      auto addr_val = executor.toUnique(state, arguments[1]); \
+      auto value_val = executor.toUnique(state, arguments[2]); \
+      \
+      if (auto const_addr = llvm::dyn_cast<ConstantExpr>(addr_val)) { \
+        auto addr_uint = const_addr->getZExtValue(); \
+        executor.bindLocal(target, state, runtime_write_ ## num_bits( \
+            state, addr_uint, value_val, memory, mem_val)); \
+      } else { \
+        auto range = executor.solver->getRange(state, addr_val); \
+        auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first); \
+        auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second); \
+        auto min_uint = min->getZExtValue(); \
+        auto max_uint = max->getZExtValue(); \
+        auto mem_cont = new MemoryAccessContinuation( \
+            &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
+            MemoryContinuationKind::kContinueWrite ## num_bits); \
+        executor.pendingAddresses.emplace_back(mem_cont); \
+        mem_cont->val_to_write = value_val; \
+        if (!executor.updateMemContinuation(*mem_cont)) { \
+          executor.pendingAddresses.pop_back(); \
+        } \
+      } \
+    }
 
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
-            min_uint, max_uint, min_uint + 1, mem_val, 8);
-    
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-void SpecialFunctionHandler::handle__remill_read_16(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-    
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-
-  
-  if (isa<ConstantExpr>(addr_val)){
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, runtime_read_16(state, addr_uint));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
-            min_uint, max_uint, min_uint + 1, mem_val, 16);
-    
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-void SpecialFunctionHandler::handle__remill_read_32(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-
-  if (isa<ConstantExpr>(addr_val)){
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, runtime_read_32(state, addr_uint));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
-            min_uint, max_uint, min_uint + 1, mem_val, 32);
-    
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-void SpecialFunctionHandler::handle__remill_read_64(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-
-  if (isa<ConstantExpr>(addr_val)){
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, runtime_read_64(state, addr_uint));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, true, 
-            min_uint, max_uint, min_uint + 1, mem_val, 64);
-    
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-void SpecialFunctionHandler::handle__remill_write_8(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto value_val = executor.toUnique(state, arguments[2]);
- 
-  if (isa<ConstantExpr>(addr_val)){
-    auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
-    executor.bindLocal(target, state, runtime_write_8(state, addr_uint, value_val, mem_val));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
-            min_uint, max_uint + 1, min_uint + 1, mem_val, 8);
-
-    mem_cont->val_to_write = value_val;
-    
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-
-void SpecialFunctionHandler::handle__remill_write_16(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto value_val = executor.toUnique(state, arguments[2]);
-  if (isa<ConstantExpr>(addr_val)) {
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, 
-        runtime_write_16(state, addr_uint, value_val, mem_val));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
-            min_uint, max_uint + 1, min_uint + 1, mem_val, 16);
-
-    mem_cont->val_to_write = value_val;
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-
-void SpecialFunctionHandler::handle__remill_write_32(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto value_val = executor.toUnique(state, arguments[2]);
-  if (isa<ConstantExpr>(addr_val)) {
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, 
-        runtime_write_32(state, addr_uint, value_val, mem_val));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
-            min_uint, max_uint + 1, min_uint + 1, mem_val, 32);
-
-    mem_cont->val_to_write = value_val;
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-}
-
-
-void SpecialFunctionHandler::handle__remill_write_64(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  auto mem_val = executor.toUnique(state, arguments[0]);
-  auto addr_val = executor.toUnique(state, arguments[1]);
-  auto value_val = executor.toUnique(state, arguments[2]);
-  if (isa<ConstantExpr>(addr_val)) {
-    auto addr_uint = dyn_cast<ConstantExpr>(addr_val) -> getZExtValue();
-    executor.bindLocal(target, state, 
-        runtime_write_64(state, addr_uint, value_val, mem_val));
-  } else {
-    auto range = executor.solver->getRange(state, addr_val);
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    
-    auto mem_cont = new MemoryAccessContinuation( &state, addr_val, false, 
-            min_uint, max_uint + 1, min_uint + 1, mem_val, 64);
-
-    mem_cont->val_to_write = value_val;
-    executor.scheduleMemContinuation(*mem_cont);
-  }
-
-}
-
+HANDLE_WRITE(8, 1)
+HANDLE_WRITE(16, 2)
+HANDLE_WRITE(32, 4)
+HANDLE_WRITE(64, 8)
+#undef HANDLE_WRITE
 
 void SpecialFunctionHandler::handle__llvm_ctpop(
     ExecutionState &state, KInstruction *target,
