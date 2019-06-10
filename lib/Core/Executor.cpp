@@ -3159,7 +3159,11 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
     return false;
   }
 
-  mem_cont.state = curr_state->branch();
+  // Fork/branch the current state, without changing the depth or weight.
+  mem_cont.state = new ExecutionState(*curr_state);
+  mem_cont.state->coveredNew = false;
+  mem_cont.state->coveredLines.clear();
+
   mem_cont.next_addr = curr_addr + 1;
 
   addConstraint(*curr_state, constr);
