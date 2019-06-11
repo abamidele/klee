@@ -592,7 +592,7 @@ void SpecialFunctionHandler::handle__kleemill_can_write_byte(
 
   auto mem_val = executor.toUnique(state, arguments[0]);
   auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-  auto mem = executor.Memory(state, mem);
+  auto mem = executor.Memory(state, mem_uint);
 
   //LOG(INFO) << "addressspace num is " << mem_uint;
 
