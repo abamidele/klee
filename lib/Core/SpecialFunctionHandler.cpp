@@ -347,14 +347,23 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
 void SpecialFunctionHandler::handle_klee_init_remill_mem(
   ExecutionState &state, KInstruction *target,
   std::vector<ref<Expr>> &arguments) {
-  LOG(INFO) << "Initialized klee's concrete address space";
   auto memory_val = executor.toUnique(state, arguments[0]);
   auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
+  if (memory_uint >= executor.memories.size()) {
+    std::stringstream ss;
+    ss << "Cannot copy invalid address space " << memory_uint
+       << " into state";
+    executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
+    return;
+  }
+
   auto mem = executor.memories[memory_uint];
   auto new_size = memory_uint + 1ULL;
   if (new_size >= state.memories.size()) {
     state.memories.resize(new_size);
   }
+
+  LOG(INFO) << "Copying address space " << memory_uint << " into state";
   state.memories[memory_uint].reset(new klee::native::AddressSpace(*mem));
 }
 

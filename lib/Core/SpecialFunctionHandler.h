@@ -168,17 +168,6 @@ class SpecialFunctionHandler {
                              ref<Expr> value_val, native::AddressSpace *mem,
                              ref<Expr> mem_ptr);
  
-  std::vector<uint8_t> generate_concrete_array(
-          ExecutionState &state, bool new_array, uint64_t start, 
-          uint64_t stop);
-
-  ref<Expr> build_array_expr(
-          ExecutionState &state, 
-          const std::vector<uint8_t>& concrete_array,
-          uint64_t start);
-
-
-  
   void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
 
   /* Handlers */
