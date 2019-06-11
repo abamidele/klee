@@ -263,15 +263,6 @@ class SpecialFunctionHandler {
   HANDLER(handle_get_dirent_index);
   HANDLER(handle_get_dirent_name);
   HANDLER(handle_klee_init_remill_mem);
-  HANDLER(handle__remill_symbolize_read);
-  HANDLER(handle__remill_symbolic_address);
-  HANDLER(handle__remill_assert_address);
-  HANDLER(handle__remill_assert_byte);
-  HANDLER(handle__remill_min_address);
-  HANDLER(handle__remill_max_address);
-  HANDLER(handle__remill_search_byte);
-  HANDLER(handle__remill_search_byte_array);
-  HANDLER(handle__remill_get_array_option);
  
  
 #undef HANDLER

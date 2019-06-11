@@ -203,102 +203,35 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
-    //add("__remill_symbolize_read", handle__remill_symbolize_read, true),
-    add("__remill_check_range", handle__remill_symbolic_address, true), 
-    add("__remill_search_symbolic_memory",
-            handle__remill_assert_address, true),
-    add("__remill_get_min_address", handle__remill_min_address, true),
-    add("__remill_get_max_address", handle__remill_max_address, true),
-    
-    add("__remill_search_symbolic_byte", 
-            handle__remill_search_byte, false),
-    
-    add("__remill_search_symbolic_byte_array", 
-            handle__remill_search_byte_array, false),
-    add("__remill_get_array_option", 
-            handle__remill_get_array_option, true),
  
 #undef addDNR
 #undef add
 };
-
-
-void SpecialFunctionHandler::handle__remill_get_array_option( ExecutionState &state, 
-        KInstruction *target, std::vector<ref<Expr>> &arguments) {
-  
-  auto new_str = arguments[0];
-  auto min  = arguments[1];
-  auto max = arguments[2];
-
-  auto new_uint = llvm::dyn_cast<ConstantExpr>(new_str) 
-      -> getZExtValue();
-  auto max_uint = llvm::dyn_cast<ConstantExpr>(max)
-      -> getZExtValue();
-  auto min_uint = llvm::dyn_cast<ConstantExpr>(min)
-      -> getZExtValue();
-
-}
-
-
-void SpecialFunctionHandler::handle__remill_min_address(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-    
-    auto addr_val = executor.toUnique(state, arguments[0]);
-    auto range = executor.solver->getRange(state, addr_val);
-
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    // min value should either be concrete or unsat
-    // LOG(INFO) << "range in min address: is " << min->getZExtValue()
-    //     << " - " << max -> getZExtValue();
-    
-    executor.bindLocal(target, 
-            state, ConstantExpr::create( min->getZExtValue(), 64));
-}
-
-void SpecialFunctionHandler::handle__remill_max_address(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-    
-    auto addr_val = executor.toUnique(state, arguments[0]);
-    auto range = executor.solver->getRange(state, addr_val);
-
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-    
-    LOG(INFO) << "range in max address: is " << max -> getZExtValue();
-    
-    executor.bindLocal(target, 
-            state, ConstantExpr::create( max->getZExtValue(), 64));
-   
-}
 
 ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
                                                   uint64_t addr_uint,
                                                   ref<Expr> value_val,
                                                   native::AddressSpace *mem,
                                                   ref<Expr> mem_ptr) {
-  value_val -> dump();
+  value_val->dump();
+  uint8_t val_to_write = 0;
+
   if (auto const_val = llvm::dyn_cast<ConstantExpr>(value_val)) {
-    auto val = const_val->getZExtValue();
-    if (val == klee::native::symbolic_byte) {
+    val_to_write = static_cast<uint8_t>(const_val->getZExtValue(8));
+    if (val_to_write == klee::native::symbolic_byte) {
       mem->symbolic_memory.erase(addr_uint);
     }
 
-    if (!mem->TryWrite(addr_uint, static_cast<uint8_t>(val))) {
-      LOG(ERROR)<< "Failed 1-byte write of 0x" << std::hex << val
-      << " to address 0x" << addr_uint << " in address space ";
-      return Expr::createPointer(0);
-    }
-
-  } else if (!mem->TryWrite(addr_uint, klee::native::symbolic_byte)) {
-    std::stringstream ss;
-    ss << "Failed 1-byte write to address 0x" << std::hex << addr_uint;
-    executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
-
   } else {
+    val_to_write = klee::native::symbolic_byte;
     mem->symbolic_memory[addr_uint] = value_val;
+  }
+
+  if (!mem->TryWrite(addr_uint, val_to_write)) {
+    std::stringstream ss;
+    ss << "Failed 1-byte write of 0x" << std::hex << val_to_write
+       << " to address 0x" << addr_uint;
+    executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
   }
 
   return mem_ptr;
@@ -360,15 +293,21 @@ ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
 ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     native::AddressSpace *mem, uint64_t addr, uint64_t num_bytes,
     const MemoryReadResult &val) {
-  LOG(INFO) << "hit runtime read function!!!";
+
+  LOG(INFO) << "hit runtime read function addr=" << std::hex << addr
+            << " num_bytes=" << std::dec << num_bytes << " bytes=[" << std::hex
+            << unsigned(val.as_bytes[0]) << ", " << unsigned(val.as_bytes[1]) << ", "
+            << unsigned(val.as_bytes[2]) << ", " << unsigned(val.as_bytes[3]) << ", "
+            << unsigned(val.as_bytes[4]) << ", " << unsigned(val.as_bytes[5]) << ", "
+            << unsigned(val.as_bytes[6]) << ", " << unsigned(val.as_bytes[7]) << "]";
+
   bool any_symbolic = false;
   bool all_symbolic = true;
 
   ref<klee::Expr> symbolic_bytes[8] = {};
   for (uint64_t i = 0; i < num_bytes; ++i) {
-    LOG(INFO) << "i: " << i << ", " << (int)val.as_bytes[i];
     if (val.as_bytes[i] == klee::native::symbolic_byte) {
-      auto sym_pair = mem->symbolic_memory.find(addr + i);
+      const auto sym_pair = mem->symbolic_memory.find(addr + i);
       if (sym_pair != mem->symbolic_memory.end()) {
         symbolic_bytes[i] = sym_pair->second;
         any_symbolic = true;
@@ -401,218 +340,9 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
       }
     }
   }
+
   return ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
 }
-
-void SpecialFunctionHandler::handle__remill_search_byte(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-    // unconstrained or uninstrumented byte range branching
-    ref<Expr> byte_val = executor.toUnique(state, arguments[0]);
-    auto range = executor.solver->getRange(state, byte_val);
-
-    auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-    auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-  
-    LOG(INFO) << "range for symbolic byte";
-    auto min_uint = min->getZExtValue();
-    auto max_uint = max->getZExtValue();
-    
-    std::vector<ref<Expr>> constraints;
-    std::vector<ExecutionState*> branches;
- 
-    for (uint8_t curr = min_uint; curr < max_uint; ++curr) {
-      const ref<Expr> constr = EqExpr::create(byte_val, ConstantExpr::create(curr, 8));
-      constraints.push_back(constr);
-    }
-
-    executor.branch(state, constraints , branches);
-}
-
-void SpecialFunctionHandler::handle__remill_search_byte_array(
-  ExecutionState &state, KInstruction *target,
-  std::vector<ref<Expr>> &arguments) {
-  // unconstrained or uninstrumented byte range branching
-  static uint64_t batch_size = 1;
-
-  auto min = llvm::dyn_cast<klee::ConstantExpr>(executor.toUnique(state, arguments[0]));
-  auto max = llvm::dyn_cast<klee::ConstantExpr>(executor.toUnique(state, arguments[1]));
-
-  auto min_uint = min->getZExtValue();
-  auto max_uint = max->getZExtValue();
-  LOG(INFO) << min_uint << "-> " << max_uint;
-  std::vector<ref<Expr>> constraints;
-  std::vector<ExecutionState*> branches;
-
-  generate_concrete_array(state, true, min_uint, max_uint); 
-  
-  for (uint64_t i=0; i < batch_size; ++i) {
-    //printf("i is : %d\n", i);
-    auto concrete_array = generate_concrete_array(state,false,0,0);
-    /*
-    std::stringstream arr;
-    for (auto& i:concrete_array){
-      arr << (int)i << " ";
-    }
-
-    LOG(INFO) << "array: " << arr.str();
-    */
-    constraints.push_back(
-          build_array_expr(state, concrete_array, min_uint));
-  }
-
-  executor.branch(state, constraints, branches);
-}
-
-std::vector<uint8_t> SpecialFunctionHandler::generate_concrete_array(
-    ExecutionState &state, bool new_array, uint64_t start, 
-    uint64_t stop) {
-    LOG(INFO) << "hit the generate case!";
-    
-    static std::vector<uint8_t>(concrete_array);
-    static std::vector<std::pair<uint8_t, uint8_t>> range_cache;
-    static uint8_t min;
-    static uint8_t max;
-    static int curr;
-    
-    const auto &solver = executor.solver;
-    auto mem = executor.Memory(state);
-
-    if (new_array) {
-      // figure out another way to do this
-      concrete_array = std::vector<uint8_t>();
-      range_cache = std::vector<std::pair<uint8_t, uint8_t>>();
-      min = start;
-      max = stop;
-
-      for (auto curr=start; curr<=stop; ++curr){
-        auto byte_expr_pair = mem->symbolic_memory.find(curr);
-        if (byte_expr_pair == mem ->symbolic_memory.end()){
-          LOG(FATAL) << "out of bounds error in array concretization";
-        }
-        auto byte_expr = byte_expr_pair->second;
-        // should add err checking but currently assume start/stop are symbolid
-        auto range = solver->getRange(state, byte_expr);
-        concrete_array.push_back(
-            llvm::dyn_cast<ConstantExpr>(range.first) -> getZExtValue());
-
-        range_cache.push_back( 
-            std::pair<uint8_t, uint8_t >(
-              llvm::dyn_cast<ConstantExpr>(range.first) -> getZExtValue(),
-              llvm::dyn_cast<ConstantExpr>(range.second) -> getZExtValue()
-            ));
-      }
-      return concrete_array;
-    }
-    
-    auto concr_str = concrete_array;
-    
-    if ( concrete_array[curr] == range_cache[curr].second){
-      concrete_array[curr] = range_cache[curr].first;
-    } else {
-      ++concrete_array[curr];
-    }
-
-    curr = (curr + 1) % (max - min + 1);
-    //for (auto &i:concr_str){
-    //  LOG(INFO) << "byte is " << (int)i;
-    //}
-    return concr_str;
-}
-
-ref<Expr> SpecialFunctionHandler::build_array_expr(
-        ExecutionState &state, 
-        const std::vector<uint8_t >& concrete_array,
-          uint64_t start ) {
-  
-  auto sym_mem = executor.Memory(state) -> symbolic_memory;
-  ExprBuilder *builder = createDefaultExprBuilder();
-  LOG(INFO) << "concreter_array len is " << concrete_array.size();
-
-  auto expr = builder -> Eq(sym_mem.find(start)->second, 
-                ConstantExpr::create( concrete_array[0], 8));
-
-  for (int i=1; i < concrete_array.size(); ++i) {
-    auto eq = builder->Eq(sym_mem.find(start + i)->second, 
-                ConstantExpr::create( concrete_array[i], 8));
-    expr = builder -> And(eq, expr);
-  }
-  expr->dump();
-  delete builder;
-  return expr;
-}
-
-
-void SpecialFunctionHandler::handle__remill_assert_address(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  
-  auto addr = executor.toUnique(state, arguments[0]);
-  auto min = llvm::dyn_cast<klee::ConstantExpr>(arguments[1]);
-  auto max = llvm::dyn_cast<klee::ConstantExpr>(arguments[2]);
-
-  auto min_uint = min->getZExtValue();
-  auto max_uint = max->getZExtValue();
-
-  auto mem = executor.Memory(state);
-  uint64_t curr = min_uint;
-  // find min and max
- // is current mapped?
- // if not TODO()continue
- // if not mapped handle it later
- // take curr and round it up to the next page boundary
- // ask is curr satisfiable
- // if not sat continue
- // if sat
-
- // in first address == current -> state that returns out
- // second address > current copy current and save with injected assumption of the address
- // save executionstate and also save the arguments to this method and the address size so we 
- // can callback and pass in the right arguments
- // assert  that address == current
- // bindlocal the next sat address
-
-  while ( curr <= max_uint ) {
-    ++curr;
-    LOG(INFO) << "curr at this iteration is " << curr;
-    ref<Expr> constr = EqExpr::create(addr, ConstantExpr::create(curr, 64));
-    if (mem->IsMapped(curr)) {
-      LOG(INFO) << "is mapped";
-      bool res;
-      (void) executor.solver->mayBeTrue(state, constr, res);
-      LOG(INFO) << "after solver query";
-      if (res) {
-        LOG(INFO) <<  curr << " is a valid address";
-        executor.bindLocal(target, state, ConstantExpr::create(curr, 64));
-        return;
-      } else {
-        LOG(INFO) << "is not a valid query";
-      }
-    } else {
-     LOG(ERROR) << "address: " << curr << " is not mapped";
-    // TODO(sai) properly handled unmapped addresses
-    }
-  }
-
-  executor.bindLocal(target, state, ConstantExpr::create(min_uint, 64));
-}
-
-void SpecialFunctionHandler::handle__remill_symbolic_address(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-
-  auto addr_expression = executor.toUnique(state, arguments[0]);
-  auto range = executor.solver->getRange(state, addr_expression);
-  auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first);
-  auto max = llvm::dyn_cast<klee::ConstantExpr>(range.second);
-
-  auto min_uint = min->getZExtValue();
-  auto max_uint = max->getZExtValue();
-  LOG(INFO) << "RANGE: " << min_uint << "-" << max_uint;
-  executor.bindLocal(target, state, 
-        ConstantExpr::create( !(min_uint == max_uint) , Expr::Bool));
-}
-
 
 void SpecialFunctionHandler::handle_klee_init_remill_mem(
   ExecutionState &state, KInstruction *target,
@@ -621,7 +351,11 @@ void SpecialFunctionHandler::handle_klee_init_remill_mem(
   auto memory_val = executor.toUnique(state, arguments[0]);
   auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
   auto mem = executor.memories[memory_uint];
-  state.memories.emplace_back(new klee::native::AddressSpace(*mem));
+  auto new_size = memory_uint + 1ULL;
+  if (new_size >= state.memories.size()) {
+    state.memories.resize(new_size);
+  }
+  state.memories[memory_uint].reset(new klee::native::AddressSpace(*mem));
 }
 
 void SpecialFunctionHandler::handle__kleemill_log_state(
@@ -980,35 +714,6 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
   } else {
     executor.bindLocal(target, state, ConstantExpr::create(0, Expr::Int64));
   }
-}
-
-void SpecialFunctionHandler::handle__remill_symbolize_read (
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-
-  auto addr_val = executor.toUnique(state, arguments[0]);
-  uint64_t addr_uint = llvm::dyn_cast<klee::ConstantExpr>(addr_val) -> getZExtValue();
-  auto mem = executor.Memory(state);
-  uint8_t value_uint = ~static_cast<uint8_t>(0);
-  if (!mem->TryRead(addr_uint, &value_uint)) {
-    LOG(ERROR) << "Failed 1-byte read from address 0x" << addr_uint
-               << " in address space ";
-  }
-  
-  if (value_uint == klee::native::symbolic_byte) {
-    LOG(INFO) << "concrete byte was equal to symbolic byte";
-    auto sym_pair = mem->symbolic_memory.find(addr_uint);
-    if (sym_pair != mem->symbolic_memory.end()) {
-        LOG(INFO) << "proceed with symbolic read because addr existed in space";
-        executor.bindLocal(target, state, sym_pair->second);
-        return;
-    } 
-  }
-  //LOG(INFO) << "concrete read";
-  executor.bindLocal(target, state, 
-              executor.replaceReadWithSymbolic( state,
-                  ConstantExpr::create(value_uint, Expr::Int8)));
-
 }
 
 #define HANDLE_READ(num_bits, num_bytes, bits_type) \
