@@ -228,13 +228,16 @@ ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
   }
 
   if (!mem->TryWrite(addr_uint, val_to_write)) {
+    auto addr_space_id = llvm::dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
     std::stringstream ss;
-    ss << "Failed 1-byte write of 0x" << std::hex << val_to_write
-       << " to address 0x" << addr_uint;
+    ss << "Failed 1-byte write of 0x" << std::hex << unsigned(val_to_write)
+       << " to address 0x" << addr_uint << " in address space "
+       << addr_space_id;
     executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
+    return Expr::createPointer(0);
+  } else {
+    return mem_ptr;
   }
-
-  return mem_ptr;
 }
 
 ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
