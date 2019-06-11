@@ -572,14 +572,14 @@ void SpecialFunctionHandler::handle__kleemill_can_read_byte(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
 
   //LOG(INFO) << "addressspace num is " << mem_uint;
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
 
   bool can_read = mem->CanRead(addr_uint);
 
@@ -590,15 +590,15 @@ void SpecialFunctionHandler::handle__kleemill_can_write_byte(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem);
 
   //LOG(INFO) << "addressspace num is " << mem_uint;
 
   auto addr_val = executor.toUnique(state, arguments[1]);
   auto addr_uint = llvm::dyn_cast<ConstantExpr>(addr_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
 
   bool can_write = mem->CanWrite(addr_uint);
 
@@ -611,8 +611,8 @@ void SpecialFunctionHandler::handle__kleemill_free_memory(
     std::vector<ref<Expr>> &arguments) {
 
   auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
 
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
@@ -620,7 +620,6 @@ void SpecialFunctionHandler::handle__kleemill_free_memory(
   auto size_val = executor.toUnique(state, arguments[2]);
   auto size_uint = llvm::dyn_cast<ConstantExpr>(size_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
 
   mem->RemoveMap(where_uint, size_uint);
 
@@ -632,9 +631,8 @@ void SpecialFunctionHandler::handle__kleemill_allocate_memory(
     std::vector<ref<Expr>> &arguments) {
 
   auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-
-  //LOG(INFO) << "addressspace num is " << mem_uint;
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
 
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
@@ -649,7 +647,6 @@ void SpecialFunctionHandler::handle__kleemill_allocate_memory(
   auto offset_val = executor.toUnique(state, arguments[4]);
   auto offset_uint = llvm::dyn_cast<ConstantExpr>(offset_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
   mem->AddMap(where_uint, size_uint, name_char, offset_uint);
   executor.bindLocal(target, state, mem_val);
 }
@@ -659,9 +656,8 @@ void SpecialFunctionHandler::handle__kleemill_protect_memory(
     std::vector<ref<Expr>> &arguments) {
 
   auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
-
-  //LOG(INFO) << "addressspace num is " << mem_uint;
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
 
   auto where_val = executor.toUnique(state, arguments[1]);
   auto where_uint = llvm::dyn_cast<ConstantExpr>(where_val)->getZExtValue();
@@ -680,8 +676,6 @@ void SpecialFunctionHandler::handle__kleemill_protect_memory(
   auto can_exec_val = executor.toUnique(state, arguments[5]);
   auto can_exec_uint =
       llvm::dyn_cast<ConstantExpr>(can_exec_val)->getZExtValue();
-
-  auto mem = executor.Memory(state);
 
   mem->SetPermissions(where_uint, size_uint, static_cast<bool>(can_read_uint),
                       static_cast<bool>(can_write_uint),
@@ -834,13 +828,13 @@ void SpecialFunctionHandler::handle__llvm_ctpop(
 void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-  //auto mem_val = executor.toUnique(state, arguments[0]);
-  //auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem_val = executor.toUnique(state, arguments[0]);
+  auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
 
   auto pc_val = executor.toUnique(state, arguments[1]);
   auto pc_uint = llvm::dyn_cast<ConstantExpr>(pc_val)->getZExtValue();
 
-  auto mem = executor.Memory(state);
   auto func = executor.GetLiftedFunction(mem, pc_uint);
 
   // LOG(INFO)

@@ -550,10 +550,6 @@ native::AddressSpace *Executor::Memory(klee::ExecutionState &state,
   return state.memories[index].get();
 }
 
-native::AddressSpace *Executor::Memory(klee::ExecutionState &state ) {
-  return state.memories[0].get();
-}
-
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
                                             uint64_t addr) {
   auto func = trace_manager->GetLiftedTraceDefinition(addr);

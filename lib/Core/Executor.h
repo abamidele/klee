@@ -569,7 +569,6 @@ class Executor : public Interpreter {
 
   native::AddressSpace *Memory(klee::ExecutionState &state,
                                uintptr_t index);
-  native::AddressSpace *Memory(klee::ExecutionState &state );
 
   llvm::Function *GetLiftedFunction(native::AddressSpace *memory, uint64_t addr);
 
