@@ -735,7 +735,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
         std::vector<ref<Expr>> &arguments) { \
       \
       auto mem_val = executor.toUnique(state, arguments[0]); \
-      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue() - 1; \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
       auto memory = executor.Memory(state, mem_uint); \
       auto addr_val = executor.toUnique(state, arguments[1]); \
       \
@@ -781,7 +781,7 @@ HANDLE_READ(64, 8, as_qword)
         std::vector<ref<Expr>> &arguments) { \
       \
       auto mem_val = executor.toUnique(state, arguments[0]); \
-      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue() - 1; \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
       auto memory = executor.Memory(state, mem_uint); \
       auto addr_val = executor.toUnique(state, arguments[1]); \
       auto value_val = executor.toUnique(state, arguments[2]); \
