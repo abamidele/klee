@@ -119,8 +119,16 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
 
 // Clear out the contents of this address space.
 void AddressSpace::Kill(void) {
+  if (is_dead) {
+    return;
+  }
   maps.clear();
   page_to_map.clear();
+  symbolic_memory.clear();
+  page_is_readable.clear();
+  page_is_writable.clear();
+  page_is_executable.clear();
+  trace_heads.clear();
   is_dead = true;
   memset(last_map_cache, 0, sizeof(last_map_cache));
   memset(wnx_last_map_cache, 0, sizeof(wnx_last_map_cache));

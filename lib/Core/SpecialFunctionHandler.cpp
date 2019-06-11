@@ -367,8 +367,14 @@ void SpecialFunctionHandler::handle_klee_init_remill_mem(
     state.memories.back()->Kill();
   }
 
-  LOG(INFO) << "Copying address space " << memory_uint << " into state";
-  state.memories[memory_uint].reset(new klee::native::AddressSpace(*mem));
+  if (mem->IsDead()) {
+    LOG(INFO) << "Killing address space " << memory_uint << " in state";
+    state.memories[memory_uint]->Kill();
+
+  } else {
+    LOG(INFO) << "Copying address space " << memory_uint << " into state";
+    state.memories[memory_uint].reset(new klee::native::AddressSpace(*mem));
+  }
 }
 
 void SpecialFunctionHandler::handle__kleemill_log_state(
