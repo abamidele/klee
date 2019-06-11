@@ -468,6 +468,7 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
 
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -487,8 +488,8 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+*/
 
-/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -499,33 +500,32 @@ int main(int argc, char *argv[3], char *envp[]) {
   memcpy(&memory, argv[2], sizeof(memory));
   __kleemill_init(memory);
   State *state = reinterpret_cast<State *>(argv[1]);
+  uint8_t sym_byte = 0xaa;
+  uint32_t sym_byte1 = 0xaabbccdd;
   
-  uint32_t sym_byte1 = 0x69ff69ff;
-  uint32_t sym_byte2 = 0x11111111;
-  klee_make_symbolic(&sym_byte2, sizeof(sym_byte2),"sym_byte2");
-  klee_assume(sym_byte2 > 0x1337);
-
+  klee_make_symbolic(&sym_byte1, sizeof sym_byte1, "sb1");
+  //klee_assume(sym_byte1 > 0x80);
+  //uint32_t sym_byte2 = 0x11111111;
+  //klee_make_symbolic(&sym_byte2, sizeof(sym_byte2),"sym_byte2");
+  //klee_assume(sym_byte2 > 0x1337);
   uint64_t a = 0;
   klee_make_symbolic(&a, sizeof(a), "a");
-  klee_assume(a <= 8);
-  
-
+  klee_assume(a <= 1);
   __remill_write_memory_32(memory, state->gpr.rsp.aword, sym_byte1);
-  __remill_write_memory_32(memory, state->gpr.rsp.aword + 4, sym_byte2);
+  //__remill_write_memory_32(memory, state->gpr.rsp.aword + 4, sym_byte2);
   //__remill_write_memory_64(memory, state->gpr.rsp.aword + 8, a);
-
-  uint64_t res = __remill_read_memory_64(memory, state->gpr.rsp.aword + a);
-  if (res < 0x1337) {
+  uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + a);
+  //klee_assume(res >= 0x1339);
+  if (res > 0x25) {
     puts("YOu lose : /");
   } else {
     printf("You Win!!\n");
   }
-
-  printf("%lx\n", klee_get_value_i64(res));
+  printf("%lx\n", static_cast<uint32_t>(klee_get_value_i32(res)));
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
+
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {

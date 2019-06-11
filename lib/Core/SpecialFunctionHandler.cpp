@@ -218,9 +218,6 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__remill_get_array_option", 
             handle__remill_get_array_option, true),
  
-
-
-
 #undef addDNR
 #undef add
 };
@@ -282,7 +279,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
                                                   ref<Expr> value_val,
                                                   native::AddressSpace *mem,
                                                   ref<Expr> mem_ptr) {
-
+  value_val -> dump();
   if (auto const_val = llvm::dyn_cast<ConstantExpr>(value_val)) {
     auto val = const_val->getZExtValue();
     if (val == klee::native::symbolic_byte) {
@@ -312,10 +309,8 @@ ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
                                                    ref<Expr> value_val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-
-  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
-  auto byte0 = builder->Extract(value_val, 0, 8);
-  auto byte1 = builder->Extract(value_val, 8, 8);
+  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
+  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
   (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
   (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
   return mem_ptr;
@@ -326,11 +321,11 @@ ref<Expr> SpecialFunctionHandler::runtime_write_32(ExecutionState &state,
                                                    ref<Expr> value_val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
-  auto byte0 = builder->Extract(value_val, 0, 8);
-  auto byte1 = builder->Extract(value_val, 8, 8);
-  auto byte2 = builder->Extract(value_val, 16, 8);
-  auto byte3 = builder->Extract(value_val, 24, 8);
+  
+  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
+  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
+  auto byte2 = constant_folding_builder->Extract(value_val, 16, 8);
+  auto byte3 = constant_folding_builder->Extract(value_val, 24, 8);
   (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
   (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
   (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
@@ -343,15 +338,14 @@ ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
                                                    ref<Expr> value_val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  std::unique_ptr<ExprBuilder> builder(createDefaultExprBuilder());
-  auto byte0 = builder->Extract(value_val, 0, 8);
-  auto byte1 = builder->Extract(value_val, 8, 8);
-  auto byte2 = builder->Extract(value_val, 16, 8);
-  auto byte3 = builder->Extract(value_val, 24, 8);
-  auto byte4 = builder->Extract(value_val, 32, 8);
-  auto byte5 = builder->Extract(value_val, 40, 8);
-  auto byte6 = builder->Extract(value_val, 48, 8);
-  auto byte7 = builder->Extract(value_val, 56, 8);
+  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
+  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
+  auto byte2 = constant_folding_builder->Extract(value_val, 16, 8);
+  auto byte3 = constant_folding_builder->Extract(value_val, 24, 8);
+  auto byte4 = constant_folding_builder->Extract(value_val, 32, 8);
+  auto byte5 = constant_folding_builder->Extract(value_val, 40, 8);
+  auto byte6 = constant_folding_builder->Extract(value_val, 48, 8);
+  auto byte7 = constant_folding_builder->Extract(value_val, 56, 8);
   (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
   (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
   (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
@@ -366,11 +360,13 @@ ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
 ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     native::AddressSpace *mem, uint64_t addr, uint64_t num_bytes,
     const MemoryReadResult &val) {
+  LOG(INFO) << "hit runtime read function!!!";
   bool any_symbolic = false;
   bool all_symbolic = true;
 
   ref<klee::Expr> symbolic_bytes[8] = {};
   for (uint64_t i = 0; i < num_bytes; ++i) {
+    LOG(INFO) << "i: " << i << ", " << (int)val.as_bytes[i];
     if (val.as_bytes[i] == klee::native::symbolic_byte) {
       auto sym_pair = mem->symbolic_memory.find(addr + i);
       if (sym_pair != mem->symbolic_memory.end()) {
@@ -384,22 +380,27 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     }
   }
 
+  LOG(INFO) << "any_symbolic: " << any_symbolic;
+  LOG(INFO) << "all_symbolic: " << all_symbolic;
+  
   if (!any_symbolic) {
+    LOG(INFO) << "HIT ALL CONCRETE CASE!!!!!";
     return ConstantExpr::create(val.as_qword, num_bytes * 8);
   }
 
   if (num_bytes == 1) {
+    LOG(INFO) << "hit single byte case";
     return symbolic_bytes[0];
   }
 
   if (!all_symbolic) {
+    LOG(INFO) << "hit not all bytes symbolic case";
     for (uint64_t i = 0; i < num_bytes; ++i) {
       if (symbolic_bytes[i].isNull()) {
         symbolic_bytes[i] = ConstantExpr::create(val.as_bytes[i], 8);
       }
     }
   }
-
   return ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
 }
 
@@ -619,8 +620,7 @@ void SpecialFunctionHandler::handle_klee_init_remill_mem(
   LOG(INFO) << "Initialized klee's concrete address space";
   auto memory_val = executor.toUnique(state, arguments[0]);
   auto memory_uint = llvm::dyn_cast<ConstantExpr>(memory_val)->getZExtValue();
-
-  auto mem = executor.Memory(state, memory_uint);
+  auto mem = executor.memories[memory_uint];
   state.memories.emplace_back(new klee::native::AddressSpace(*mem));
 }
 
@@ -1011,20 +1011,20 @@ void SpecialFunctionHandler::handle__remill_symbolize_read (
 
 }
 
-#define HANDLE_READ(num_bits, num_bytes) \
+#define HANDLE_READ(num_bits, num_bytes, bits_type) \
     void SpecialFunctionHandler::handle__remill_read_ ## num_bits( \
         ExecutionState &state, KInstruction *target, \
         std::vector<ref<Expr>> &arguments) { \
       \
       auto mem_val = executor.toUnique(state, arguments[0]); \
-      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue() - 1; \
       auto memory = executor.Memory(state, mem_uint); \
       auto addr_val = executor.toUnique(state, arguments[1]); \
       \
       if (auto const_addr = llvm::dyn_cast<klee::ConstantExpr>(addr_val)) { \
         auto addr_uint = const_addr->getZExtValue(); \
         MemoryReadResult result = {}; \
-        if (memory->TryRead(addr_uint, &(result.as_byte))) { \
+        if (memory->TryRead(addr_uint, &(result.bits_type))) { \
           executor.bindLocal( \
               target, state, runtime_read_memory(memory, addr_uint, \
                                                  num_bytes, result)); \
@@ -1051,10 +1051,10 @@ void SpecialFunctionHandler::handle__remill_symbolize_read (
       } \
     }
 
-HANDLE_READ(8, 1)
-HANDLE_READ(16, 2)
-HANDLE_READ(32, 4)
-HANDLE_READ(64, 8)
+HANDLE_READ(8, 1, as_byte)
+HANDLE_READ(16, 2, as_word)
+HANDLE_READ(32, 4, as_dword)
+HANDLE_READ(64, 8, as_qword)
 #undef HANDLE_READ
 
 #define HANDLE_WRITE(num_bits, num_bytes) \
@@ -1063,7 +1063,7 @@ HANDLE_READ(64, 8)
         std::vector<ref<Expr>> &arguments) { \
       \
       auto mem_val = executor.toUnique(state, arguments[0]); \
-      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
+      auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue() - 1; \
       auto memory = executor.Memory(state, mem_uint); \
       auto addr_val = executor.toUnique(state, arguments[1]); \
       auto value_val = executor.toUnique(state, arguments[2]); \
@@ -1153,7 +1153,11 @@ int SpecialFunctionHandler::size() {
 }
 
 SpecialFunctionHandler::SpecialFunctionHandler(Executor &_executor)
-    : executor(_executor) {}
+    : executor(_executor),
+      default_builder(createDefaultExprBuilder()),
+      constant_folding_builder(
+      createConstantFoldingExprBuilder(default_builder.get())){}
+
 
 void SpecialFunctionHandler::prepare(
     llvm::Module *mod, std::vector<const char *> &preservedFunctions) {

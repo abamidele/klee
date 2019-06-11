@@ -3102,7 +3102,6 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   const auto max_addr = mem_cont.max_addr;
   const auto curr_state = mem_cont.state;
   auto curr_addr = mem_cont.next_addr;
-  const auto curr_state = mem_cont.state;
   const auto curr_mem = Memory(*curr_state, mem_cont.memory_index);
   auto found = false;
   auto has_error = false;
@@ -3137,6 +3136,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
     constr = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr_addr, 64));
     bool res = false;
     (void) solver->mayBeTrue(*mem_cont.state, constr, res);
+    // TODO(sai) terminate state on false
 
     // Not readable.
     if (!can_read) {
@@ -3356,11 +3356,12 @@ void Executor::run(ExecutionState &initialState) {
           << " <= " << mem_cont->next_addr << " <= "
           << mem_cont->max_addr << std::dec;
 
-      auto state = mem_cont->state;
       if (!updateMemContinuation(*mem_cont)) {
         pendingAddresses.pop_back();
       } else {
-        states.insert(state);
+        resumeMemContinuation(*mem_cont);
+        //  states.insert(state); TODO(sai) 
+        //  this does not quite work yet because of random searcher
       }
     }
   } while (!states.empty() && !haltExecution);
@@ -3370,6 +3371,18 @@ void Executor::run(ExecutionState &initialState) {
 
   doDumpStates();
 }
+
+void Executor::resumeMemContinuation(MemoryAccessContinuation &mem_cont ) {
+  auto state = mem_cont.state;
+  while (state->prevPC != state->pc) {
+    KInstruction *ki = state->pc;
+    stepInstruction(*state);
+    executeInstruction(*state, ki);
+    processTimers(state, maxInstructionTime);
+    checkMemoryUsage();
+  }
+}
+
 
 std::string Executor::getAddressInfo(ExecutionState &state,
                                      ref<Expr> address) const {

@@ -18,6 +18,7 @@
 #include <deque>
 #include <dirent.h>
 #include "Executor.h"
+#include "klee/ExprBuilder.h"
 
 namespace llvm {
 class Function;
@@ -69,13 +70,16 @@ class SpecialFunctionHandler {
   typedef std::map<const llvm::Function*, std::pair<Handler, bool> > handlers_ty;
   std::vector<uint64_t> fstat_vector;
   std::vector<uint64_t> sym_addrs;
-  
+ 
+
   struct dirent dirent_entry;
   std::string entry_name;
 
   handlers_ty handlers;
   class Executor &executor;
-
+  std::unique_ptr<ExprBuilder> default_builder;
+  std::unique_ptr<ExprBuilder> constant_folding_builder;
+ 
   struct HandlerInfo {
     const char *name;
     SpecialFunctionHandler::Handler handler;
@@ -176,9 +180,6 @@ class SpecialFunctionHandler {
 
   
   void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
-  //void __remill_search_byte(
-  //  ExecutionState &state, ref<Expr> byte_val);
-
 
   /* Handlers */
 

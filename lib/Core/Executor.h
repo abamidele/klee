@@ -212,6 +212,7 @@ class Executor : public Interpreter {
   std::deque<vTask *> tasks;
   std::set<uint64_t> visited_addrs;
   std::vector<std::unique_ptr<MemoryAccessContinuation>> pendingAddresses;
+  std::vector<std::shared_ptr<native::AddressSpace>> memories;
 
   /// ExecutionStates currently paused from scheduling because they are
   /// waiting to be merged in a klee_close_merge instruction
@@ -317,6 +318,9 @@ class Executor : public Interpreter {
   
   // Returns `true` if it updated `mem_cont` in place, and `false` otherwise.
   bool updateMemContinuation(MemoryAccessContinuation &mem_cont );
+  
+  void resumeMemContinuation(MemoryAccessContinuation &mem_cont );
+
 
   void run(ExecutionState &initialState);
 

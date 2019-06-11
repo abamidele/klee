@@ -404,6 +404,25 @@ extern "C" void __remill_search_symbolic_byte_array(
 extern "C" char *__remill_get_array_option(bool new_str, addr_t start, addr_t stop);
 extern "C" uint8_t __remill_read_memory_8(Memory *mem, addr_t addr);
 
+/*
+Memory * __remill_write_memory_32(Memory *mem, addr_t addr, uint32_t val) {
+  mem = __remill_write_memory_16(mem, addr, static_cast<uint16_t>(val));
+  mem = __remill_write_memory_16(mem, addr+2, static_cast<uint16_t>(val >> 16));
+  return mem;
+}
+
+Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
+  mem = __remill_write_memory_8(mem, addr, static_cast<uint8_t>(val));
+  mem = __remill_write_memory_8(mem, addr+1, static_cast<uint8_t>(val >> 8));
+  return mem;
+}
+
+uint16_t __remill_read_memory_16(Memory *mem, addr_t addr) {
+  uint8_t b0 = __remill_read_memory_8(mem, addr);
+  uint8_t b1 = __remill_read_memory_8(mem, addr + 1);
+  return (static_cast<uint16_t>(b1) << static_cast<uint16_t>(8)) | b0;
+}
+*/
 
 /*
 Memory * __remill_write_memory_16(Memory *mem, addr_t addr, uint16_t val) {
