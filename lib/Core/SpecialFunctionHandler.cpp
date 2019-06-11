@@ -359,8 +359,9 @@ void SpecialFunctionHandler::handle_klee_init_remill_mem(
 
   auto mem = executor.memories[memory_uint];
   auto new_size = memory_uint + 1ULL;
-  if (new_size >= state.memories.size()) {
-    state.memories.resize(new_size);
+  while (state.memories.size() < new_size) {
+    state.memories.emplace_back(new klee::native::AddressSpace);
+    state.memories.back()->Kill();
   }
 
   LOG(INFO) << "Copying address space " << memory_uint << " into state";
