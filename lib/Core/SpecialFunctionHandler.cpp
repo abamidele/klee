@@ -297,7 +297,7 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     native::AddressSpace *mem, uint64_t addr, uint64_t num_bytes,
     const MemoryReadResult &val) {
 
-  LOG(INFO) << "hit runtime read function addr=" << std::hex << addr
+  LOG(INFO) << "Reading addr=" << std::hex << addr
             << " num_bytes=" << std::dec << num_bytes << " bytes=[" << std::hex
             << unsigned(val.as_bytes[0]) << ", " << unsigned(val.as_bytes[1]) << ", "
             << unsigned(val.as_bytes[2]) << ", " << unsigned(val.as_bytes[3]) << ", "
@@ -331,7 +331,8 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
   }
 
   if (num_bytes == 1) {
-    LOG(INFO) << "hit single byte case";
+    LOG(INFO) << "Read symbolic byte from " << std::hex << addr << std::dec;
+    symbolic_bytes[0]->dump();
     return symbolic_bytes[0];
   }
 
