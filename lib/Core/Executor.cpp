@@ -3352,12 +3352,13 @@ void Executor::run(ExecutionState &initialState) {
           << " <= " << mem_cont->next_addr << " <= "
           << mem_cont->max_addr << std::dec;
 
+      auto state = mem_cont->state;
       if (!updateMemContinuation(*mem_cont)) {
         pendingAddresses.pop_back();
       } else {
-        resumeMemContinuation(*mem_cont);
-        //  states.insert(state); TODO(sai) 
-        //  this does not quite work yet because of random searcher
+        states.insert(state);
+        addedStates.push_back(state);
+        searcher->update(nullptr, addedStates, removedStates);
       }
     }
   } while (!states.empty() && !haltExecution);
