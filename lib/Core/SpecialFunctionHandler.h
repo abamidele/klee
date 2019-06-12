@@ -172,8 +172,6 @@ class SpecialFunctionHandler {
                              ref<Expr> value_val, native::AddressSpace *mem,
                              ref<Expr> mem_ptr);
  
-  void scheduleMemContinuation(MemoryAccessContinuation &mem_cont);
-
   /* Handlers */
 
 #define HANDLER(name) void name(ExecutionState &state, \

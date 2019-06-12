@@ -4235,20 +4235,21 @@ void Executor::runFunctionAsMain(Function *f,
   while (curr_state) {
     run(*curr_state);
 
-    while (!pendingAddresses.empty() && !curr_state) {
+    while (!pendingAddresses.empty()) {
       auto mem_cont = pendingAddresses.back().get();
       LOG(INFO)
-          << "Using memory continuation " << std::hex << mem_cont->min_addr
-          << " <= " << mem_cont->next_addr << " <= "
+          << "Trying to use memory continuation " << std::hex
+          << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
           << mem_cont->max_addr << std::dec;
 
       curr_state = updateMemContinuation(*mem_cont);
       if (!curr_state) {
         pendingAddresses.pop_back();
         // TODO(pag): Do the states get destroyed?
+      } else {
+        break;
       }
     }
-
   }
 
   delete processTree;
