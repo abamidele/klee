@@ -3093,7 +3093,7 @@ void Executor::doDumpStates() {
   updateStates(nullptr);
 }
 
-bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
+ExecutionState *Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   auto min_addr = mem_cont.min_addr;
   const auto max_addr = mem_cont.max_addr;
   const auto curr_state = mem_cont.state;
@@ -3167,7 +3167,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   // There are no more addresses to find.
   if (!found) {
     terminateState(*curr_state);
-    return false;
+    return nullptr;
   }
 
   // Fork/branch the current state, without changing the depth or weight.
@@ -3183,7 +3183,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
     std::stringstream ss;
     ss << "Failed 1-byte read from address 0x" << std::hex << curr_addr;
     terminateStateOnError(*curr_state, ss.str(), Executor::ReportError);
-    return true;
+    return curr_state;
   }
 
   // Add the constraint to our current state that the address must equal
@@ -3246,7 +3246,7 @@ bool Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
       break;
   }
 
-  return true;
+  return curr_state;
 }
 
 
@@ -3352,12 +3352,11 @@ void Executor::run(ExecutionState &initialState) {
           << " <= " << mem_cont->next_addr << " <= "
           << mem_cont->max_addr << std::dec;
 
-      auto state = mem_cont->state;
-      if (!updateMemContinuation(*mem_cont)) {
-        pendingAddresses.pop_back();
-      } else {
+      if (auto state = updateMemContinuation(*mem_cont)) {
         addedStates.push_back(state);
-        updateStates(state);
+        updateStates(nullptr);
+      } else {
+        pendingAddresses.pop_back();
       }
     }
   } while (!states.empty() && !haltExecution);

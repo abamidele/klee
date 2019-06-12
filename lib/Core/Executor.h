@@ -317,7 +317,7 @@ class Executor : public Interpreter {
                      llvm::raw_ostream &file);
   
   // Returns `true` if it updated `mem_cont` in place, and `false` otherwise.
-  bool updateMemContinuation(MemoryAccessContinuation &mem_cont );
+  ExecutionState *updateMemContinuation(MemoryAccessContinuation &mem_cont);
   
   void resumeMemContinuation(MemoryAccessContinuation &mem_cont );
 
