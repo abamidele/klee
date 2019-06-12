@@ -261,7 +261,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
   std::string out;
-  llvm::raw_string_ostream os;
+  llvm::raw_string_ostream os(out);
   val->print(os);
   LOG(ERROR)
       << "Writing 2 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
@@ -287,7 +287,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_32(ExecutionState &state,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
   std::string out;
-  llvm::raw_string_ostream os;
+  llvm::raw_string_ostream os(out);
   val->print(os);
   LOG(ERROR)
       << "Writing 4 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
@@ -321,7 +321,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
   std::string out;
-  llvm::raw_string_ostream os;
+  llvm::raw_string_ostream os(out);
   val->print(os);
   LOG(ERROR)
       << "Writing 8 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
