@@ -3356,9 +3356,8 @@ void Executor::run(ExecutionState &initialState) {
       if (!updateMemContinuation(*mem_cont)) {
         pendingAddresses.pop_back();
       } else {
-        states.insert(state);
         addedStates.push_back(state);
-        searcher->update(nullptr, addedStates, removedStates);
+        updateStates(state);
       }
     }
   } while (!states.empty() && !haltExecution);
