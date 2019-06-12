@@ -3334,32 +3334,15 @@ void Executor::run(ExecutionState &initialState) {
 
   LOG(INFO) << "state size is " << states.size();
 
-  do {
-    while (!states.empty() && !haltExecution) {
-      auto state = &searcher->selectState();
-      KInstruction *ki = state->pc;
-      stepInstruction(*state);
-      executeInstruction(*state, ki);
-      processTimers(state, maxInstructionTime);
-      checkMemoryUsage();
-      updateStates(state);
-    }
-
-    while (!pendingAddresses.empty()) {
-      auto mem_cont = pendingAddresses.back().get();
-      LOG(INFO)
-          << "Using memory continuation " << std::hex << mem_cont->min_addr
-          << " <= " << mem_cont->next_addr << " <= "
-          << mem_cont->max_addr << std::dec;
-
-      if (auto state = updateMemContinuation(*mem_cont)) {
-        addedStates.push_back(state);
-        updateStates(nullptr);
-      } else {
-        pendingAddresses.pop_back();
-      }
-    }
-  } while (!states.empty() && !haltExecution);
+  while (!states.empty() && !haltExecution) {
+    auto state = &searcher->selectState();
+    KInstruction *ki = state->pc;
+    stepInstruction(*state);
+    executeInstruction(*state, ki);
+    processTimers(state, maxInstructionTime);
+    checkMemoryUsage();
+    updateStates(state);
+  }
 
   delete searcher;
   searcher = 0;
@@ -4245,9 +4228,29 @@ void Executor::runFunctionAsMain(Function *f,
   LOG(INFO)
       << "Initialized globals in state";
 
+
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
-  run(*state);
+  auto curr_state = state;
+  while (curr_state) {
+    run(*curr_state);
+
+    while (!pendingAddresses.empty() && !curr_state) {
+      auto mem_cont = pendingAddresses.back().get();
+      LOG(INFO)
+          << "Using memory continuation " << std::hex << mem_cont->min_addr
+          << " <= " << mem_cont->next_addr << " <= "
+          << mem_cont->max_addr << std::dec;
+
+      curr_state = updateMemContinuation(*mem_cont);
+      if (!curr_state) {
+        pendingAddresses.pop_back();
+        // TODO(pag): Do the states get destroyed?
+      }
+    }
+
+  }
+
   delete processTree;
   processTree = 0;
 
