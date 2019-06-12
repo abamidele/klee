@@ -210,86 +210,158 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
 ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
                                                   uint64_t addr_uint,
-                                                  ref<Expr> value_val,
+                                                  ref<Expr> val,
                                                   native::AddressSpace *mem,
                                                   ref<Expr> mem_ptr) {
-  value_val->dump();
-  uint8_t val_to_write = 0;
-
-  if (auto const_val = llvm::dyn_cast<ConstantExpr>(value_val)) {
-    val_to_write = static_cast<uint8_t>(const_val->getZExtValue(8));
-    if (val_to_write == klee::native::symbolic_byte) {
-      mem->symbolic_memory.erase(addr_uint);
-    }
-
-  } else {
-    val_to_write = klee::native::symbolic_byte;
-    mem->symbolic_memory[addr_uint] = value_val;
+  if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
+    return runtime_write_8(state, addr_uint,
+                           static_cast<uint8_t>(const_val->getZExtValue(8)),
+                           mem, mem_ptr);
   }
 
-  if (!mem->TryWrite(addr_uint, val_to_write)) {
+  if (!mem->TryWrite(addr_uint, klee::native::kSymbolicByte)) {
     auto addr_space_id = llvm::dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
     std::stringstream ss;
-    ss << "Failed 1-byte write of 0x" << std::hex << unsigned(val_to_write)
+    ss << "Failed 1-byte write of symbol to address 0x"
+       << addr_uint << " in address space " << addr_space_id;
+    executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
+    return Expr::createPointer(0);
+  }
+
+  mem->symbolic_memory[addr_uint] = val;
+  return mem_ptr;
+}
+
+ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
+                                                  uint64_t addr_uint,
+                                                  uint8_t val,
+                                                  native::AddressSpace *mem,
+                                                  ref<Expr> mem_ptr) {
+  if (val == klee::native::kSymbolicByte) {
+    mem->symbolic_memory.erase(addr_uint);
+  }
+
+  if (!mem->TryWrite(addr_uint, val)) {
+    auto addr_space_id = llvm::dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+    std::stringstream ss;
+    ss << "Failed 1-byte write of " << std::hex << unsigned(val)
        << " to address 0x" << addr_uint << " in address space "
        << addr_space_id;
     executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
+    mem->Kill();
     return Expr::createPointer(0);
-  } else {
-    return mem_ptr;
   }
+
+  return mem_ptr;
 }
 
 ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
                                                    uint64_t addr_uint,
-                                                   ref<Expr> value_val,
+                                                   ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
-  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
-  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+  std::string out;
+  llvm::raw_string_ostream os;
+  val->print(os);
+  LOG(ERROR)
+      << "Writing 2 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+
+  if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
+    auto v = const_val->getZExtValue(16);
+    mem_ptr = runtime_write_8(state, addr_uint + 0,
+                              static_cast<uint8_t>(v >> 0), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 1,
+                              static_cast<uint8_t>(v >> 8), mem, mem_ptr);
+  } else {
+    auto byte0 = constant_folding_builder->Extract(val, 0, 8);
+    auto byte1 = constant_folding_builder->Extract(val, 8, 8);
+    mem_ptr = runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+  }
   return mem_ptr;
 }
 
 ref<Expr> SpecialFunctionHandler::runtime_write_32(ExecutionState &state,
                                                    uint64_t addr_uint,
-                                                   ref<Expr> value_val,
+                                                   ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  
-  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
-  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
-  auto byte2 = constant_folding_builder->Extract(value_val, 16, 8);
-  auto byte3 = constant_folding_builder->Extract(value_val, 24, 8);
-  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
+  std::string out;
+  llvm::raw_string_ostream os;
+  val->print(os);
+  LOG(ERROR)
+      << "Writing 4 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+
+  if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
+    auto v = const_val->getZExtValue(32);
+    mem_ptr = runtime_write_8(state, addr_uint + 0,
+                              static_cast<uint8_t>(v >> 0), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 1,
+                              static_cast<uint8_t>(v >> 8), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 2,
+                              static_cast<uint8_t>(v >> 16), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 3,
+                              static_cast<uint8_t>(v >> 24), mem, mem_ptr);
+  } else {
+    auto byte0 = constant_folding_builder->Extract(val, 0, 8);
+    auto byte1 = constant_folding_builder->Extract(val, 8, 8);
+    auto byte2 = constant_folding_builder->Extract(val, 16, 8);
+    auto byte3 = constant_folding_builder->Extract(val, 24, 8);
+    (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
+  }
   return mem_ptr;
 }
 
 ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
                                                    uint64_t addr_uint,
-                                                   ref<Expr> value_val,
+                                                   ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  auto byte0 = constant_folding_builder->Extract(value_val, 0, 8);
-  auto byte1 = constant_folding_builder->Extract(value_val, 8, 8);
-  auto byte2 = constant_folding_builder->Extract(value_val, 16, 8);
-  auto byte3 = constant_folding_builder->Extract(value_val, 24, 8);
-  auto byte4 = constant_folding_builder->Extract(value_val, 32, 8);
-  auto byte5 = constant_folding_builder->Extract(value_val, 40, 8);
-  auto byte6 = constant_folding_builder->Extract(value_val, 48, 8);
-  auto byte7 = constant_folding_builder->Extract(value_val, 56, 8);
-  (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 4, byte4, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 5, byte5, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 6, byte6, mem, mem_ptr);
-  (void) runtime_write_8(state, addr_uint + 7, byte7, mem, mem_ptr);
+  std::string out;
+  llvm::raw_string_ostream os;
+  val->print(os);
+  LOG(ERROR)
+      << "Writing 8 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+
+  if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
+    auto v = const_val->getZExtValue();
+    mem_ptr = runtime_write_8(state, addr_uint + 0,
+                              static_cast<uint8_t>(v >> 0ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 1,
+                              static_cast<uint8_t>(v >> 8ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 2,
+                              static_cast<uint8_t>(v >> 16ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 3,
+                              static_cast<uint8_t>(v >> 24ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 4,
+                              static_cast<uint8_t>(v >> 32ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 5,
+                              static_cast<uint8_t>(v >> 40ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 6,
+                              static_cast<uint8_t>(v >> 48ull), mem, mem_ptr);
+    mem_ptr = runtime_write_8(state, addr_uint + 7,
+                              static_cast<uint8_t>(v >> 56ull), mem, mem_ptr);
+  } else {
+    auto byte0 = constant_folding_builder->Extract(val, 0, 8);
+    auto byte1 = constant_folding_builder->Extract(val, 8, 8);
+    auto byte2 = constant_folding_builder->Extract(val, 16, 8);
+    auto byte3 = constant_folding_builder->Extract(val, 24, 8);
+    auto byte4 = constant_folding_builder->Extract(val, 32, 8);
+    auto byte5 = constant_folding_builder->Extract(val, 40, 8);
+    auto byte6 = constant_folding_builder->Extract(val, 48, 8);
+    auto byte7 = constant_folding_builder->Extract(val, 56, 8);
+    (void) runtime_write_8(state, addr_uint + 0, byte0, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 1, byte1, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 2, byte2, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 3, byte3, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 4, byte4, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 5, byte5, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 6, byte6, mem, mem_ptr);
+    (void) runtime_write_8(state, addr_uint + 7, byte7, mem, mem_ptr);
+  }
   return mem_ptr;
 }
 
@@ -309,7 +381,7 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
 
   ref<klee::Expr> symbolic_bytes[8] = {};
   for (uint64_t i = 0; i < num_bytes; ++i) {
-    if (val.as_bytes[i] == klee::native::symbolic_byte) {
+    if (val.as_bytes[i] == klee::native::kSymbolicByte) {
       const auto sym_pair = mem->symbolic_memory.find(addr + i);
       if (sym_pair != mem->symbolic_memory.end()) {
         symbolic_bytes[i] = sym_pair->second;
@@ -748,6 +820,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
               target, state, runtime_read_memory(memory, addr_uint, \
                                                  num_bytes, result)); \
         } else { \
+          memory->Kill(); \
           std::stringstream ss; \
           ss << "Can't read " << num_bytes << " from " \
              << std::hex << addr_uint; \
@@ -785,12 +858,12 @@ HANDLE_READ(64, 8, as_qword)
       auto mem_uint = llvm::dyn_cast<ConstantExpr>(mem_val)->getZExtValue(); \
       auto memory = executor.Memory(state, mem_uint); \
       auto addr_val = executor.toUnique(state, arguments[1]); \
-      auto value_val = executor.toUnique(state, arguments[2]); \
+      auto val = executor.toUnique(state, arguments[2]); \
       \
       if (auto const_addr = llvm::dyn_cast<ConstantExpr>(addr_val)) { \
         auto addr_uint = const_addr->getZExtValue(); \
         executor.bindLocal(target, state, runtime_write_ ## num_bits( \
-            state, addr_uint, value_val, memory, mem_val)); \
+            state, addr_uint, val, memory, mem_val)); \
       } else { \
         auto range = executor.solver->getRange(state, addr_val); \
         auto min = llvm::dyn_cast<klee::ConstantExpr>(range.first); \
@@ -801,7 +874,7 @@ HANDLE_READ(64, 8, as_qword)
             &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
             MemoryContinuationKind::kContinueWrite ## num_bits); \
         executor.pendingAddresses.emplace_back(mem_cont); \
-        mem_cont->val_to_write = value_val; \
+        mem_cont->val_to_write = val; \
         if (!executor.updateMemContinuation(*mem_cont)) { \
           executor.pendingAddresses.pop_back(); \
         } \
@@ -875,7 +948,8 @@ SpecialFunctionHandler::SpecialFunctionHandler(Executor &_executor)
     : executor(_executor),
       default_builder(createDefaultExprBuilder()),
       constant_folding_builder(
-      createConstantFoldingExprBuilder(default_builder.get())){}
+          createConstantFoldingExprBuilder(default_builder.get())) {
+}
 
 
 void SpecialFunctionHandler::prepare(

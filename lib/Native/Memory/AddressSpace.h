@@ -34,7 +34,7 @@ namespace native {
 
 using CodeVersion = uint64_t;
 using PC = uint64_t;
-static const uint8_t symbolic_byte = 0xff;
+static const uint8_t kSymbolicByte = 0xff;
 
 // Basic memory implementation.
 class AddressSpace : public Memory {

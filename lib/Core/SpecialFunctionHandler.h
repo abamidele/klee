@@ -156,8 +156,12 @@ class SpecialFunctionHandler {
                                 uint64_t addr_uint, uint64_t num_bytes,
                                 const MemoryReadResult &val);
   ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint,
-                            ref<Expr> value_val, native::AddressSpace *mem,
+                            ref<Expr> val, native::AddressSpace *mem,
                             ref<Expr> mem_ptr);
+  ref<Expr> runtime_write_8(ExecutionState &state, uint64_t addr_uint,
+                            uint8_t val, native::AddressSpace *mem,
+                            ref<Expr> mem_ptr);
+
   ref<Expr> runtime_write_16(ExecutionState &state, uint64_t addr_uint,
                              ref<Expr> value_val, native::AddressSpace *mem,
                              ref<Expr> mem_ptr);
