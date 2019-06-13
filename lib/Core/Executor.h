@@ -107,8 +107,8 @@ enum class MemoryContinuationKind {
 struct MemoryAccessContinuation {
   ExecutionState *state;
   const ref<Expr> addr;
-  const uint64_t min_addr;
-  const uint64_t max_addr;
+  uint64_t min_addr;
+  uint64_t max_addr;
   uint64_t next_addr;
   const MemoryContinuationKind kind;
 

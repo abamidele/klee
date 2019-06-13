@@ -397,22 +397,22 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     }
   }
 
-  LOG(INFO) << "any_symbolic: " << any_symbolic;
-  LOG(INFO) << "all_symbolic: " << all_symbolic;
+  //LOG(INFO) << "any_symbolic: " << any_symbolic;
+  //LOG(INFO) << "all_symbolic: " << all_symbolic;
   
   if (!any_symbolic) {
-    LOG(INFO) << "HIT ALL CONCRETE CASE!!!!!";
+    //LOG(INFO) << "HIT ALL CONCRETE CASE!!!!!";
     return ConstantExpr::create(val.as_qword, num_bytes * 8);
   }
 
   if (num_bytes == 1) {
-    LOG(INFO) << "Read symbolic byte from " << std::hex << addr << std::dec;
+    //LOG(INFO) << "Read symbolic byte from " << std::hex << addr << std::dec;
     symbolic_bytes[0]->dump();
     return symbolic_bytes[0];
   }
 
   if (!all_symbolic) {
-    LOG(INFO) << "hit not all bytes symbolic case";
+    //LOG(INFO) << "hit not all bytes symbolic case";
     for (uint64_t i = 0; i < num_bytes; ++i) {
       if (symbolic_bytes[i].isNull()) {
         symbolic_bytes[i] = ConstantExpr::create(val.as_bytes[i], 8);
@@ -840,9 +840,11 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
             &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
             MemoryContinuationKind::kContinueRead ## num_bits); \
         executor.pendingAddresses.emplace_back(mem_cont); \
+        LOG(INFO) << "initial min is " << mem_cont->min_addr;\
         if (!executor.updateMemContinuation(*mem_cont)) { \
           executor.pendingAddresses.pop_back(); \
         } \
+        LOG(INFO) << "min address is " << mem_cont->min_addr;\
       } \
     }
 

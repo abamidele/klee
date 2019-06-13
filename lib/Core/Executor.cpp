@@ -3093,6 +3093,7 @@ void Executor::doDumpStates() {
   updateStates(nullptr);
 }
 
+
 ExecutionState *Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
   auto min_addr = mem_cont.min_addr;
   const auto max_addr = mem_cont.max_addr;
@@ -3333,15 +3334,55 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   LOG(INFO) << "state size is " << states.size();
+/*
+  if (states.empty()){
+      auto mem_cont = pendingAddresses.back().get();
+      LOG(INFO)
+          << "Trying to use memory continuation " << std::hex
+          << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
+          << mem_cont->max_addr << std::dec;
+      state = updateMemContinuation(*mem_cont);
+      if (!state) {
+        pendingAddresses.pop_back();
+        // TODO(pag): Do the states get destroyed?
+      } else {
+        LOG(INFO) << ""
+        states.insert(mem_cont->state);
+      }
+    }
+*/
 
-  while (!states.empty() && !haltExecution) {
-    auto state = &searcher->selectState();
-    KInstruction *ki = state->pc;
-    stepInstruction(*state);
-    executeInstruction(*state, ki);
-    processTimers(state, maxInstructionTime);
-    checkMemoryUsage();
-    updateStates(state);
+  ExecutionState *state;
+  bool manual_update = false;
+  while ((!states.empty() && !haltExecution) || !pendingAddresses.empty()) {
+    if (states.empty()){
+      auto mem_cont = pendingAddresses.back().get();
+      manual_update = true;
+      LOG(INFO)
+        << "Trying to use memory continuation " << std::hex
+        << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
+        << mem_cont->max_addr << std::dec;
+      
+      if (auto curr_state = updateMemContinuation(*mem_cont)){
+        states.insert(curr_state);
+      } else {
+        pendingAddresses.pop_back();
+      }
+    } else {
+      state = *states.begin();
+      KInstruction *ki = state->pc;
+      stepInstruction(*state);
+      executeInstruction(*state, ki);
+      processTimers(state, maxInstructionTime);
+      checkMemoryUsage();
+      if (!manual_update) {
+        updateStates(state);
+      } else {
+        if (state -> pc == state -> prevPC ){
+          states.erase(state);
+        }
+      }
+    }
   }
 
   delete searcher;
@@ -3352,7 +3393,9 @@ void Executor::run(ExecutionState &initialState) {
 
 void Executor::resumeMemContinuation(MemoryAccessContinuation &mem_cont ) {
   auto state = mem_cont.state;
-  while (state->prevPC != state->pc) {
+  int count = 0;
+  while (count <= 15) {
+    ++count;
     KInstruction *ki = state->pc;
     stepInstruction(*state);
     executeInstruction(*state, ki);
@@ -4228,30 +4271,10 @@ void Executor::runFunctionAsMain(Function *f,
   LOG(INFO)
       << "Initialized globals in state";
 
-
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
-  auto curr_state = state;
-  while (curr_state) {
-    run(*curr_state);
-
-    while (!pendingAddresses.empty()) {
-      auto mem_cont = pendingAddresses.back().get();
-      LOG(INFO)
-          << "Trying to use memory continuation " << std::hex
-          << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
-          << mem_cont->max_addr << std::dec;
-
-      curr_state = updateMemContinuation(*mem_cont);
-      if (!curr_state) {
-        pendingAddresses.pop_back();
-        // TODO(pag): Do the states get destroyed?
-      } else {
-        break;
-      }
-    }
-  }
-
+  run(*state);
+  
   delete processTree;
   processTree = 0;
 

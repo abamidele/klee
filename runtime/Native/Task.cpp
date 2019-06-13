@@ -510,7 +510,7 @@ int main(int argc, char *argv[3], char *envp[]) {
   //klee_assume(sym_byte2 > 0x1337);
   uint64_t a = 0;
   klee_make_symbolic(&a, sizeof(a), "a");
-  klee_assume(a <= 1);
+  klee_assume(a <= 3);
   __remill_write_memory_32(memory, state->gpr.rsp.aword, sym_byte1);
   //__remill_write_memory_32(memory, state->gpr.rsp.aword + 4, sym_byte2);
   //__remill_write_memory_64(memory, state->gpr.rsp.aword + 8, a);
