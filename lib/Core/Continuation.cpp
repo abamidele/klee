@@ -16,7 +16,8 @@
 
 #include "Continuation.h"
 #include "SpecialFunctionHandler.h"
-#include "Solver.h"
+
+#include "klee/Solver.h"
 
 
 namespace klee {
