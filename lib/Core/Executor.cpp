@@ -3036,16 +3036,18 @@ void Executor::run(ExecutionState &initialState) {
 
   continuations.emplace_back(new NullContinuation(&initialState));
 
-  while (!haltExecution && !continuations.empty()) {
+  while (!continuations.empty()) {
     std::unique_ptr<StateContinuation> cont(std::move(continuations.back()));
     continuations.pop_back();
 
     std::unique_ptr<ExecutionState> state(cont->YieldNextState(*this));
     if (!state) {
+      LOG(INFO)
+          << "Popping ineffectual continuation off stack.";
       continue;
     }
 
-    auto is_done = state->pc != state->prevPC;
+    auto is_done = false;
     auto should_remove = removedStates.count(state.get());
     while (!is_done && !should_remove) {
       auto ki = state->pc;
@@ -3057,6 +3059,10 @@ void Executor::run(ExecutionState &initialState) {
 
     continuations.emplace_back(std::move(cont));
     removedStates.clear();
+
+    LOG(INFO)
+        << "Finished state, continuation stack size is "
+        << continuations.size();
   }
 
   if (searcher) {
