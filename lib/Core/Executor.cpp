@@ -1868,7 +1868,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         }
       }
 
-      continuations.emplace_back(new BranchContinuation(state, branches));
+      continuations.emplace_back(new BranchContinuation(&state, branches));
 
       break;
     }

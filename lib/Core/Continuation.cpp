@@ -16,6 +16,7 @@
 
 #include "Continuation.h"
 #include "SpecialFunctionHandler.h"
+#include "TimingSolver.h"
 
 #include "klee/Solver.h"
 
