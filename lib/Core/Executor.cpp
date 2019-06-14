@@ -3380,10 +3380,12 @@ void Executor::run(ExecutionState &initialState) {
       } else {
         if (state -> pc == state -> prevPC ){
           states.erase(state);
+          delete state;
         }
       }
     }
   }
+   
 
   delete searcher;
   searcher = 0;

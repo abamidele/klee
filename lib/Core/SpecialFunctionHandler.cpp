@@ -387,7 +387,7 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     if (val.as_bytes[i] == klee::native::kSymbolicByte) {
       const auto sym_pair = mem->symbolic_memory.find(addr + i);
       if (sym_pair != mem->symbolic_memory.end()) {
-        symbolic_bytes[i] = sym_pair->second;
+        symbolic_bytes[num_bytes-1-i] = sym_pair->second;
         any_symbolic = true;
       } else {
         all_symbolic = false;
@@ -407,20 +407,22 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
 
   if (num_bytes == 1) {
     //LOG(INFO) << "Read symbolic byte from " << std::hex << addr << std::dec;
-    symbolic_bytes[0]->dump();
-    return symbolic_bytes[0];
+    symbolic_bytes[num_bytes - 1]->dump();
+    return symbolic_bytes[num_bytes - 1];
   }
 
   if (!all_symbolic) {
     //LOG(INFO) << "hit not all bytes symbolic case";
     for (uint64_t i = 0; i < num_bytes; ++i) {
-      if (symbolic_bytes[i].isNull()) {
-        symbolic_bytes[i] = ConstantExpr::create(val.as_bytes[i], 8);
+      if (symbolic_bytes[num_bytes-1-i].isNull()) {
+        symbolic_bytes[num_bytes-1-i] = ConstantExpr::create(val.as_bytes[i], 8);
       }
     }
   }
 
-  return ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
+  auto res = ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
+  res -> dump();
+  return res;
 }
 
 void SpecialFunctionHandler::handle_klee_init_remill_mem(
