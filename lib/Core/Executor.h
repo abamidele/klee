@@ -36,7 +36,7 @@
 #include <deque>
 
 #include "Native/Memory/AddressSpace.h"
-
+#include "Continuation.h"
 #include "remill/BC/Lifter.h"
 
 struct KTest;
@@ -79,6 +79,8 @@ class StatsTracker;
 class TimingSolver;
 class TreeStreamWriter;
 class MergeHandler;
+class StateContinuation;
+class MemoryAccessContinuation;
 
 namespace native {
 class TraceManager;
@@ -90,45 +92,6 @@ class vTask {
   llvm::Function *first_func;
   std::vector<std::string> argv;
   std::vector<std::string> envp;
-};
-
-enum class MemoryContinuationKind {
-  kContinueRead8,
-  kContinueRead16,
-  kContinueRead32,
-  kContinueRead64,
-
-  kContinueWrite8,
-  kContinueWrite16,
-  kContinueWrite32,
-  kContinueWrite64
-};
-
-struct MemoryAccessContinuation {
-  ExecutionState *state;
-  const ref<Expr> addr;
-  uint64_t min_addr;
-  uint64_t max_addr;
-  uint64_t next_addr;
-  const MemoryContinuationKind kind;
-
-  const uint64_t memory_index;
-  const ref<Expr> memory;
-  ref<Expr> val_to_write;
-
-  MemoryAccessContinuation(ExecutionState *state, ref<Expr> addr,
-                           uint64_t min_val, uint64_t max_val,
-                           uint64_t next_val, uint64_t memory_index_,
-                           ref<Expr> memory_, MemoryContinuationKind kind_)
-      : state(state),
-        addr(addr),
-        min_addr(min_val),
-        max_addr(max_val),
-        next_addr(next_val),
-        memory_index(memory_index_),
-        memory(memory_),
-        kind(kind_) {
-  }
 };
 
 template<class T> class ref;
@@ -145,6 +108,9 @@ class Executor : public Interpreter {
   friend class StatsTracker;
   friend class MergeHandler;
   friend class MergingSearcher;
+  friend class MemoryAccessContinuation;
+  friend class StateContinuation;
+
 
  public:
   class Timer {
@@ -211,7 +177,7 @@ class Executor : public Interpreter {
   std::vector<MergeHandler *> mergeGroups;
   std::deque<vTask *> tasks;
   std::set<uint64_t> visited_addrs;
-  std::vector<std::unique_ptr<MemoryAccessContinuation>> pendingAddresses;
+  std::vector<std::unique_ptr<StateContinuation>> continuations;
   std::vector<std::shared_ptr<native::AddressSpace>> memories;
 
   /// ExecutionStates currently paused from scheduling because they are
@@ -319,9 +285,6 @@ class Executor : public Interpreter {
   // Returns `true` if it updated `mem_cont` in place, and `false` otherwise.
   ExecutionState *updateMemContinuation(MemoryAccessContinuation &mem_cont);
   
-  void resumeMemContinuation(MemoryAccessContinuation &mem_cont );
-
-
   void run(ExecutionState &initialState);
 
   // Given a concrete object in our [klee's] address space, add it to 

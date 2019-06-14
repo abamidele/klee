@@ -8,7 +8,7 @@
 
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-
+#include <memory>
 #include "Executor.h"
 #include "Context.h"
 #include "CoreStats.h"
@@ -24,6 +24,7 @@
 #include "TimingSolver.h"
 #include "UserSearcher.h"
 #include "ExecutorTimerInfo.h"
+#include "Continuation.h"
 
 #include "Native/Arch/TraceManager.h"
 #include "Native/Memory/AddressSpace.h"
@@ -540,7 +541,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   inst_lifter.reset(new remill::InstructionLifter(
       remill::GetTargetArch(), *intrinsics));
   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
-  pendingAddresses.reserve( 8192 );
+  continuations.reserve( 8192 );
 
   return kmodule->module.get();
 }
@@ -1166,7 +1167,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
     ++stats::forks;
 
     falseState = trueState->branch();
-    addedStates.push_back(falseState);
+    //addedStates.push_back(falseState);
+    // perhaps create a branch continuation here and insert it into the queue
 
     if (it != seedMap.end()) {
       std::vector<SeedInfo> seeds = it->second;
@@ -1237,7 +1239,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       terminateStateEarly(*falseState, "max-depth exceeded.");
       return StatePair(0, 0);
     }
-
+    //  auto branch = new BranchContinuation(falseState -> branch());
+    //  continuations.emplace_back(branch);
     return StatePair(trueState, falseState);
   }
 }
@@ -1841,20 +1844,23 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         ref<Expr> cond = eval(ki, 0, state).value;
         cond = optimizer.optimizeExpr(cond, false);
         Executor::StatePair branches = fork(state, cond, false);
-
-        // NOTE: There is a hidden dependency here, markBranchVisited
+       // NOTE: There is a hidden dependency here, markBranchVisited
         // requires that we still be in the context of the branch
         // instruction (it reuses its statistic id). Should be cleaned
         // up with convenient instruction specific data.
-        if (statsTracker && state.stack.back().kf->trackCoverage)
-          statsTracker->markBranchVisited(branches.first, branches.second);
+        //if (statsTracker && state.stack.back().kf->trackCoverage)
+          //statsTracker->markBranchVisited(branches.first, branches.second);
 
         if (branches.first)
           transferToBasicBlock(bi->getSuccessor(0), bi->getParent(),
                                *branches.first);
-        if (branches.second)
+        if (branches.second) {
+          
           transferToBasicBlock(bi->getSuccessor(1), bi->getParent(),
                                *branches.second);
+          auto new_state = new ExecutionState(*branches.second);
+          continuations.emplace_back(new BranchContinuation(new_state));
+        }
       }
       break;
     }
@@ -3336,14 +3342,14 @@ void Executor::run(ExecutionState &initialState) {
   LOG(INFO) << "state size is " << states.size();
 /*
   if (states.empty()){
-      auto mem_cont = pendingAddresses.back().get();
+      auto mem_cont = continuations.back().get();
       LOG(INFO)
           << "Trying to use memory continuation " << std::hex
           << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
           << mem_cont->max_addr << std::dec;
       state = updateMemContinuation(*mem_cont);
       if (!state) {
-        pendingAddresses.pop_back();
+        continuations.pop_back();
         // TODO(pag): Do the states get destroyed?
       } else {
         LOG(INFO) << ""
@@ -3354,19 +3360,21 @@ void Executor::run(ExecutionState &initialState) {
 
   ExecutionState *state;
   bool manual_update = false;
-  while ((!states.empty() && !haltExecution) || !pendingAddresses.empty()) {
+  while ((!states.empty() && !haltExecution) || !continuations.empty()) {
     if (states.empty()){
-      auto mem_cont = pendingAddresses.back().get();
+      auto cont = continuations.back().get();
       manual_update = true;
+      /* 
       LOG(INFO)
         << "Trying to use memory continuation " << std::hex
-        << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
-        << mem_cont->max_addr << std::dec;
-      
-      if (auto curr_state = updateMemContinuation(*mem_cont)){
+        << cont->min_addr << " <= " << cont->next_addr << " <= "
+        << cont->max_addr << std::dec;
+      */
+
+      if (auto curr_state = cont->TryContinue(*this)){
         states.insert(curr_state);
       } else {
-        pendingAddresses.pop_back();
+        continuations.pop_back();
       }
     } else {
       state = *states.begin();
@@ -3392,20 +3400,6 @@ void Executor::run(ExecutionState &initialState) {
 
   doDumpStates();
 }
-
-void Executor::resumeMemContinuation(MemoryAccessContinuation &mem_cont ) {
-  auto state = mem_cont.state;
-  int count = 0;
-  while (count <= 15) {
-    ++count;
-    KInstruction *ki = state->pc;
-    stepInstruction(*state);
-    executeInstruction(*state, ki);
-    processTimers(state, maxInstructionTime);
-    checkMemoryUsage();
-  }
-}
-
 
 std::string Executor::getAddressInfo(ExecutionState &state,
                                      ref<Expr> address) const {

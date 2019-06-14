@@ -840,10 +840,10 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
         auto mem_cont = new MemoryAccessContinuation( \
             &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
             MemoryContinuationKind::kContinueRead ## num_bits); \
-        executor.pendingAddresses.emplace_back(mem_cont); \
+        executor.continuations.emplace_back(mem_cont); \
         LOG(INFO) << "initial min is " << mem_cont->min_addr;\
         if (!executor.updateMemContinuation(*mem_cont)) { \
-          executor.pendingAddresses.pop_back(); \
+          executor.continuations.pop_back(); \
         } \
         LOG(INFO) << "min address is " << mem_cont->min_addr;\
       } \
@@ -879,10 +879,10 @@ HANDLE_READ(64, 8, as_qword)
         auto mem_cont = new MemoryAccessContinuation( \
             &state, addr_val, min_uint, max_uint, min_uint, mem_uint, mem_val, \
             MemoryContinuationKind::kContinueWrite ## num_bits); \
-        executor.pendingAddresses.emplace_back(mem_cont); \
+        executor.continuations.emplace_back(mem_cont); \
         mem_cont->val_to_write = val; \
         if (!executor.updateMemContinuation(*mem_cont)) { \
-          executor.pendingAddresses.pop_back(); \
+          executor.continuations.pop_back(); \
         } \
       } \
     }

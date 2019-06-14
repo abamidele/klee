@@ -89,6 +89,7 @@ add_library(${PROJECT_NAME} STATIC
   lib/Core/StatsTracker.cpp
   lib/Core/TimingSolver.cpp
   lib/Core/UserSearcher.cpp
+  lib/Core/Continuation.cpp
   
   lib/Expr/ArrayCache.cpp
   lib/Expr/ArrayExprOptimizer.cpp
