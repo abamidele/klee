@@ -140,7 +140,7 @@ class Executor : public Interpreter {
     Unhandled
   };
 
- private:
+ public:
   static const char *TerminateReasonNames[];
 
   class TimerInfo;
@@ -188,12 +188,12 @@ class Executor : public Interpreter {
   /// instructions step. 
   /// \invariant \ref addedStates is a subset of \ref states. 
   /// \invariant \ref addedStates and \ref removedStates are disjoint.
-  std::vector<ExecutionState *> addedStates;
+//  std::vector<ExecutionState *> addedStates;
   /// Used to track states that have been removed during the current
   /// instructions step. 
   /// \invariant \ref removedStates is a subset of \ref states. 
   /// \invariant \ref addedStates and \ref removedStates are disjoint.
-  std::vector<ExecutionState *> removedStates;
+  std::unordered_set<ExecutionState *> removedStates;
 
   /// Used to track states that are not terminated, but should not
   /// be scheduled by the searcher.
@@ -282,9 +282,6 @@ class Executor : public Interpreter {
   void printFileLine(ExecutionState &state, KInstruction *ki,
                      llvm::raw_ostream &file);
   
-  // Returns `true` if it updated `mem_cont` in place, and `false` otherwise.
-  ExecutionState *updateMemContinuation(MemoryAccessContinuation &mem_cont);
-  
   void run(ExecutionState &initialState);
 
   // Given a concrete object in our [klee's] address space, add it to 
@@ -297,7 +294,7 @@ class Executor : public Interpreter {
   void initializeGlobals(ExecutionState &state);
 
   void stepInstruction(ExecutionState &state);
-  void updateStates(ExecutionState *current);
+//  void updateStates(ExecutionState *current);
   void transferToBasicBlock(llvm::BasicBlock *dst, llvm::BasicBlock *src,
                             ExecutionState &state);
 
@@ -493,10 +490,10 @@ class Executor : public Interpreter {
   void addTimer(Timer *timer, time::Span rate);
 
   void initTimers();
-  void processTimers(ExecutionState *current, time::Span maxInstTime);
-  void checkMemoryUsage();
+//  void processTimers(ExecutionState *current, time::Span maxInstTime);
+//  void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
-  void doDumpStates();
+//  void doDumpStates();
 
  public:
   Executor(llvm::LLVMContext &ctx, const InterpreterOptions &opts,

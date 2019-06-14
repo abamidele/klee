@@ -19,6 +19,7 @@
 #include <dirent.h>
 #include "Executor.h"
 #include "klee/ExprBuilder.h"
+#include "Continuation.h"
 
 namespace llvm {
 class Function;
@@ -37,27 +38,6 @@ class ExecutionState;
 struct KInstruction;
 template<typename T> class ref;
 
-
-
-union MemoryReadResult {
-  uint64_t as_qword;
-  uint32_t as_dword;
-  uint16_t as_word;
-  uint8_t as_byte;
-  uint8_t as_bytes[8];
-};
-
-static_assert(sizeof(MemoryReadResult) == sizeof(uint64_t),
-              "Invalid packing of `union MemoryReadResult`.");
-
-static_assert(!__builtin_offsetof(MemoryReadResult, as_dword),
-              "Invalid packing of `union MemoryReadResult`.");
-
-static_assert(!__builtin_offsetof(MemoryReadResult, as_word),
-              "Invalid packing of `union MemoryReadResult`.");
-
-static_assert(!__builtin_offsetof(MemoryReadResult, as_byte),
-              "Invalid packing of `union MemoryReadResult`.");
 
 class SpecialFunctionHandler {
  private:

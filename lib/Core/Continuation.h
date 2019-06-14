@@ -19,57 +19,96 @@
 #include "Executor.h"
 
 namespace klee {
-  class ExecutionState;
-  enum class MemoryContinuationKind {
-	kContinueRead8,
-	kContinueRead16,
-	kContinueRead32,
-	kContinueRead64,
+class ExecutionState;
+enum class MemoryContinuationKind {
+  kContinueRead8,
+  kContinueRead16,
+  kContinueRead32,
+  kContinueRead64,
 
-	kContinueWrite8,
-	kContinueWrite16,
-	kContinueWrite32,
-	kContinueWrite64
-  };
+  kContinueWrite8,
+  kContinueWrite16,
+  kContinueWrite32,
+  kContinueWrite64
+};
+
+class StateContinuation {
+ public:
+  virtual ~StateContinuation(void) = default;
+  virtual ExecutionState *YieldNextState(Executor &exe) = 0;
 
 
-  class StateContinuation {
-   public:
-	 virtual ~StateContinuation(void) = default;
-	 virtual ExecutionState *TryContinue(Executor &exe) = 0;
-  };
+  std::unique_ptr<ExecutionState> state;
 
-  class MemoryAccessContinuation : public StateContinuation {
-   public:
-    ExecutionState *state;
-	const ref<Expr> addr;
-	uint64_t min_addr;
-	uint64_t max_addr;
-	uint64_t next_addr;
-	const MemoryContinuationKind kind;
+  inline explicit StateContinuation(ExecutionState *state_)
+      : state(state_) {}
 
-	const uint64_t memory_index;
-	const ref<Expr> memory;
-    ref<Expr> val_to_write;
+ private:
+  StateContinuation(void) = delete;
+};
 
-	virtual ~MemoryAccessContinuation(void) = default;
+union MemoryReadResult {
+  uint64_t as_qword;
+  uint32_t as_dword;
+  uint16_t as_word;
+  uint8_t as_byte;
+  uint8_t as_bytes[8];
+};
 
-	MemoryAccessContinuation(ExecutionState *state, ref<Expr> addr,
-							 uint64_t min_val, uint64_t max_val,
-							 uint64_t next_val, uint64_t memory_index_,
-							 ref<Expr> memory_, MemoryContinuationKind kind_);
-    
-    ExecutionState *TryContinue(Executor &exe) override;
-  };
+static_assert(sizeof(MemoryReadResult) == sizeof(uint64_t),
+              "Invalid packing of `union MemoryReadResult`.");
 
-  class BranchContinuation : public StateContinuation {
-    public:
-	 ExecutionState *state;
-	 
-     virtual ~BranchContinuation(void) = default;
-     BranchContinuation(ExecutionState *state);
-     ExecutionState *TryContinue(Executor &exe) override;
-  };
+static_assert(!__builtin_offsetof(MemoryReadResult, as_dword),
+              "Invalid packing of `union MemoryReadResult`.");
+
+static_assert(!__builtin_offsetof(MemoryReadResult, as_word),
+              "Invalid packing of `union MemoryReadResult`.");
+
+static_assert(!__builtin_offsetof(MemoryReadResult, as_byte),
+              "Invalid packing of `union MemoryReadResult`.");
+
+
+class MemoryAccessContinuation : public StateContinuation {
+ public:
+  const ref<Expr> addr;
+  uint64_t min_addr;
+  uint64_t max_addr;
+  uint64_t next_addr;
+  const MemoryContinuationKind kind;
+
+  const uint64_t memory_index;
+  const ref<Expr> memory;
+  ref<Expr> val_to_write;
+
+  virtual ~MemoryAccessContinuation(void) = default;
+
+  MemoryAccessContinuation(ExecutionState *state, ref<Expr> addr,
+                           uint64_t min_val, uint64_t max_val,
+                           uint64_t next_val, uint64_t memory_index_,
+                           ref<Expr> memory_, MemoryContinuationKind kind_);
+
+  ExecutionState *YieldNextState(Executor &exe) override;
+};
+
+class NullContinuation : public StateContinuation {
+ public:
+  using StateContinuation::StateContinuation;
+
+  virtual ~NullContinuation(void) = default;
+  ExecutionState *YieldNextState(Executor &exe) override;
+};
+
+class BranchContinuation : public StateContinuation {
+ public:
+  virtual ~BranchContinuation(void) = default;
+  BranchContinuation(ExecutionState *disabled_state_,
+                     std::vector<ExecutionState *> &states_);
+  ExecutionState *YieldNextState(Executor &exe) override;
+
+ private:
+  ExecutionState * const disabled_state;
+  std::vector<ExecutionState *> states;
+};
 
 }  //  klee namespace
 #endif 

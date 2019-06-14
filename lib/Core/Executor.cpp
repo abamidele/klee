@@ -935,24 +935,22 @@ void Executor::branch(ExecutionState &state,
   unsigned N = conditions.size();
   assert(N);
 
+  // If there is a limit on forking, and we've exceeded our forking budget,
+  // then don't fork.
   if (MaxForks != ~0u && stats::forks >= MaxForks) {
-    unsigned next = theRNG.getInt32() % N;
-    for (unsigned i = 0; i < N; ++i) {
-      if (i == next) {
-        result.push_back(&state);
-      } else {
-        result.push_back(NULL);
-      }
-    }
+    result.clear();
+    result.resize(N);
+    result[theRNG.getInt32() % N] = &state;
+
   } else {
     stats::forks += N - 1;
+    result.push_back(&state);  // In place of current state.
 
     // XXX do proper balance or keep random?
-    result.push_back(&state);
     for (unsigned i = 1; i < N; ++i) {
       ExecutionState *es = result[theRNG.getInt32() % i];
       ExecutionState *ns = es->branch();
-      addedStates.push_back(ns);
+//      addedStates.push_back(ns);
       result.push_back(ns);
       es->ptreeNode->data = 0;
       std::pair<PTree::Node*, PTree::Node*> res = processTree->split(
@@ -962,55 +960,11 @@ void Executor::branch(ExecutionState &state,
     }
   }
 
-  // If necessary redistribute seeds to match conditions, killing
-  // states if necessary due to OnlyReplaySeeds (inefficient but
-  // simple).
-
-  std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it = seedMap.find(
-      &state);
-  if (it != seedMap.end()) {
-    std::vector<SeedInfo> seeds = it->second;
-    seedMap.erase(it);
-
-    // Assume each seed only satisfies one condition (necessarily true
-    // when conditions are mutually exclusive and their conjunction is
-    // a tautology).
-    for (std::vector<SeedInfo>::iterator siit = seeds.begin(), siie =
-        seeds.end(); siit != siie; ++siit) {
-      unsigned i;
-      for (i = 0; i < N; ++i) {
-        ref<ConstantExpr> res;
-        bool success = solver->getValue(
-            state, siit->assignment.evaluate(conditions[i]), res);
-        assert(success && "FIXME: Unhandled solver failure");
-        (void) success;
-        if (res->isTrue())
-          break;
-      }
-
-      // If we didn't find a satisfying condition randomly pick one
-      // (the seed will be patched).
-      if (i == N)
-        i = theRNG.getInt32() % N;
-
-      // Extra check in case we're replaying seeds with a max-fork
-      if (result[i])
-        seedMap[result[i]].push_back(*siit);
-    }
-
-    if (OnlyReplaySeeds) {
-      for (unsigned i = 0; i < N; ++i) {
-        if (result[i] && !seedMap.count(result[i])) {
-          terminateState(*result[i]);
-          result[i] = NULL;
-        }
-      }
+  for (unsigned i = 0; i < N; ++i) {
+    if (result[i]) {
+      addConstraint(*result[i], conditions[i]);
     }
   }
-
-  for (unsigned i = 0; i < N; ++i)
-    if (result[i])
-      addConstraint(*result[i], conditions[i]);
 }
 
 Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
@@ -1360,45 +1314,12 @@ ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, ref<Expr> e,
 void Executor::executeGetValue(ExecutionState &state, ref<Expr> e,
                                KInstruction *target) {
   e = state.constraints.simplifyExpr(e);
-  std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it = seedMap.find(
-      &state);
-  if (it == seedMap.end() || isa<ConstantExpr>(e)) {
-    ref<ConstantExpr> value;
-    e = optimizer.optimizeExpr(e, true);
-    bool success = solver->getValue(state, e, value);
-    assert(success && "FIXME: Unhandled solver failure");
-    (void) success;
-    bindLocal(target, state, value);
-  } else {
-    std::set<ref<Expr> > values;
-    for (std::vector<SeedInfo>::iterator siit = it->second.begin(), siie = it
-        ->second.end(); siit != siie; ++siit) {
-      ref<Expr> cond = siit->assignment.evaluate(e);
-      cond = optimizer.optimizeExpr(cond, true);
-      ref<ConstantExpr> value;
-      bool success = solver->getValue(state, cond, value);
-      assert(success && "FIXME: Unhandled solver failure");
-      (void) success;
-      values.insert(value);
-    }
-
-    std::vector<ref<Expr> > conditions;
-    for (const auto &val : values) {
-      conditions.push_back(EqExpr::create(e, val));
-    }
-
-    std::vector<ExecutionState*> branches;
-    branch(state, conditions, branches);
-
-    std::vector<ExecutionState*>::iterator bit = branches.begin();
-    for (const auto &val : values) {
-      ExecutionState *es = *bit;
-      if (es) {
-        bindLocal(target, *es, val);
-      }
-      ++bit;
-    }
-  }
+  ref<ConstantExpr> value;
+  e = optimizer.optimizeExpr(e, true);
+  bool success = solver->getValue(state, e, value);
+  assert(success && "FIXME: Unhandled solver failure");
+  (void) success;
+  bindLocal(target, state, value);
 }
 
 void Executor::printDebugInstructions(ExecutionState &state) {
@@ -1851,15 +1772,20 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         //if (statsTracker && state.stack.back().kf->trackCoverage)
           //statsTracker->markBranchVisited(branches.first, branches.second);
 
-        if (branches.first)
+        if (branches.first) {
           transferToBasicBlock(bi->getSuccessor(0), bi->getParent(),
                                *branches.first);
+        }
+
         if (branches.second) {
-          
           transferToBasicBlock(bi->getSuccessor(1), bi->getParent(),
                                *branches.second);
+        }
+
+        // This is a symbolic branch and both sides can be explored.
+        if (branches.first && branches.second) {
           auto new_state = new ExecutionState(*branches.second);
-          continuations.emplace_back(new BranchContinuation(new_state));
+          continuations.emplace_back(new NullContinuation(new_state));
         }
       }
       break;
@@ -1941,6 +1867,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           transferToBasicBlock(targets[k], bi->getParent(), *branches[k]);
         }
       }
+
+      continuations.emplace_back(new BranchContinuation(state, branches));
 
       break;
     }
@@ -2925,34 +2853,34 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       break;
   }
 }
-
-void Executor::updateStates(ExecutionState *current) {
-  if (searcher) {
-    searcher->update(current, addedStates, removedStates);
-  }
-
-  states.insert(addedStates.begin(), addedStates.end());
-  addedStates.clear();
-
-  for (auto es : removedStates) {
-    auto it2 = states.find(es);
-    assert(it2 != states.end());
-    states.erase(it2);
-    auto it3 = seedMap.find(es);
-    if (it3 != seedMap.end())
-      seedMap.erase(it3);
-    processTree->remove(es->ptreeNode);
-    delete es;
-  }
-
-  removedStates.clear();
-
-  if (searcher) {
-    searcher->update(nullptr, continuedStates, pausedStates);
-    pausedStates.clear();
-    continuedStates.clear();
-  }
-}
+//
+//void Executor::updateStates(ExecutionState *current) {
+//  if (searcher) {
+//    searcher->update(current, addedStates, removedStates);
+//  }
+//
+//  states.insert(addedStates.begin(), addedStates.end());
+//  addedStates.clear();
+//
+//  for (auto es : removedStates) {
+//    auto it2 = states.find(es);
+//    assert(it2 != states.end());
+//    states.erase(it2);
+//    auto it3 = seedMap.find(es);
+//    if (it3 != seedMap.end())
+//      seedMap.erase(it3);
+//    processTree->remove(es->ptreeNode);
+//    delete es;
+//  }
+//
+//  removedStates.clear();
+//
+//  if (searcher) {
+//    searcher->update(nullptr, continuedStates, pausedStates);
+//    pausedStates.clear();
+//    continuedStates.clear();
+//  }
+//}
 
 template<typename TypeIt>
 void Executor::computeOffsets(KGEPInstruction *kgepi, TypeIt ib, TypeIt ie) {
@@ -3053,352 +2981,88 @@ void Executor::bindModuleConstants(llvm::Module *mod) {
   CHECK_EQ(new_num_constants, kmodule->constants.size());
   kmodule->numConstants = new_num_constants;
 }
-
-void Executor::checkMemoryUsage() {
-  if (!MaxMemory)
-    return;
-  if ((stats::instructions & 0xFFFF) == 0) {
-    // We need to avoid calling GetTotalMallocUsage() often because it
-    // is O(elts on freelist). This is really bad since we start
-    // to pummel the freelist once we hit the memory cap.
-    unsigned mbs = (util::GetTotalMallocUsage() >> 20)
-        + (memory->getUsedDeterministicSize() >> 20);
-
-    if (mbs > MaxMemory) {
-      if (mbs > MaxMemory + 100) {
-        // just guess at how many to kill
-        unsigned numStates = states.size();
-        unsigned toKill = std::max(1U, numStates - numStates * MaxMemory / mbs);
-        klee_warning("killing %d states (over memory cap)", toKill);
-        std::vector<ExecutionState *> arr(states.begin(), states.end());
-        for (unsigned i = 0, N = arr.size(); N && i < toKill; ++i, --N) {
-          unsigned idx = rand() % N;
-          // Make two pulls to try and not hit a state that
-          // covered new code.
-          if (arr[idx]->coveredNew)
-            idx = rand() % N;
-
-          std::swap(arr[idx], arr[N - 1]);
-          terminateStateEarly(*arr[N - 1], "Memory limit exceeded.");
-        }
-      }
-      atMemoryLimit = true;
-    } else {
-      atMemoryLimit = false;
-    }
-  }
-}
-
-void Executor::doDumpStates() {
-  if (!DumpStatesOnHalt || states.empty())
-    return;
-
-  klee_message("halting execution, dumping remaining states");
-  for (const auto &state : states)
-    terminateStateEarly(*state, "Execution halting.");
-  updateStates(nullptr);
-}
-
-
-ExecutionState *Executor::updateMemContinuation(MemoryAccessContinuation &mem_cont) {
-  auto min_addr = mem_cont.min_addr;
-  const auto max_addr = mem_cont.max_addr;
-  const auto curr_state = mem_cont.state;
-  auto curr_addr = mem_cont.next_addr;
-  const auto curr_mem = Memory(*curr_state, mem_cont.memory_index);
-  auto found = false;
-  auto has_error = false;
-
-  MemoryReadResult val;
-  ref<Expr> constr;
-  uint64_t next_addr = curr_addr;
-  while (min_addr <= next_addr && next_addr <= max_addr) {
-    curr_addr = next_addr;
-    val = {};
-    auto can_read = false;
-
-    switch (mem_cont.kind) {
-      case MemoryContinuationKind::kContinueRead8:
-      case MemoryContinuationKind::kContinueWrite8:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_byte));
-        break;
-      case MemoryContinuationKind::kContinueRead16:
-      case MemoryContinuationKind::kContinueWrite16:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_word));
-        break;
-      case MemoryContinuationKind::kContinueRead32:
-      case MemoryContinuationKind::kContinueWrite32:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_dword));
-        break;
-      case MemoryContinuationKind::kContinueRead64:
-      case MemoryContinuationKind::kContinueWrite64:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_qword));
-        break;
-    }
-
-    constr = EqExpr::create(mem_cont.addr, ConstantExpr::create(curr_addr, 64));
-    bool res = false;
-    (void) solver->mayBeTrue(*mem_cont.state, constr, res);
-    // TODO(sai) terminate state on false
-
-    // Not readable.
-    if (!can_read) {
-      min_addr = curr_addr;
-
-      // Not readable, but satisfiable; this is a memory access violation.
-      if (res) {
-        found = true;
-        has_error = true;
-        break;
-
-      // Not readable, not satisfiable, so round up to the next page boundary
-      // and keep looking.
-      } else {
-        next_addr = (curr_addr + 4096ULL) & ~4095ULL;
-        continue;
-      }
-
-    // Readable but not satisfiable.
-    } else if (!res) {
-      min_addr = curr_addr;
-      next_addr = curr_addr + 1;
-      continue;
-
-    // Readable and satisfiable.
-    } else {
-      found = true;
-      break;
-    }
-  }
-
-  // There are no more addresses to find.
-  if (!found) {
-    terminateState(*curr_state);
-    return nullptr;
-  }
-
-  // Fork/branch the current state, without changing the depth or weight.
-  mem_cont.state = new ExecutionState(*curr_state);
-  mem_cont.state->coveredNew = false;
-  mem_cont.state->coveredLines.clear();
-  mem_cont.next_addr = curr_addr + 1;
-
-  // If we found an error, report it immediately by terminating the state.
-  // This happens *after* forking the current state, so that the executor
-  // can go visit the next valid values for the addresss.
-  if (has_error) {
-    std::stringstream ss;
-    ss << "Failed 1-byte read from address 0x" << std::hex << curr_addr;
-    terminateStateOnError(*curr_state, ss.str(), Executor::ReportError);
-    return curr_state;
-  }
-
-  // Add the constraint to our current state that the address must equal
-  // `curr_addr`.
-  addConstraint(*curr_state, constr);
-
-  switch (mem_cont.kind) {
-    case MemoryContinuationKind::kContinueRead8:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_read_memory(
-              curr_mem, curr_addr, 1, val));
-      break;
-    case MemoryContinuationKind::kContinueRead16:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_read_memory(
-              curr_mem, curr_addr, 2, val));
-      break;
-    case MemoryContinuationKind::kContinueRead32:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_read_memory(
-              curr_mem, curr_addr, 4, val));
-      break;
-    case MemoryContinuationKind::kContinueRead64:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_read_memory(
-              curr_mem, curr_addr, 8, val));
-      break;
-
-    case MemoryContinuationKind::kContinueWrite8:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_write_8(*mem_cont.state, curr_addr,
-                                                  mem_cont.val_to_write,
-                                                  curr_mem, mem_cont.memory));
-      break;
-    case MemoryContinuationKind::kContinueWrite16:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_write_16(*mem_cont.state, curr_addr,
-                                                   mem_cont.val_to_write,
-                                                   curr_mem, mem_cont.memory));
-      break;
-    case MemoryContinuationKind::kContinueWrite32:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_write_32(*mem_cont.state, curr_addr,
-                                                   mem_cont.val_to_write,
-                                                   curr_mem, mem_cont.memory));
-      break;
-    case MemoryContinuationKind::kContinueWrite64:
-      bindLocal(
-          curr_state->prevPC, *curr_state,
-          specialFunctionHandler->runtime_write_64(*mem_cont.state, curr_addr,
-                                                   mem_cont.val_to_write,
-                                                   curr_mem, mem_cont.memory));
-      break;
-  }
-
-  return curr_state;
-}
-
+//
+//void Executor::checkMemoryUsage() {
+//  if (!MaxMemory)
+//    return;
+//  if ((stats::instructions & 0xFFFF) == 0) {
+//    // We need to avoid calling GetTotalMallocUsage() often because it
+//    // is O(elts on freelist). This is really bad since we start
+//    // to pummel the freelist once we hit the memory cap.
+//    unsigned mbs = (util::GetTotalMallocUsage() >> 20)
+//        + (memory->getUsedDeterministicSize() >> 20);
+//
+//    if (mbs > MaxMemory) {
+//      if (mbs > MaxMemory + 100) {
+//        // just guess at how many to kill
+//        unsigned numStates = states.size();
+//        unsigned toKill = std::max(1U, numStates - numStates * MaxMemory / mbs);
+//        klee_warning("killing %d states (over memory cap)", toKill);
+//        std::vector<ExecutionState *> arr(states.begin(), states.end());
+//        for (unsigned i = 0, N = arr.size(); N && i < toKill; ++i, --N) {
+//          unsigned idx = rand() % N;
+//          // Make two pulls to try and not hit a state that
+//          // covered new code.
+//          if (arr[idx]->coveredNew)
+//            idx = rand() % N;
+//
+//          std::swap(arr[idx], arr[N - 1]);
+//          terminateStateEarly(*arr[N - 1], "Memory limit exceeded.");
+//        }
+//      }
+//      atMemoryLimit = true;
+//    } else {
+//      atMemoryLimit = false;
+//    }
+//  }
+//}
+//
+//void Executor::doDumpStates() {
+//  if (!DumpStatesOnHalt || states.empty())
+//    return;
+//
+//  klee_message("halting execution, dumping remaining states");
+//  for (const auto &state : states)
+//    terminateStateEarly(*state, "Execution halting.");
+//  updateStates(nullptr);
+//}
 
 void Executor::run(ExecutionState &initialState) {
   bindModuleConstants(kmodule->module.get());
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.
-  initTimers();
+//  initTimers();
 
-  states.insert(&initialState);
+  continuations.emplace_back(new NullContinuation(&initialState));
 
-  if (usingSeeds) {
-    std::vector<SeedInfo> &v = seedMap[&initialState];
+  while (!haltExecution && !continuations.empty()) {
+    std::unique_ptr<StateContinuation> cont(std::move(continuations.back()));
+    continuations.pop_back();
 
-    for (std::vector<KTest*>::const_iterator it = usingSeeds->begin(), ie =
-        usingSeeds->end(); it != ie; ++it)
-      v.push_back(SeedInfo(*it));
-
-    int lastNumSeeds = usingSeeds->size() + 10;
-    time::Point lastTime, startTime = lastTime = time::getWallTime();
-    ExecutionState *lastState = 0;
-    while (!seedMap.empty()) {
-      if (haltExecution) {
-        doDumpStates();
-        return;
-      }
-
-      std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it = seedMap
-          .upper_bound(lastState);
-      if (it == seedMap.end())
-        it = seedMap.begin();
-      lastState = it->first;
-      ExecutionState &state = *lastState;
-      KInstruction *ki = state.pc;
-      stepInstruction(state);
-
-      executeInstruction(state, ki);
-
-      unsigned numSeeds = it->second.size();
-      processTimers(&state, maxInstructionTime * numSeeds);
-      updateStates(&state);
-
-      if ((stats::instructions % 1000) == 0) {
-        int numSeeds = 0, numStates = 0;
-        for (std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it =
-            seedMap.begin(), ie = seedMap.end(); it != ie; ++it) {
-          numSeeds += it->second.size();
-          numStates++;
-        }
-        const auto time = time::getWallTime();
-        const time::Span seedTime(SeedTime);
-        if (seedTime && time > startTime + seedTime) {
-          klee_warning("seed time expired, %d seeds remain over %d states",
-                       numSeeds, numStates);
-          break;
-        } else if (numSeeds <= lastNumSeeds - 10
-            || time - lastTime >= time::seconds(10)) {
-          lastTime = time;
-          lastNumSeeds = numSeeds;
-          klee_message("%d seeds remaining over: %d states", numSeeds,
-                       numStates);
-        }
-      }
+    std::unique_ptr<ExecutionState> state(cont->YieldNextState(*this));
+    if (!state) {
+      continue;
     }
 
-    klee_message("seeding done (%d states remain)", (int) states.size());
-
-    // XXX total hack, just because I like non uniform better but want
-    // seed results to be equally weighted.
-    for (auto state : states) {
-      state->weight = 1.;
-    }
-
-    if (OnlySeed) {
-      doDumpStates();
-      return;
-    }
-  }
-
-  searcher = constructUserSearcher(*this);
-
-  std::vector<ExecutionState *> newStates(states.begin(), states.end());
-  searcher->update(0, newStates, std::vector<ExecutionState *>());
-
-  LOG(INFO) << "state size is " << states.size();
-/*
-  if (states.empty()){
-      auto mem_cont = continuations.back().get();
-      LOG(INFO)
-          << "Trying to use memory continuation " << std::hex
-          << mem_cont->min_addr << " <= " << mem_cont->next_addr << " <= "
-          << mem_cont->max_addr << std::dec;
-      state = updateMemContinuation(*mem_cont);
-      if (!state) {
-        continuations.pop_back();
-        // TODO(pag): Do the states get destroyed?
-      } else {
-        LOG(INFO) << ""
-        states.insert(mem_cont->state);
-      }
-    }
-*/
-
-  ExecutionState *state;
-  bool manual_update = false;
-  while ((!states.empty() && !haltExecution) || !continuations.empty()) {
-    if (states.empty()){
-      auto cont = continuations.back().get();
-      manual_update = true;
-      /* 
-      LOG(INFO)
-        << "Trying to use memory continuation " << std::hex
-        << cont->min_addr << " <= " << cont->next_addr << " <= "
-        << cont->max_addr << std::dec;
-      */
-
-      if (auto curr_state = cont->TryContinue(*this)){
-        states.insert(curr_state);
-      } else {
-        continuations.pop_back();
-      }
-    } else {
-      state = *states.begin();
-      KInstruction *ki = state->pc;
+    auto is_done = state->pc != state->prevPC;
+    auto should_remove = removedStates.count(state.get());
+    while (!is_done && !should_remove) {
+      auto ki = state->pc;
       stepInstruction(*state);
       executeInstruction(*state, ki);
-      processTimers(state, maxInstructionTime);
-      checkMemoryUsage();
-      if (!manual_update) {
-        updateStates(state);
-      } else {
-        if (state -> pc == state -> prevPC ){
-          states.erase(state);
-          delete state;
-        }
-      }
+      should_remove = removedStates.count(state.get());
+      is_done = state->pc != state->prevPC;
     }
+
+    continuations.emplace_back(std::move(cont));
+    removedStates.clear();
   }
-   
 
-  delete searcher;
-  searcher = 0;
-
-  doDumpStates();
+  if (searcher) {
+    delete searcher;
+    searcher = 0;
+  }
 }
 
 std::string Executor::getAddressInfo(ExecutionState &state,
@@ -3474,29 +3138,29 @@ void Executor::continueState(ExecutionState &state) {
 }
 
 void Executor::terminateState(ExecutionState &state) {
-  if (replayKTest && replayPosition != replayKTest->numObjects) {
-    klee_warning_once(replayKTest,
-                      "replay did not consume all objects in test input.");
-  }
-
-  interpreterHandler->incPathsExplored();
-
-  std::vector<ExecutionState *>::iterator it = std::find(addedStates.begin(),
-                                                         addedStates.end(),
-                                                         &state);
-  if (it == addedStates.end()) {
-    state.pc = state.prevPC;
-    removedStates.push_back(&state);
-  } else {
-    // never reached searcher, just delete immediately
-    std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it3 = seedMap
-        .find(&state);
-    if (it3 != seedMap.end())
-      seedMap.erase(it3);
-    addedStates.erase(it);
-    processTree->remove(state.ptreeNode);
-    delete &state;
-  }
+//  if (replayKTest && replayPosition != replayKTest->numObjects) {
+//    klee_warning_once(replayKTest,
+//                      "replay did not consume all objects in test input.");
+//  }
+//
+//  interpreterHandler->incPathsExplored();
+//
+//  std::vector<ExecutionState *>::iterator it = std::find(addedStates.begin(),
+//                                                         addedStates.end(),
+//                                                         &state);
+//  if (it == addedStates.end()) {
+//    state.pc = state.prevPC;
+  removedStates.insert(&state);
+//  } else {
+//    // never reached searcher, just delete immediately
+//    std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it3 = seedMap
+//        .find(&state);
+//    if (it3 != seedMap.end())
+//      seedMap.erase(it3);
+//    addedStates.erase(it);
+//    processTree->remove(state.ptreeNode);
+//    delete &state;
+//  }
 }
 
 void Executor::terminateStateEarly(ExecutionState &state,
