@@ -260,12 +260,12 @@ ref<Expr> SpecialFunctionHandler::runtime_write_16(ExecutionState &state,
                                                    ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  std::string out;
-  llvm::raw_string_ostream os(out);
-  val->print(os);
-  os.flush();
-  LOG(ERROR)
-      << "Writing 2 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+  //std::string out;
+  //llvm::raw_string_ostream os(out);
+  //val->print(os);
+  //os.flush();
+  //LOG(ERROR)
+  //    << "Writing 2 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
 
   if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
     auto v = const_val->getZExtValue(16);
@@ -287,12 +287,12 @@ ref<Expr> SpecialFunctionHandler::runtime_write_32(ExecutionState &state,
                                                    ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  std::string out;
-  llvm::raw_string_ostream os(out);
-  val->print(os);
-  os.flush();
-  LOG(ERROR)
-      << "Writing 4 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+  //std::string out;
+  //llvm::raw_string_ostream os(out);
+  //val->print(os);
+  //os.flush();
+  //LOG(ERROR)
+  //    << "Writing 4 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
 
   if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
     auto v = const_val->getZExtValue(32);
@@ -322,12 +322,12 @@ ref<Expr> SpecialFunctionHandler::runtime_write_64(ExecutionState &state,
                                                    ref<Expr> val,
                                                    native::AddressSpace *mem,
                                                    ref<Expr> mem_ptr) {
-  std::string out;
-  llvm::raw_string_ostream os(out);
-  val->print(os);
-  os.flush();
-  LOG(ERROR)
-      << "Writing 8 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
+  //std::string out;
+  //llvm::raw_string_ostream os(out);
+  //val->print(os);
+  //os.flush();
+  //LOG(ERROR)
+  //    << "Writing 8 bytes to addr=" << std::hex << addr_uint << " val=" << out << std::dec;
 
   if (auto const_val = llvm::dyn_cast<ConstantExpr>(val)) {
     auto v = const_val->getZExtValue();
@@ -372,13 +372,14 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     native::AddressSpace *mem, uint64_t addr, uint64_t num_bytes,
     const MemoryReadResult &val) {
 
+  /*
   LOG(INFO) << "Reading addr=" << std::hex << addr
             << " num_bytes=" << std::dec << num_bytes << " bytes=[" << std::hex
             << unsigned(val.as_bytes[0]) << ", " << unsigned(val.as_bytes[1]) << ", "
             << unsigned(val.as_bytes[2]) << ", " << unsigned(val.as_bytes[3]) << ", "
             << unsigned(val.as_bytes[4]) << ", " << unsigned(val.as_bytes[5]) << ", "
             << unsigned(val.as_bytes[6]) << ", " << unsigned(val.as_bytes[7]) << "]";
-
+  */
   bool any_symbolic = false;
   bool all_symbolic = true;
 
@@ -407,7 +408,7 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
 
   if (num_bytes == 1) {
     //LOG(INFO) << "Read symbolic byte from " << std::hex << addr << std::dec;
-    symbolic_bytes[num_bytes - 1]->dump();
+    //symbolic_bytes[num_bytes - 1]->dump();
     return symbolic_bytes[num_bytes - 1];
   }
 
@@ -420,9 +421,7 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
     }
   }
 
-  auto res = ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
-  res -> dump();
-  return res;
+  return ConcatExpr::createN(static_cast<unsigned>(num_bytes), symbolic_bytes);
 }
 
 void SpecialFunctionHandler::handle_klee_init_remill_mem(

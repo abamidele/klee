@@ -468,7 +468,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
 
-/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -488,6 +487,39 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+
+/*
+int main(int argc, char *argv[3], char *envp[]) {
+  if (argc != 3) {
+    return EXIT_FAILURE;
+  } else if (strcmp("klee-exec", argv[0])) {
+    return EXIT_FAILURE;
+  }
+  Memory *memory = nullptr;
+  memcpy(&memory, argv[2], sizeof(memory));
+  __kleemill_init(memory);
+  State *state = reinterpret_cast<State *>(argv[1]);
+  uint8_t sym_byte1; // = 0xaabbccdd;
+  uint8_t sym_byte2 = 0x69; // = 0xaabbccdd;
+  
+  klee_make_symbolic(&sym_byte1, sizeof sym_byte1, "sb1");
+  klee_assume(sym_byte1 > 0x80);
+  uint64_t a;
+  klee_make_symbolic(&a, sizeof a, "a");
+  klee_assume(a <= 1);
+ 
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + a, sym_byte1);
+  __remill_write_memory_8(memory, state->gpr.rsp.aword + 1 + a, sym_byte2);
+  uint16_t res = __remill_read_memory_16(memory, state->gpr.rsp.aword + a);
+  if (res > 0x25) {
+    puts("YOu lose : /");
+  } else {
+    printf("You Win!!\n");
+  }
+  printf("0x%lx\n", static_cast<uint16_t>(klee_get_value_i32(res)));
+  __kleemill_fini();
+  return EXIT_SUCCESS;
+}
 */
 /*
 int main(int argc, char *argv[3], char *envp[]) {
@@ -522,39 +554,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 */
-
-
-int main(int argc, char *argv[3], char *envp[]) {
-  if (argc != 3) {
-    return EXIT_FAILURE;
-  } else if (strcmp("klee-exec", argv[0])) {
-    return EXIT_FAILURE;
-  }
-  Memory *memory = nullptr;
-  memcpy(&memory, argv[2], sizeof(memory));
-  __kleemill_init(memory);
-  State *state = reinterpret_cast<State *>(argv[1]);
-  uint8_t sym_byte1; // = 0xaabbccdd;
-  uint8_t sym_byte2 = 0x69; // = 0xaabbccdd;
-  
-  klee_make_symbolic(&sym_byte1, sizeof sym_byte1, "sb1");
-  klee_assume(sym_byte1 > 0x80);
-  uint64_t a;
-  klee_make_symbolic(&a, sizeof a, "a");
-  klee_assume(a <= 1);
- 
-  __remill_write_memory_8(memory, state->gpr.rsp.aword + a, sym_byte1);
-  __remill_write_memory_8(memory, state->gpr.rsp.aword + 1 + a, sym_byte2);
-  uint16_t res = __remill_read_memory_16(memory, state->gpr.rsp.aword + a);
-  if (res > 0x25) {
-    puts("YOu lose : /");
-  } else {
-    printf("You Win!!\n");
-  }
-  printf("0x%lx\n", static_cast<uint16_t>(klee_get_value_i32(res)));
-  __kleemill_fini();
-  return EXIT_SUCCESS;
-}
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
