@@ -3054,7 +3054,7 @@ void Executor::run(ExecutionState &initialState) {
       stepInstruction(*state);
       executeInstruction(*state, ki);
       should_remove = removedStates.count(state.get());
-      is_done = state->pc != state->prevPC;
+      is_done = state->pc == state->prevPC;
     }
 
     continuations.emplace_back(std::move(cont));
