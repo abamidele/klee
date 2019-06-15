@@ -41,9 +41,8 @@ MemoryAccessContinuation::MemoryAccessContinuation(ExecutionState *state_,
 }
 
 ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
-  const auto curr_state = state.release();
   auto curr_addr = next_addr;
-  const auto curr_mem = exe.Memory(*curr_state, memory_index);
+  const auto curr_mem = exe.Memory(*state, memory_index);
   auto found = false;
   auto has_error = false;
 
@@ -76,7 +75,7 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
 
     constr = EqExpr::create(addr, ConstantExpr::create(curr_addr, 64));
     bool res = false;
-    (void) exe.solver->mayBeTrue(*curr_state, constr, res);
+    (void) exe.solver->mayBeTrue(*state, constr, res);
     // TODO(sai) terminate state on false
 
     // Not readable.
@@ -111,9 +110,10 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
 
   // There are no more addresses to find.
   if (!found) {
-    exe.terminateState(*curr_state);
-    return curr_state;
+    return nullptr;
   }
+
+  const auto curr_state = state.release();
 
   // Fork/branch the current state, without changing the depth or weight.
   state.reset(new ExecutionState(*curr_state));
