@@ -510,7 +510,7 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   __remill_write_memory_32(memory, state->gpr.rsp.aword, sym_u32);
   //__remill_write_memory_8(memory, state->gpr.rsp.aword + 1 + a, sym_byte2);
-  uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + sym_u64);
+  uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword);
 
   if (res > 0x25) {
     puts("You lose: ");

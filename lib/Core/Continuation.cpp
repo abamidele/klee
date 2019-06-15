@@ -15,6 +15,9 @@
  */
 
 #include "Continuation.h"
+
+#include <glog/logging.h>
+
 #include "SpecialFunctionHandler.h"
 #include "TimingSolver.h"
 
@@ -115,6 +118,9 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
 
   const auto curr_state = state.release();
 
+  LOG(INFO)
+      << "Found address 0x" << std::hex << curr_addr << std::dec;
+
   // Fork/branch the current state, without changing the depth or weight.
   state.reset(new ExecutionState(*curr_state));
   state->coveredNew = false;
@@ -196,12 +202,6 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
 
 ExecutionState *NullContinuation::YieldNextState(Executor &exe) {
   return state.release();
-}
-
-static ExecutionState *PopBack(std::vector<ExecutionState *> &states) {
-  auto ret = states.back();
-  states.pop_back();
-  return ret;
 }
 
 BranchContinuation::BranchContinuation(ExecutionState *disabled_state_,
