@@ -44,46 +44,42 @@ MemoryAccessContinuation::MemoryAccessContinuation(ExecutionState *state_,
 }
 
 ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
-  auto curr_addr = next_addr;
   const auto curr_mem = exe.Memory(*state, memory_index);
   auto found = false;
   auto has_error = false;
 
   MemoryReadResult val;
   ref<Expr> constr;
-  uint64_t next_addr = curr_addr;
   while (min_addr <= next_addr && next_addr <= max_addr) {
-    curr_addr = next_addr;
     val = {};
     auto can_read = false;
 
     switch (kind) {
       case MemoryContinuationKind::kContinueRead8:
       case MemoryContinuationKind::kContinueWrite8:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_byte));
+        can_read = curr_mem->TryRead(next_addr, &(val.as_byte));
         break;
       case MemoryContinuationKind::kContinueRead16:
       case MemoryContinuationKind::kContinueWrite16:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_word));
+        can_read = curr_mem->TryRead(next_addr, &(val.as_word));
         break;
       case MemoryContinuationKind::kContinueRead32:
       case MemoryContinuationKind::kContinueWrite32:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_dword));
+        can_read = curr_mem->TryRead(next_addr, &(val.as_dword));
         break;
       case MemoryContinuationKind::kContinueRead64:
       case MemoryContinuationKind::kContinueWrite64:
-        can_read = curr_mem->TryRead(curr_addr, &(val.as_qword));
+        can_read = curr_mem->TryRead(next_addr, &(val.as_qword));
         break;
     }
 
-    constr = EqExpr::create(addr, ConstantExpr::create(curr_addr, 64));
+    constr = EqExpr::create(addr, ConstantExpr::create(next_addr, 64));
     bool res = false;
     (void) exe.solver->mayBeTrue(*state, constr, res);
     // TODO(sai) terminate state on false
 
     // Not readable.
     if (!can_read) {
-      min_addr = curr_addr;
 
       // Not readable, but satisfiable; this is a memory access violation.
       if (res) {
@@ -94,14 +90,13 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
       // Not readable, not satisfiable, so round up to the next page boundary
       // and keep looking.
       } else {
-        next_addr = (curr_addr + 4096ULL) & ~4095ULL;
+        next_addr = (next_addr + 4096ULL) & ~4095ULL;
         continue;
       }
 
     // Readable but not satisfiable.
     } else if (!res) {
-      min_addr = curr_addr;
-      next_addr = curr_addr + 1;
+      next_addr += 1;
       continue;
 
     // Readable and satisfiable.
@@ -117,9 +112,7 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
   }
 
   const auto curr_state = state.release();
-
-  LOG(INFO)
-      << "Found address 0x" << std::hex << curr_addr << std::dec;
+  const auto curr_addr = next_addr;
 
   // Fork/branch the current state, without changing the depth or weight.
   state.reset(new ExecutionState(*curr_state));

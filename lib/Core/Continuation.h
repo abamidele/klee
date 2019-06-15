@@ -71,8 +71,8 @@ static_assert(!__builtin_offsetof(MemoryReadResult, as_byte),
 class MemoryAccessContinuation : public StateContinuation {
  public:
   const ref<Expr> addr;
-  uint64_t min_addr;
-  uint64_t max_addr;
+  const uint64_t min_addr;
+  const uint64_t max_addr;
   uint64_t next_addr;
   const MemoryContinuationKind kind;
 
