@@ -234,7 +234,7 @@ class SpecialFunctionHandler {
   HANDLER(handle_get_dirent_index);
   HANDLER(handle_get_dirent_name);
   HANDLER(handle_klee_init_remill_mem);
- 
+  HANDLER(handle__symbolic_stdin); 
  
 #undef HANDLER
 };
