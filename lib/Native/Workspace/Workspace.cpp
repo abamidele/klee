@@ -133,6 +133,8 @@ const std::string &Workspace::LocalRuntimeBitcodePath(void) {
   return path;
 }
 
+
+
 const std::string &Workspace::RuntimeBitcodePath(void) {
   static std::string path;
   if (!path.empty()) {
@@ -170,6 +172,16 @@ const std::string &Workspace::RuntimeBitcodePath(void) {
   path.clear();
   return path;
 }
+
+const std::string &Workspace::RuntimeInterceptPath(void) {
+  static std::string path;
+  std::stringstream ss;
+  std::string intercept = "libruntime-intercepts.so";
+  ss << gBuildRuntimDir << intercept;
+  path = ss.str();
+  return path;
+}
+
 
 namespace {
 

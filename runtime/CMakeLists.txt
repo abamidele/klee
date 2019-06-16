@@ -38,4 +38,9 @@ add_runtime_helper(linux amd64_avx 64)
 add_runtime_helper(linux amd64_avx512 64)
 
 #add_runtime_helper(linux aarch64 64)
+project(intercepts ASM)
+cmake_minimum_required(VERSION 3.2)
+set(CMAKE_ASM_CREATE_SHARED_LIBRARY "ld <CMAKE_SHARED_LIBRARY_SONAME_ASM_FLAG><TARGET_SONAME> <LINK_FLAGS> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+add_library( runtime-intercepts SHARED intercepts.S )
 
+target_include_directories(runtime-intercepts PUBLIC ${REMILL_SOURCE_DIR})

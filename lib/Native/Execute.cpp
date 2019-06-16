@@ -194,7 +194,8 @@ int main(int argc, char **argv, char **envp) {
 
   klee::Interpreter::InterpreterOptions interp_options;
   interp_options.MakeConcreteSymbolic = false;
-
+  auto intercept_path = klee::native::Workspace::RuntimeInterceptPath();
+  
   std::unique_ptr<NativeHandler> handler(new NativeHandler());
   auto executor =
       klee::Interpreter::create(context, interp_options, handler.get());

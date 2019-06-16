@@ -33,6 +33,7 @@ class Workspace {
   static const std::string &BitcodeDir(void);
   static const std::string &LocalRuntimeBitcodePath(void);
   static const std::string &RuntimeBitcodePath(void);
+  static const std::string &RuntimeInterceptPath(void);
 
   static void LoadSnapshotIntoExecutor(
       const ProgramSnapshotPtr &snapshot, klee::Interpreter *executor);

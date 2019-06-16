@@ -366,7 +366,6 @@ static void RunUntilBreakpoint(pid_t pid) {
   auto old_text_word = ptrace(PTRACE_PEEKTEXT, pid, FLAGS_breakpoint, 0);
   auto has_err = 0 != errno;
 
-
   // Add in an `int3`.
   auto new_text_word = (old_text_word & (~0xFFL)) | 0xCCL;
   ptrace(PTRACE_POKETEXT, pid, FLAGS_breakpoint, new_text_word);
@@ -839,6 +838,9 @@ static void SnapshotProgram(remill::ArchName arch, remill::OSName os) {
     // Tell the tracee to load in all shared libraries as soon as possible.
     CHECK(!setenv("LD_BIND_NOW", "1", true))
         << "Unable to set LD_BIND_NOW=1 for tracee: " << strerror(errno);
+    
+    CHECK(!setenv("LD_PRELOAD", klee::native::Workspace::RuntimeInterceptPath().c_str(), true))
+        << "Unable to set LD_PRELOAD for tracee: " << strerror(errno);
 
     // Ideally speed up calls to `localtime`.
     if (!getenv("TZ")) {
@@ -875,7 +877,7 @@ int main(int argc, char **argv) {
       << "Unable to extract arguments to tracee. Make sure to provide "
       << "the program and command-line arguments to that program after "
       << "a '--'.";
-
+  
   auto arch_name = remill::GetArchName(FLAGS_arch);
   CHECK(remill::kArchInvalid != arch_name)
       << "Invalid architecture name specified to --arch.";
