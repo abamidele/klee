@@ -22,6 +22,8 @@ Task *gCurrent = nullptr;
 
 extern "C" {
 
+bool symbolic_stdin();
+
 LiftedFunc *__kleemill_get_lifted_function(Memory *, addr_t pc);
 
 void __kleemill_log_state(State *state);

@@ -22,6 +22,8 @@
 
 namespace {
 
+extern "C" bool symbolic_stdin();
+
 static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
                   size_t *out_num_bytes) {
 
@@ -33,14 +35,17 @@ static int DoRead(Memory *memory, int fd, addr_t buf, size_t size,
   auto bytes_read = new uint8_t[size];
   static int symbolic_count;
   int num_bytes;
-  
-  if (fd == 0){
-    num_bytes = size;
-    char num[100];
-    sprintf(num, "%d", symbolic_count++);
-    klee_make_symbolic(bytes_read, size, num);
+  if (symbolic_stdin()){
+    if (fd == 0){
+      num_bytes = size;
+      char num[100];
+      sprintf(num, "%d", symbolic_count++);
+      klee_make_symbolic(bytes_read, size, num);
   } else {
-    num_bytes = read(fd, bytes_read, size);
+      num_bytes = read(fd, bytes_read, size);
+    }
+  } else {
+      num_bytes = read(fd, bytes_read, size);
   }
 
   auto err = errno;

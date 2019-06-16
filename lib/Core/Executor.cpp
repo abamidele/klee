@@ -69,7 +69,13 @@
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+
+#if LLVM_VERSION_CODE < LLVM_VERSION(8, 0)
 #include <llvm/IR/TypeBuilder.h>
+#else
+
+#endif
+
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
@@ -420,7 +426,8 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       inhibitForking(false),
       haltExecution(false),
       ivcEnabled(false),
-      debugLogBuffer(debugBufferString) {
+      debugLogBuffer(debugBufferString),
+      symbolicStdin(false){
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -628,6 +635,10 @@ vTask *Executor::NextTask(void) {
     tasks.pop_front();
     return task;
   }
+}
+
+void Executor::setSymbolicStdin(bool isSymbolic) {
+  symbolicStdin = isSymbolic;
 }
 
 void Executor::AddInitialTask(const std::string &state, const uint64_t pc,

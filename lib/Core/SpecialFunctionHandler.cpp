@@ -203,7 +203,6 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
- 
 #undef addDNR
 #undef add
 };
