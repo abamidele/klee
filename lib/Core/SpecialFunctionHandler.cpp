@@ -915,10 +915,6 @@ void SpecialFunctionHandler::handle__kleemill_get_lifted_function(
 
   auto func = executor.GetLiftedFunction(mem, pc_uint);
 
-  // LOG(INFO)
-  //    << "Indirect branch lookup " << std::hex << pc_uint << std::dec
-  //    << " in address space " << mem_uint;
-
   executor.bindLocal(target, state,
                      Expr::createPointer(reinterpret_cast<uintptr_t>(func)));
 }
