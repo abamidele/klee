@@ -123,7 +123,7 @@ bool AddressSpace::TryFree(uint64_t addr) {
   uint64_t size = address.size;
   auto alloc_list_pair = alloc_lists.find(size);
   if (alloc_list_pair != alloc_lists.end()) {
-   return alloc_list_pair.second.TryFree(addr); 
+   return alloc_list_pair->second.TryFree(addr); 
   }
 
   LOG(ERROR) << "Invalid free at address " << addr << " :-(";
@@ -133,18 +133,19 @@ bool AddressSpace::TryFree(uint64_t addr) {
 uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
   if (alloc_size >= (1U << 15U)) {
     LOG(FATAL) << "an allocation of this size must be mmapped!";
+  } else if (alloc_size <= 0 ) {
+    LOG(ERROR) << "attempt at a malloc less than or equal to 0";
+    return 0;
   }
 
-  Address address = {};
-  address.flat = addr;
-  uint64_t size = address.size;
-  auto alloc_list_pair = alloc_lists.find(size);
+  auto alloc_list_pair = alloc_lists.find(alloc_size);
   if (alloc_list_pair != alloc_lists.end()) {
-    return alloc_list_pair.second.Allocate(alloc_size); 
+    return alloc_list_pair->second.Allocate(alloc_size); 
   }
-
   auto alloc_list = AllocList(alloc_size);
-  alloc_lists[alloc_size] = alloc_list;
+  alloc_lists.insert(std::pair<uint64_t, AllocList>(
+              reinterpret_cast<uint64_t>(alloc_size), alloc_list));
+  
   return alloc_list.Allocate(alloc_size);
 }
 
@@ -201,13 +202,13 @@ bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
   Address address = {};
   address.flat = addr;
   if (address.must_be_fe == klee::native::special_malloc_byte){
-    auto alloc_list = alloc_lists.find(address.size);
+    auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()){
       LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Read";
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list.TryRead(addr + offset, out_stream++)){
+      if (alloc_list_pair->second.TryRead(addr + offset, out_stream++)){
       } else {
         return false;
       }
@@ -239,13 +240,13 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   Address address = {};
   address.flat = addr;
   if (address.must_be_fe == klee::native::special_malloc_byte){
-    auto alloc_list = alloc_lists.find(address.size);
+    auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()){
       LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Write";
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list.TryWrite(addr + offset, *in_stream++)){
+      if (alloc_list_pair->second.TryWrite(addr + offset, *in_stream++)){
         } else {
           return false;
         }

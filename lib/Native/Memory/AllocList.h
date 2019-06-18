@@ -34,21 +34,21 @@ namespace native {
 	} __attribute__((packed));
   };
 
-  static under_flow_check = 0x0f;
-  static special_malloc_byte = 0xfe;
+  static uint8_t under_flow_check = 0x0f;
+  static uint8_t special_malloc_byte = 0xfe;
 
 
  
   class AllocList {
     public:
-     explicit AllocList(uint64_t size_);
+     explicit AllocList(size_t size_);
      ~AllocList(void) = default;
      uint64_t Allocate(size_t alloc_size);
      bool TryFree(uint64_t addr);
      bool TryRead(uint64_t addr, uint8_t *byte_out);
      bool TryWrite(uint64_t addr, uint8_t byte);
 
-     uint64_t size;
+     size_t size;
 
      std::vector<bool> free_list;
      std::vector<std::shared_ptr<uint8_t[]>> allocations;

@@ -58,7 +58,7 @@ namespace native {
   }
 
   bool AllocList::TryFree(uint64_t addr) {
-    Memory address = {};
+    Address address = {};
     address.flat = addr;
 	auto alloc_index = address.alloc_index; 
     if (free_list.at(alloc_index)){
@@ -70,7 +70,7 @@ namespace native {
   }
 
 #define MEMORY_ACCESS_CHECKS(addr, type) \
-	Memory address = {}; \
+	Address address = {}; \
     address.flat = addr;\
     auto alloc_index = address.alloc_index;\
     if (alloc_index >= allocations.size() || address.offset >= size){\

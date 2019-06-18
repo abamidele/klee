@@ -162,6 +162,7 @@ add_library(${PROJECT_NAME} STATIC
   lib/Native/Memory/AddressSpace.cpp
   lib/Native/Memory/MappedRange.cpp
   lib/Native/Memory/Snapshot.cpp
+  lib/Native/Memory/AllocList.cpp
   lib/Native/Util/AreaAllocator.cpp
   lib/Native/Util/ZoneAllocator.cpp
   lib/Native/Workspace/Workspace.cpp

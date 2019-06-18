@@ -225,7 +225,7 @@ void SpecialFunctionHandler::handle__intercept_strtol(
   auto end_ptr_val = executor.toUnique(state, arguments[1]);
   auto base_val = executor.toUnique(state, arguments[2]);
 
-  auto nptr = notr_val->getZExtValue();
+  auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
   ref<Expr> read_byte;
   int size = 0;
 
@@ -233,14 +233,14 @@ void SpecialFunctionHandler::handle__intercept_strtol(
  }
 
 
-void SpecialFunctionHandler::handle__intercept_(
+void SpecialFunctionHandler::handle__intercept_malloc(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
 }
 
 
-void SpecialFunctionHandler::handle__intercept_(
+void SpecialFunctionHandler::handle__intercept_free(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
