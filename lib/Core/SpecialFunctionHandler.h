@@ -235,7 +235,13 @@ class SpecialFunctionHandler {
   HANDLER(handle_get_dirent_name);
   HANDLER(handle_klee_init_remill_mem);
   HANDLER(handle__symbolic_stdin); 
- 
+  
+  /* intercept handlers for libc calls */
+  HANDLER(handle__intercept_strtol);
+  HANDLER(handle__intercept_malloc);
+  HANDLER(handle__intercept_free);
+
+
 #undef HANDLER
 };
 }  // End klee namespace

@@ -21,8 +21,9 @@ TEXT_SECTION
 #define INTERCEPT(name, id) \
      .globl SYMBOL(name) ; \
      SYMBOL(name): \
-     mov   id, %eax; \
+     xor %eax, %eax; \
+     movl  $ ##id , %eax; \
      syscall; \
      ret ;
 
-INTERCEPT(strtol, 0x81)
+INTERCEPT(strtol, 0xa1)

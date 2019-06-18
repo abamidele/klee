@@ -40,6 +40,7 @@ static char gHostName[HOST_NAME_MAX + 1] = {};
 #include "Process.cpp"
 #include "Sys.cpp"
 #include "Thread.cpp"
+#include "Intercepts.cpp"
 
 namespace {
 
@@ -269,6 +270,8 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 323: return SysEventFd(memory, state, syscall);
     case 328: return SysEventFd2(memory, state, syscall);
     */
+    case 0xa1: return InterceptStrtol(memory, state, syscall);
+    
     default:
       STRACE_ERROR(unsupported, ANSI_COLOR_MAGENTA "nr=%" PRIuADDR,
                    syscall_num);

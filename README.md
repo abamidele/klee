@@ -1,4 +1,4 @@
-KLEEMILL 
+KLEE-NATIVE
 =============================
 
 # KLEE Symbolic Virtual Machine

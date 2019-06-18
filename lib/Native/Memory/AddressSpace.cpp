@@ -117,8 +117,40 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
   return 0 != trace_heads.count(static_cast<uint64_t>(pc));
 }
 
+bool AddressSpace::TryFree(uint64_t addr) {
+  Address address = {};
+  address.flat = addr;
+  uint64_t size = address.size;
+  auto alloc_list_pair = alloc_lists.find(size);
+  if (alloc_list_pair != alloc_lists.end()) {
+   return alloc_list_pair.second.TryFree(addr); 
+  }
+
+  LOG(ERROR) << "Invalid free at address " << addr << " :-(";
+  return false;
+}
+
+uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
+  if (alloc_size >= (1U << 15U)) {
+    LOG(FATAL) << "an allocation of this size must be mmapped!";
+  }
+
+  Address address = {};
+  address.flat = addr;
+  uint64_t size = address.size;
+  auto alloc_list_pair = alloc_lists.find(size);
+  if (alloc_list_pair != alloc_lists.end()) {
+    return alloc_list_pair.second.Allocate(alloc_size); 
+  }
+
+  auto alloc_list = AllocList(alloc_size);
+  alloc_lists[alloc_size] = alloc_list;
+  return alloc_list.Allocate(alloc_size);
+}
+
+
 // Clear out the contents of this address space.
-void AddressSpace::Kill(void) {
+void AddressSpace::AddressSpace::Kill(void) {
   if (is_dead) {
     return;
   }
@@ -166,27 +198,61 @@ bool AddressSpace::CanExecuteAligned(uint64_t addr) const {
 bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
   auto addr = addr_ & addr_mask;
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
-  for (auto page_addr = AlignDownToPage(addr),
-            end_addr = addr + size;
-       page_addr < end_addr;
-       page_addr += kPageSize) {
-
-    auto &range = FindRangeAligned(page_addr);
-    auto page_end_addr = page_addr + kPageSize;
-    auto next_end_addr = std::min(end_addr, page_end_addr);
-    while (addr < next_end_addr) {
-      if (!range.Read(addr++, out_stream++)) {
+  Address address = {};
+  address.flat = addr;
+  if (address.must_be_fe == klee::native::special_malloc_byte){
+    auto alloc_list = alloc_lists.find(address.size);
+    if (alloc_list_pair == alloc_lists.end()){
+      LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Read";
+      return false;
+    }
+    for (size_t offset = 0; offset < size; ++offset) {
+      if (alloc_list.TryRead(addr + offset, out_stream++)){
+      } else {
         return false;
       }
     }
-  }
-  return true;
+    return true;
+
+  } else {
+    for (auto page_addr = AlignDownToPage(addr),
+              end_addr = addr + size;
+         page_addr < end_addr;
+         page_addr += kPageSize) {
+
+      auto &range = FindRangeAligned(page_addr);
+      auto page_end_addr = page_addr + kPageSize;
+      auto next_end_addr = std::min(end_addr, page_end_addr);
+      while (addr < next_end_addr) {
+        if (!range.Read(addr++, out_stream++)) {
+          return false;
+        }
+      }
+    }
+    return true;
+    }
 }
 
 bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   auto addr = addr_ & addr_mask;
   auto in_stream = reinterpret_cast<const uint8_t *>(val);
-  for (auto page_addr = AlignDownToPage(addr),
+  Address address = {};
+  address.flat = addr;
+  if (address.must_be_fe == klee::native::special_malloc_byte){
+    auto alloc_list = alloc_lists.find(address.size);
+    if (alloc_list_pair == alloc_lists.end()){
+      LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Write";
+      return false;
+    }
+    for (size_t offset = 0; offset < size; ++offset) {
+      if (alloc_list.TryWrite(addr + offset, *in_stream++)){
+        } else {
+          return false;
+        }
+      }
+    return true;
+  } else {
+    for (auto page_addr = AlignDownToPage(addr),
             end_addr = addr + size;
        page_addr < end_addr;
        page_addr += kPageSize) {
@@ -215,6 +281,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
     }
   }
   return true;
+  }
 }
 
 // Read/write a byte to memory.

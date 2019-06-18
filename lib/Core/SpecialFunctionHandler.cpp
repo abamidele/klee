@@ -205,10 +205,48 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
     add("symbolic_stdin", handle__symbolic_stdin, true),
 
+    /* libc intercepts*/
+    add("symbolic_stdin", handle__symbolic_stdin, true),
+    
+    add("strtol_intercept", handle__intercept_strtol, true),
+    add("malloc_intercept", handle__intercept_malloc, true),
+    add("free_intercept", handle__intercept_free, true),
+
 
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle__intercept_strtol(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+
+  auto nptr_val = executor.toUnique(state, arguments[0]);
+  auto end_ptr_val = executor.toUnique(state, arguments[1]);
+  auto base_val = executor.toUnique(state, arguments[2]);
+
+  auto nptr = notr_val->getZExtValue();
+  ref<Expr> read_byte;
+  int size = 0;
+
+  exit(0);
+ }
+
+
+void SpecialFunctionHandler::handle__intercept_(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+
+}
+
+
+void SpecialFunctionHandler::handle__intercept_(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+
+}
+
+
 
 void SpecialFunctionHandler::handle__symbolic_stdin(
     ExecutionState &state, KInstruction *target,

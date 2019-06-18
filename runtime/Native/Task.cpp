@@ -469,6 +469,7 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
+
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -488,7 +489,6 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   puts("in main");

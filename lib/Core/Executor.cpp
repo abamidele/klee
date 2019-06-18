@@ -3053,8 +3053,8 @@ void Executor::run(ExecutionState &initialState) {
 
     std::unique_ptr<ExecutionState> state(cont->YieldNextState(*this));
     if (!state) {
-      LOG(INFO)
-          << "Popping ineffectual continuation off stack.";
+      // LOG(INFO)
+      //     << "Popping ineffectual continuation off stack.";
       continue;
     }
 

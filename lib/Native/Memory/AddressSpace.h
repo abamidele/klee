@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "Native/Memory/MappedRange.h"
+#include "Native/Memory/AllocList.h"
 #include "Core/AddressSpace.h"
 #include "klee/Expr.h"
 
@@ -130,6 +131,10 @@ class AddressSpace : public Memory {
 
   // Check to see if a given program counter is a trace head.
   bool IsMarkedTraceHead(PC pc) const;
+  
+  bool TryFree(uint64_t addr);
+  uint64_t TryMalloc(size_t alloc_size);
+
 
  private:
   AddressSpace(AddressSpace &&) = delete;
@@ -195,6 +200,7 @@ class AddressSpace : public Memory {
   // in own overarching object
   
   std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
+  std::unordered_map<uint64_t, AllocList> alloc_lists;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.

@@ -839,8 +839,8 @@ static void SnapshotProgram(remill::ArchName arch, remill::OSName os) {
     CHECK(!setenv("LD_BIND_NOW", "1", true))
         << "Unable to set LD_BIND_NOW=1 for tracee: " << strerror(errno);
     
-    //CHECK(!setenv("LD_PRELOAD", klee::native::Workspace::RuntimeInterceptPath().c_str(), true))
-    //    << "Unable to set LD_PRELOAD for tracee: " << strerror(errno);
+    CHECK(!setenv("LD_PRELOAD", klee::native::Workspace::RuntimeInterceptPath().c_str(), true))
+        << "Unable to set LD_PRELOAD for tracee: " << strerror(errno);
 
     // Ideally speed up calls to `localtime`.
     if (!getenv("TZ")) {
