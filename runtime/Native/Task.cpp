@@ -505,8 +505,20 @@ int main(int argc, char *argv[3], char *envp[]) {
   //State *state = reinterpret_cast<State *>(argv[1]);
   //Task *task = __kleemill_create_task(state, memory);
   auto chunk = malloc(0x15);
+  auto chunk2 = malloc(0x15);
+
   free(chunk);
 
+  auto chunk3 = malloc(0x15);
+
+  free(chunk2);
+  
+  auto chunk4 = malloc(0x18);
+  
+  free(chunk3);
+  free(chunk4);
+  free(chunk2);
+  
   __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;

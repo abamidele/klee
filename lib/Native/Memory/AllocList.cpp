@@ -42,8 +42,8 @@ namespace native {
         break;
       }
     }
-
-	if (free_slot == 0 || free_slot == (free_list.size() - 1)){
+    LOG(INFO) << "free_slot is " << free_slot;
+	if (free_slot == free_list.size()){
       LOG(INFO) << "a new allocation is being pushed back on the AllocList";
 	  address.alloc_index = allocations.size();
       allocations.emplace_back(new uint8_t[alloc_size]);
