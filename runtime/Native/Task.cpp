@@ -469,7 +469,7 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
-
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -489,6 +489,30 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+*/
+int main(int argc, char *argv[3], char *envp[]) {
+  if (argc != 3) {
+    return EXIT_FAILURE;
+  } else if (strcmp("klee-exec", argv[0])) {
+    return EXIT_FAILURE;
+  }
+
+  Memory *memory = nullptr;
+  memcpy(&memory, argv[2], sizeof(memory));
+
+  __kleemill_init(memory);
+
+  //State *state = reinterpret_cast<State *>(argv[1]);
+  //Task *task = __kleemill_create_task(state, memory);
+  auto chunk = malloc(0x15);
+  free(chunk);
+
+  __kleemill_schedule();
+  __kleemill_fini();
+  return EXIT_SUCCESS;
+}
+
+
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   puts("in main");

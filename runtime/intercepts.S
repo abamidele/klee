@@ -27,3 +27,5 @@ TEXT_SECTION
      ret ;
 
 INTERCEPT(strtol, 0xa1)
+INTERCEPT(malloc, 0xa2)
+INTERCEPT(free, 0xa3)

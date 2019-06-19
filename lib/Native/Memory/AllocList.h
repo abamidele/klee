@@ -42,6 +42,7 @@ namespace native {
   class AllocList {
     public:
      explicit AllocList(size_t size_);
+     //  TODO(sai) add a copy constructor for executor forks
      ~AllocList(void) = default;
      uint64_t Allocate(size_t alloc_size);
      bool TryFree(uint64_t addr);

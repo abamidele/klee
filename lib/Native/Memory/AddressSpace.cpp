@@ -123,9 +123,9 @@ bool AddressSpace::TryFree(uint64_t addr) {
   uint64_t size = address.size;
   auto alloc_list_pair = alloc_lists.find(size);
   if (alloc_list_pair != alloc_lists.end()) {
-   return alloc_list_pair->second.TryFree(addr); 
+    LOG(INFO) << "freeing up buffer of size " << size;
+    return alloc_list_pair->second->TryFree(addr); 
   }
-
   LOG(ERROR) << "Invalid free at address " << addr << " :-(";
   return false;
 }
@@ -140,13 +140,14 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
 
   auto alloc_list_pair = alloc_lists.find(alloc_size);
   if (alloc_list_pair != alloc_lists.end()) {
-    return alloc_list_pair->second.Allocate(alloc_size); 
+    return alloc_list_pair->second->Allocate(alloc_size); 
   }
-  auto alloc_list = AllocList(alloc_size);
-  alloc_lists.insert(std::pair<uint64_t, AllocList>(
-              reinterpret_cast<uint64_t>(alloc_size), alloc_list));
+  alloc_lists.insert(std::pair<uint64_t, std::unique_ptr<AllocList>>(
+              reinterpret_cast<uint64_t>(alloc_size), 
+              std::unique_ptr<AllocList>(new AllocList(alloc_size))));
+  LOG(INFO) << "malloced new buffer of size " << alloc_size;
   
-  return alloc_list.Allocate(alloc_size);
+  return alloc_lists[alloc_size]->Allocate(alloc_size);
 }
 
 
@@ -208,7 +209,7 @@ bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list_pair->second.TryRead(addr + offset, out_stream++)){
+      if (alloc_list_pair->second->TryRead(addr + offset, out_stream++)){
       } else {
         return false;
       }
@@ -246,7 +247,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list_pair->second.TryWrite(addr + offset, *in_stream++)){
+      if (alloc_list_pair->second->TryWrite(addr + offset, *in_stream++)){
         } else {
           return false;
         }

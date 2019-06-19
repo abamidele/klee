@@ -34,6 +34,7 @@ namespace native {
     Address address = {};
     address.must_be_0f = 0x0f;
     address.size = alloc_size;
+
     
     size_t free_slot; 
 	for(free_slot=0; free_slot < free_list.size(); ++free_slot) {
@@ -43,16 +44,20 @@ namespace native {
     }
 
 	if (free_slot == 0 || free_slot == (free_list.size() - 1)){
+      LOG(INFO) << "a new allocation is being pushed back on the AllocList";
 	  address.alloc_index = allocations.size();
       allocations.emplace_back(new uint8_t[alloc_size]);
       free_list.push_back(false);
+      LOG(INFO) << "allocation count is " << free_list.size();
     } else {
+      LOG(INFO) << "A free slot at " << free_slot << " was found";
 	  address.alloc_index = free_slot;
       allocations[free_slot].reset((new uint8_t[alloc_size]));
       free_list[free_slot] = false;
     }
 
     address.must_be_fe = special_malloc_byte;
+    LOG(INFO) << "the address returned was " << address.flat;
     
     return address.flat;
   }
@@ -60,13 +65,17 @@ namespace native {
   bool AllocList::TryFree(uint64_t addr) {
     Address address = {};
     address.flat = addr;
+    LOG(INFO) << "free is at " << address.flat;
 	auto alloc_index = address.alloc_index; 
+    LOG(INFO) << "alloc_index was: " << alloc_index;
+    LOG(INFO) << "free list size is " << free_list.size();
     if (free_list.at(alloc_index)){
       LOG(ERROR) << "detected a double free on address " << addr;
       return false;
     }
-
+    LOG(INFO) << "the address freed: " << addr;
     free_list[alloc_index] = true;
+    return true;
   }
 
 #define MEMORY_ACCESS_CHECKS(addr, type) \
@@ -92,6 +101,7 @@ namespace native {
   }
 
   bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
+    // still need to do a ref count check for copy on write
     MEMORY_ACCESS_CHECKS(addr, "Write");
  	allocations[alloc_index][address.offset] = byte;
 	return true;

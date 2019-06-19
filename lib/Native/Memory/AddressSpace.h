@@ -200,7 +200,7 @@ class AddressSpace : public Memory {
   // in own overarching object
   
   std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
-  std::unordered_map<uint64_t, AllocList> alloc_lists;
+  std::unordered_map<uint64_t, std::unique_ptr<AllocList>> alloc_lists;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.
