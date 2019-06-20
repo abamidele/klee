@@ -21,11 +21,7 @@ TEXT_SECTION
 #define INTERCEPT(name, id) \
      .globl SYMBOL(name) ; \
      SYMBOL(name): \
-     xor %eax, %eax; \
-     movl  $ ##id , %eax; \
-     syscall; \
+     int $ ##id ; \
      ret ;
 
-INTERCEPT(strtol, 0xa1)
-INTERCEPT(malloc, 0xa2)
-INTERCEPT(free, 0xa3)
+#include "intercepts.inc"

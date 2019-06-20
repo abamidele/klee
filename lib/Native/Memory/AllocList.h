@@ -41,15 +41,13 @@ namespace native {
  
   class AllocList {
     public:
-     explicit AllocList(size_t size_);
+     explicit AllocList();
      //  TODO(sai) add a copy constructor for executor forks
      ~AllocList(void) = default;
      uint64_t Allocate(size_t alloc_size);
      bool TryFree(uint64_t addr);
      bool TryRead(uint64_t addr, uint8_t *byte_out);
      bool TryWrite(uint64_t addr, uint8_t byte);
-
-     size_t size;
 
      std::vector<bool> free_list;
      std::vector<std::shared_ptr<uint8_t[]>> allocations;

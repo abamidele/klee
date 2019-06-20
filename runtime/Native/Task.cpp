@@ -469,7 +469,6 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
-/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -489,7 +488,8 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
-*/
+
+/*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -502,7 +502,7 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   __kleemill_init(memory);
 
-  //State *state = reinterpret_cast<State *>(argv[1]);
+  State *state = reinterpret_cast<State *>(argv[1]);
   //Task *task = __kleemill_create_task(state, memory);
   auto chunk = malloc(0x15);
   auto chunk2 = malloc(0x15);
@@ -518,12 +518,57 @@ int main(int argc, char *argv[3], char *envp[]) {
   free(chunk3);
   free(chunk4);
   free(chunk2);
+  void *chunk5 = malloc(0x16);
+  __remill_write_memory_32(memory, reinterpret_cast<addr_t>(chunk5), 
+          0x89124441);
+   uint32_t bytes =
+       __remill_read_memory_32(memory, reinterpret_cast<addr_t>(chunk5));
+   printf("read bytes were %lx\n", bytes);
+   //free(chunk5);
+    __remill_write_memory_32(memory, reinterpret_cast<addr_t>(chunk5),
+          0x69696969);
+  uint8_t a;
+  void *chunk5 = malloc(0x16);
+  __remill_write_memory_32(memory, reinterpret_cast<addr_t>(chunk5), 
+          0x89124441);
+   uint32_t bytes =
+       __remill_read_memory_32(memory, reinterpret_cast<addr_t>(chunk5));
+  printf("read bytes before fork were %lx\n", bytes);
   
+  klee_make_symbolic(&a, sizeof(a), "a");
+
+  if (a > 50) {
+    uint32_t bytes2 =
+       __remill_read_memory_32(memory, reinterpret_cast<addr_t>(chunk5));
+ 
+    printf("read bytes fork1 case were %lx\n", bytes2);
+    __remill_write_memory_32(memory, reinterpret_cast<addr_t>(chunk5), 
+          0x61616161);
+    uint32_t bytes4 =
+       __remill_read_memory_32(memory, reinterpret_cast<addr_t>(chunk5));
+    printf("read bytes fork1 case were %lx\n", bytes4);
+    free(chunk5);
+  } else {
+    uint32_t bytes3 =
+       __remill_read_memory_32(memory, reinterpret_cast<addr_t>(chunk5));
+    printf("read bytes fork2 case were %lx\n", bytes3);
+    __remill_write_memory_32(memory, reinterpret_cast<addr_t>(chunk5), 
+          0x42424242);
+    uint32_t bytes5 = __remill_read_memory_32(memory, 
+            reinterpret_cast<addr_t>(chunk5));
+    printf("read bytes fork2 case were %lx\n", bytes5);
+    free(chunk5);
+    __remill_read_memory_32(memory, 
+            reinterpret_cast<addr_t>(chunk5));
+
+  }
+ 
   __kleemill_schedule();
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
 
+*/
 
 /*
 int main(int argc, char *argv[3], char *envp[]) {

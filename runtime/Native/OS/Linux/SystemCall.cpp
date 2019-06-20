@@ -47,6 +47,13 @@ namespace {
 #ifdef KLEEMILL_RUNTIME_X86
 // 32-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
+
+template <typename ABI>
+static Memory *X86LibcIntercept(Memory *memory, State *state,
+                             const ABI &intercept) {
+
+}
+
 template <typename ABI>
 static Memory *X86SystemCall(Memory *memory, State *state,
                              const ABI &syscall) {

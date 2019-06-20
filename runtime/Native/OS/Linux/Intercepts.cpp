@@ -15,7 +15,6 @@
  */
 
 namespace {
-static int MAX_INT_LENGTH = 2^3;
 
 
 extern "C" {
@@ -24,14 +23,14 @@ extern "C" {
 
 template <typename ABI>
 static Memory *InterceptStrtol(Memory *memory, State *state,
-                       const ABI &syscall) {
+                       const ABI &intercept) {
   addr_t nptr = 0;
   addr_t endptr;
   int base;
   
-  if (!syscall.TryGetArgs(memory, state, &nptr, &endptr, &base)) {
+  if (!intercept.TryGetArgs(memory, state, &nptr, &endptr, &base)) {
     STRACE_ERROR(read, "Couldn't get args");
-    return syscall.SetReturn(memory, state, -EFAULT);
+    return intercept.SetReturn(memory, state, -EFAULT);
   }
 
   long number = strtol_intercept(nptr, endptr, base, memory);
@@ -41,12 +40,12 @@ static Memory *InterceptStrtol(Memory *memory, State *state,
 
 template <typename ABI>
 static Memory *InterceptMalloc(Memory *memory, State *state,
-                       const ABI &syscall) {
+                       const ABI &intercept) {
 }
 
 template <typename ABI>
 static Memory *InterceptFree(Memory *memory, State *state,
-                       const ABI &syscall) {
+                       const ABI &intercept) {
 }
 
 }  // namespace

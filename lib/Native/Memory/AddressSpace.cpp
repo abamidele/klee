@@ -95,8 +95,9 @@ AddressSpace::AddressSpace(const AddressSpace &parent)
       page_is_executable(parent.page_is_executable),
       trace_heads(parent.trace_heads),
       symbolic_memory(parent.symbolic_memory),
+      alloc_lists(parent.alloc_lists),
       is_dead(parent.is_dead) {
-
+  // TODO(sai) add a thing in here that properly copies over the AllocList map
   unsigned i = 0;
   for (const auto &range : parent.maps) {
     if (range->IsValid()) {
@@ -123,8 +124,8 @@ bool AddressSpace::TryFree(uint64_t addr) {
   uint64_t size = address.size;
   auto alloc_list_pair = alloc_lists.find(size);
   if (alloc_list_pair != alloc_lists.end()) {
-    LOG(INFO) << "freeing up buffer of size " << size;
-    return alloc_list_pair->second->TryFree(addr); 
+    //LOG(INFO) << "freeing up buffer of size " << size;
+    return alloc_list_pair->second.TryFree(addr); 
   }
   LOG(ERROR) << "Invalid free at address " << addr << " :-(";
   return false;
@@ -140,14 +141,12 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
 
   auto alloc_list_pair = alloc_lists.find(alloc_size);
   if (alloc_list_pair != alloc_lists.end()) {
-    return alloc_list_pair->second->Allocate(alloc_size); 
+    return alloc_list_pair->second.Allocate(alloc_size); 
   }
-  alloc_lists.insert(std::pair<uint64_t, std::unique_ptr<AllocList>>(
-              reinterpret_cast<uint64_t>(alloc_size), 
-              std::unique_ptr<AllocList>(new AllocList(alloc_size))));
-  LOG(INFO) << "malloced new buffer of size " << alloc_size;
+  alloc_lists.emplace(std::make_pair(alloc_size, AllocList()));
+  //LOG(INFO) << "malloced new buffer of size " << alloc_size;
   
-  return alloc_lists[alloc_size]->Allocate(alloc_size);
+  return alloc_lists[alloc_size].Allocate(alloc_size);
 }
 
 
@@ -198,18 +197,20 @@ bool AddressSpace::CanExecuteAligned(uint64_t addr) const {
 }
 
 bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
+  //LOG(INFO) << "HIT TRY READ CASE !!!";
   auto addr = addr_ & addr_mask;
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = {};
   address.flat = addr;
   if (address.must_be_fe == klee::native::special_malloc_byte){
+    //LOG(INFO) << "HIT THE HEAP READ CASE !!!!!";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()){
       LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Read";
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list_pair->second->TryRead(addr + offset, out_stream++)){
+      if (alloc_list_pair->second.TryRead(addr + offset, out_stream++)){
       } else {
         return false;
       }
@@ -241,13 +242,14 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   Address address = {};
   address.flat = addr;
   if (address.must_be_fe == klee::native::special_malloc_byte){
+    //LOG(INFO) << " hit the heap write case";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()){
       LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Write";
       return false;
     }
     for (size_t offset = 0; offset < size; ++offset) {
-      if (alloc_list_pair->second->TryWrite(addr + offset, *in_stream++)){
+      if (alloc_list_pair->second.TryWrite(addr + offset, *in_stream++)){
         } else {
           return false;
         }
@@ -289,28 +291,54 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
 // Read/write a byte to memory.
 bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   const auto addr = addr_ & addr_mask;
+  auto out_stream = reinterpret_cast<uint8_t *>(val_out);
+  Address address = {};
+  address.flat = addr;
+  if (address.must_be_fe == klee::native::special_malloc_byte){
+    //LOG(INFO) << "HIT THE HEAP READ CASE !!!!!";
+    auto alloc_list_pair = alloc_lists.find(address.size);
+    if (alloc_list_pair == alloc_lists.end()){
+      LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Read";
+      return false;
+    }
+
+    if (alloc_list_pair->second.TryRead(addr, out_stream++)){
+      //LOG(INFO) << "try read was successful";
+      return true;
+    } else {
+      //LOG(INFO) << "try read failed";
+      return false;
+    }
+  }
   return FindRange(addr).Read(addr, val_out);
 }
 
 #define MAKE_TRY_READ(type) \
     bool AddressSpace::TryRead(uint64_t addr_, type *val_out) { \
       const auto addr = addr_ & addr_mask; \
-      auto &range = FindRange(addr); \
-      auto ptr = reinterpret_cast<const type *>( \
-          range.ToReadOnlyVirtualAddress(addr)); \
-      if (unlikely(ptr == nullptr)) { \
-        return false; \
-      } \
-      const auto end_addr = addr + sizeof(type) - 1; \
-      if (likely(range.BaseAddress() <= addr && \
-                 end_addr < range.LimitAddress())) { \
-        if (likely(AlignDownToPage(addr) == AlignDownToPage(end_addr))) { \
-          *val_out = *ptr; \
-          return true; \
+      Address address = {}; \
+      address.flat = addr; \
+      if (address.must_be_fe == klee::native::special_malloc_byte) { \
+        return TryRead(addr, val_out, sizeof(type)); \
+      \
+      } else { \
+        auto &range = FindRange(addr); \
+        auto ptr = reinterpret_cast<const type *>( \
+            range.ToReadOnlyVirtualAddress(addr)); \
+        if (unlikely(ptr == nullptr)) { \
+          return false; \
         } \
+        const auto end_addr = addr + sizeof(type) - 1; \
+        if (likely(range.BaseAddress() <= addr && \
+                   end_addr < range.LimitAddress())) { \
+          if (likely(AlignDownToPage(addr) == AlignDownToPage(end_addr))) { \
+            *val_out = *ptr; \
+            return true; \
+            } \
+          } \
+        return TryRead(addr, val_out, sizeof(type)); \
       } \
-      return TryRead(addr, val_out, sizeof(type)); \
-    }
+    } \
 
 MAKE_TRY_READ(uint16_t)
 MAKE_TRY_READ(uint32_t)

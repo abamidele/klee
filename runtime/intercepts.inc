@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-#include "intercepts.S"
-
-INTERCEPT(strtol, 129)
+INTERCEPT(strtol, 0xa1)
+INTERCEPT(malloc, 0xa2)
+INTERCEPT(free, 0xa3)

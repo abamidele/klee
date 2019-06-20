@@ -1252,11 +1252,13 @@ void SpecialFunctionHandler::handleMalloc(ExecutionState &state,
                                           std::vector<ref<Expr>> &arguments) {
   // XXX should type check args
   assert(arguments.size() == 1 && "invalid number of arguments to malloc");
+  /*
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto mem = executor.Memory(state, 1);
   auto addr = mem->TryMalloc(size);
   executor.bindLocal(target, state, Expr::createPointer(addr));
-  //executor.executeAlloc(state, arguments[0], false, target);
+  */
+  executor.executeAlloc(state, arguments[0], false, target);
 }
 
 void SpecialFunctionHandler::handleMemalign(ExecutionState &state,
@@ -1552,11 +1554,13 @@ void SpecialFunctionHandler::handleFree(ExecutionState &state,
   // XXX should type check args
   assert(arguments.size() == 1 && "invalid number of arguments to free");
   auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
+  /*
   auto mem = executor.Memory(state, 1);
   if(!mem->TryFree(ptr)) {
-    LOG(FATAL) << "invalid free :-(";
+    LOG(ERROR) << "invalid free :-(";
   }
-  //executor.executeFree(state, arguments[0]);
+  */
+  executor.executeFree(state, arguments[0]);
 }
 
 void SpecialFunctionHandler::handleCheckMemoryAccess(
