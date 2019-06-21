@@ -240,6 +240,7 @@ class SpecialFunctionHandler {
   HANDLER(handle__intercept_strtol);
   HANDLER(handle__intercept_malloc);
   HANDLER(handle__intercept_free);
+  HANDLER(handle__intercept_calloc);
 
 
 #undef HANDLER

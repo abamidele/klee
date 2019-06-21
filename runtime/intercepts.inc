@@ -17,3 +17,5 @@
 INTERCEPT(strtol, 0xa1)
 INTERCEPT(malloc, 0xa2)
 INTERCEPT(free, 0xa3)
+//INTERCEPT(realloc, 0xa4)
+INTERCEPT(calloc, 0xa5)

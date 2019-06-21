@@ -55,7 +55,13 @@ CR8Reg gCR8;
   } \
   addr_t GetSystemCallNum(Memory *, State *state) const { \
     return state->gpr.rax.aword; \
-  }
+  } \
+  addr_t GetInterruptNum(Memory *, State *state) const { \
+    return state->hyper_call_vector; \
+  } \
+
+
+
 
 // 32-bit `int 0x80` system call ABI.
 class X86Int0x80SystemCall : public SystemCallABI<X86Int0x80SystemCall> {
@@ -194,6 +200,46 @@ class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
   }
 };
 
+
+// 64-bit libc/regular function call ABI.
+class Amd64LibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
+ // TODO(sai) support variable length arguments
+ public:
+  COMMON_X86_METHODS
+  addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
+    return ret_addr;
+  }
+  Memory *DoSetReturn(Memory *memory, State *state, addr_t ret_val) const {
+    state->gpr.rax.aword = ret_val;
+    return memory;
+  }
+  bool CanReadArgs(Memory *, State *, int num_args) const {
+    bool can_read = num_args <= 6;
+    if (!can_read)
+      puts("DO NOT YET SUPPORT VAR ARGS");
+    return can_read;
+  }
+  // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64.S.html#106
+  addr_t GetArg(Memory *&memory, State *state, int i) const {
+    switch (i) {
+      case 0:
+        return state->gpr.rdi.aword;
+      case 1:
+        return state->gpr.rsi.aword;
+      case 2:
+        return state->gpr.rdx.aword;
+      case 3:
+        return state->gpr.rcx.aword;
+      case 4:
+        return state->gpr.r8.aword;
+      case 5:
+        return state->gpr.r9.aword;
+      default:
+        return 0;
+    }
+  }
+};
+
 extern "C" {
 
 Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
@@ -240,6 +286,7 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
         task.continuation = __remill_async_hyper_call;
       }
     }
+
     break;
 #endif
 
@@ -267,6 +314,27 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
       }
       break;
     }
+    case AsyncHyperCall::kX86IntN: {
+      printf("0x%lx\n", state.hyper_call_vector);
+      puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
+      Amd64LibcIntercept intercept;
+      memory = AMD64LibcIntercept(memory, &state, intercept);
+      if (intercept.Completed()) {
+        ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
+        state.gpr.rip.aword = ret_addr;
+        task.last_pc = ret_addr;
+        task.location = kTaskStoppedAfterHyperCall;
+        task.status = kTaskStatusRunnable;
+        task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
+      } else {
+        task.last_pc = ret_addr;
+        task.location = kTaskStoppedBeforeHyperCall;
+        task.status = kTaskStatusResumable;
+        task.continuation = __remill_async_hyper_call;
+      }
+    break;
+    }
+
 #endif
     default:
       task.last_pc = ret_addr;

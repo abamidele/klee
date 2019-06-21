@@ -48,11 +48,6 @@ namespace {
 // 32-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
 
-template <typename ABI>
-static Memory *X86LibcIntercept(Memory *memory, State *state,
-                             const ABI &intercept) {
-
-}
 
 template <typename ABI>
 static Memory *X86SystemCall(Memory *memory, State *state,
@@ -158,6 +153,24 @@ static Memory *X86SystemCall(Memory *memory, State *state,
 #if 64 == KLEEMILL_RUNTIME_X86
 // 64-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
+
+#define INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
+
+template <typename ABI>
+static Memory *AMD64LibcIntercept(Memory *memory, State *state,
+                             const ABI &intercept) {
+  auto interrupt_num = intercept.GetInterruptNum(memory, state);
+  switch (interrupt_num) {
+    #include "runtime/intercepts.inc"
+	default:
+      STRACE_ERROR(unsupported, ANSI_COLOR_MAGENTA "nr=%" PRIuADDR, interrupt_num);
+      return intercept.SetReturn(memory, state, 0);
+  }
+  return memory;
+}
+
+#undef INTERCEPT
+
 template <typename ABI>
 static Memory *AMD64SystemCall(Memory *memory, State *state,
                                const ABI &syscall) {
@@ -277,8 +290,6 @@ static Memory *AMD64SystemCall(Memory *memory, State *state,
     case 323: return SysEventFd(memory, state, syscall);
     case 328: return SysEventFd2(memory, state, syscall);
     */
-    case 0xa1: return InterceptStrtol(memory, state, syscall);
-    
     default:
       STRACE_ERROR(unsupported, ANSI_COLOR_MAGENTA "nr=%" PRIuADDR,
                    syscall_num);

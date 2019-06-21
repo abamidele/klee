@@ -210,12 +210,29 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     
     add("strtol_intercept", handle__intercept_strtol, true),
     add("malloc_intercept", handle__intercept_malloc, true),
-    add("free_intercept", handle__intercept_free, true),
+    add("free_intercept", handle__intercept_free, false),
+	add("calloc_intercept", handle__intercept_calloc, true)
 
 
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle__intercept_calloc(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+  auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
+  auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
+  auto addr = mem->TryMalloc(size);
+  if (addr){
+	uint8_t byte=0;
+	for (size_t i = 0; i < size; ++i){
+      (void) mem->TryWrite(addr+i, byte);
+    }
+  }
+  executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
+}
 
 void SpecialFunctionHandler::handle__intercept_strtol(
     ExecutionState &state, KInstruction *target,
@@ -228,6 +245,7 @@ void SpecialFunctionHandler::handle__intercept_strtol(
   auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
   ref<Expr> read_byte;
   int size = 0;
+  LOG(INFO) << "CONGRATZZZZ  U DID THE THING";
 
   exit(0);
  }
@@ -236,13 +254,23 @@ void SpecialFunctionHandler::handle__intercept_strtol(
 void SpecialFunctionHandler::handle__intercept_malloc(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-
+  auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
+  auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
+  auto addr = mem->TryMalloc(size);
+  executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
 
 void SpecialFunctionHandler::handle__intercept_free(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
+  auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
+  if(!mem->TryFree(ptr)) {
+    LOG(ERROR) << "invalid free :-(";
+  }
 
 }
 
@@ -1252,12 +1280,7 @@ void SpecialFunctionHandler::handleMalloc(ExecutionState &state,
                                           std::vector<ref<Expr>> &arguments) {
   // XXX should type check args
   assert(arguments.size() == 1 && "invalid number of arguments to malloc");
-  /*
-  auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
-  auto mem = executor.Memory(state, 1);
-  auto addr = mem->TryMalloc(size);
-  executor.bindLocal(target, state, Expr::createPointer(addr));
-  */
+
   executor.executeAlloc(state, arguments[0], false, target);
 }
 
@@ -1554,12 +1577,6 @@ void SpecialFunctionHandler::handleFree(ExecutionState &state,
   // XXX should type check args
   assert(arguments.size() == 1 && "invalid number of arguments to free");
   auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
-  /*
-  auto mem = executor.Memory(state, 1);
-  if(!mem->TryFree(ptr)) {
-    LOG(ERROR) << "invalid free :-(";
-  }
-  */
   executor.executeFree(state, arguments[0]);
 }
 

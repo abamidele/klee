@@ -95,7 +95,6 @@ static int DoWrite(Memory *memory, int fd, addr_t buf, size_t size,
   if (!CanReadMemory(memory, buf, size)) {
     return EFAULT;
   }
-
   auto write_bytes = new uint8_t[size];
   CopyFromMemory(memory, write_bytes, buf, size);
   auto num_bytes = write(fd, write_bytes, size);
