@@ -211,12 +211,26 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("strtol_intercept", handle__intercept_strtol, true),
     add("malloc_intercept", handle__intercept_malloc, true),
     add("free_intercept", handle__intercept_free, false),
-	add("calloc_intercept", handle__intercept_calloc, true)
-
+	add("calloc_intercept", handle__intercept_calloc, true),
+	add("realloc_intercept", handle__intercept_realloc, true),
 
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle__intercept_realloc(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+  auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
+  auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+  auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
+  auto mem = executor.Memory(state, mem_uint);
+  uint64_t addr;
+
+
+  //auto addr = mem->TryMalloc(size);
+  executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
+}
 
 void SpecialFunctionHandler::handle__intercept_calloc(
     ExecutionState &state, KInstruction *target,

@@ -241,7 +241,7 @@ class SpecialFunctionHandler {
   HANDLER(handle__intercept_malloc);
   HANDLER(handle__intercept_free);
   HANDLER(handle__intercept_calloc);
-
+  HANDLER(handle__intercept_realloc);
 
 #undef HANDLER
 };

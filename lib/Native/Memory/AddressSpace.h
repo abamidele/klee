@@ -134,6 +134,7 @@ class AddressSpace : public Memory {
   
   bool TryFree(uint64_t addr);
   uint64_t TryMalloc(size_t alloc_size);
+  uint64_t TryRealloc(uint64_t addr, size_t alloc_size);
 
 
  private:
