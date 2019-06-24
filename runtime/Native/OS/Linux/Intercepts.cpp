@@ -23,6 +23,9 @@ extern "C" {
   void free_intercept( Memory *memory, addr_t ptr);
   addr_t calloc_intercept( Memory *memory, uint64_t size);
   addr_t realloc_intercept( Memory *memory, addr_t ptr,  uint64_t size);
+  size_t malloc_size( Memory *memory, addr_t ptr);
+  addr_t independent_calloc_intercept(Memory *memory, size_t n_elements,size_t size);
+  addr_t independent_comalloc_intercept(Memory *memory, size_t n_elements, size_t size);
 }
 
 template <typename ABI>
@@ -136,23 +139,79 @@ static Memory *Intercept__Znwm(Memory *memory, State *state,
   DO_INTERCEPT_MALLOC()
 }
 
-/*
-add("_ZdaPv", handleDeleteArray, false),
-// operator delete(void*)
-add("_ZdlPv", handleDelete, false),
+template <typename ABI>
+static Memory *Intercept_valloc(Memory *memory, State *state,
+                       const ABI &intercept) {
+  DO_INTERCEPT_MALLOC()
+}
 
-// operator new[](unsigned int)
-add("_Znaj", handleNewArray, true),
-// operator new(unsigned int)
-add("_Znwj", handleNew, true),
+template <typename ABI>
+static Memory *Intercept_memalign(Memory *memory, State *state,
+                       const ABI &intercept) {
+  size_t alignment;
+  size_t size;
+  if (!intercept.TryGetArgs(memory, state, &alignment, &size)) {
+    STRACE_ERROR(read, "Couldn't get args");
+    return intercept.SetReturn(0, state, 0);
+  }
+  addr_t ptr = malloc_intercept(memory, size);
+  return intercept.SetReturn(memory, state, ptr);
+}
 
-// FIXME-64: This is wrong for 64-bit long...
 
-// operator new[](unsigned long)
-add("_Znam", handleNewArray, true),
-// operator new(unsigned long)
-add("_Znwm", handleNew, true),
-*/
+template <typename ABI>
+static Memory *Intercept_independent_calloc(Memory *memory, State *state,
+                       const ABI &intercept) {
+  size_t n_elements;
+  size_t size;
+  addr_t chunks;
+  if (!intercept.TryGetArgs(memory, state, &n_elements, &size, &chunks)) {
+    STRACE_ERROR(read, "Couldn't get args");
+    return intercept.SetReturn(0, state, 0);
+    }
+
+  chunks = independent_calloc_intercept(memory, n_elements, size);
+  return intercept.SetReturn(memory, state, chunks);
+}
+
+template <typename ABI>
+static Memory *Intercept_independent_comalloc(Memory *memory, State *state,
+                       const ABI &intercept) {
+  size_t n_elements;
+  addr_t sizes;
+  addr_t chunks;
+  if (!intercept.TryGetArgs(memory, state, &n_elements, &sizes, &chunks)) {
+    STRACE_ERROR(read, "Couldn't get args");
+    return intercept.SetReturn(0, state, 0);
+  }
+
+  chunks = independent_comalloc_intercept(memory, n_elements, sizes);
+  return intercept.SetReturn(memory, state, chunks);
+}
+
+template <typename ABI>
+static Memory *Intercept_pvalloc(Memory *memory, State *state,
+                       const ABI &intercept) {
+  DO_INTERCEPT_MALLOC()
+}
+
+template <typename ABI>
+static Memory *Intercept_malloc_trim(Memory *memory, State *state,
+                       const ABI &intercept) {
+  return intercept.SetReturn(memory, state, 0);
+}
+
+template <typename ABI>
+static Memory *Intercept_malloc_usable_size(Memory *memory, State *state,
+                       const ABI &intercept) {
+  addr_t ptr;
+  if (!intercept.TryGetArgs(memory, state, &ptr)) {
+    STRACE_ERROR(read, "Couldn't get args");
+    return intercept.SetReturn(0, state, 0);
+  }
+  addr_t size = malloc_size(memory, ptr);
+  return intercept.SetReturn(memory, state, size);
+}
 
 
 }  // namespace

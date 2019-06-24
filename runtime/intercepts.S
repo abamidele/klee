@@ -19,9 +19,31 @@
 TEXT_SECTION
 
 #define INTERCEPT(name, id) \
-     .globl SYMBOL(name) ; \
-     SYMBOL(name): \
-     int $ ##id ; \
-     ret ;
+  .globl SYMBOL(name) ; \
+   SYMBOL(name): \
+   int $ ##id ; \
+   ret ;
+
+#define INTERCEPT_ALIAS(name, id) \
+  INTERCEPT(name, id)\
+  INTERCEPT(dl##name, id)\
+  INTERCEPT(__libc_##name, id)\
+  INTERCEPT(__GI___libc_##name, id)
+
+#define IGNORE(name) \
+  .globl SYMBOL(name) ; \
+  SYMBOL(name): \
+  xor %eax, %eax ; \
+  ret ;
+
+#define IGNORE_ALIAS(name) \
+  IGNORE(name)\
+  IGNORE(dl##name)\
+  IGNORE(__libc_##name)\
+  IGNORE(__GI___libc_##name)
 
 #include "intercepts.inc"
+
+IGNORE_ALIAS(mallinfo)
+IGNORE_ALIAS(mallopt)
+IGNORE_ALIAS(malloc_stats)

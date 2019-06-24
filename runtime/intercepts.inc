@@ -14,14 +14,22 @@
  * limitations under the License.
  */
 
+
 INTERCEPT(strtol, 0xa1)
-INTERCEPT(malloc, 0xa2)
-INTERCEPT(free, 0xa3)
-INTERCEPT(realloc, 0xa4)
-INTERCEPT(calloc, 0xa5)
+INTERCEPT_ALIAS(malloc, 0xa2)
+INTERCEPT_ALIAS(free, 0xa3)
+INTERCEPT_ALIAS(realloc, 0xa4)
+INTERCEPT_ALIAS(calloc, 0xa5)
 INTERCEPT(_ZdaPv, 0xa6)
 INTERCEPT(_ZdlPv, 0xa7)
 INTERCEPT(_Znaj, 0xa8)
 INTERCEPT(_Znwj, 0xa9)
 INTERCEPT(_Znam, 0xaa)
 INTERCEPT(_Znwm, 0xab)
+INTERCEPT_ALIAS(memalign, 0xac)
+INTERCEPT_ALIAS(valloc, 0xad)
+INTERCEPT_ALIAS(independent_calloc, 0xb0)
+INTERCEPT_ALIAS(independent_comalloc, 0xb1)
+INTERCEPT_ALIAS(pvalloc, 0xb2)
+INTERCEPT_ALIAS(malloc_trim, 0xb3)
+INTERCEPT_ALIAS(malloc_usable_size, 0xb4)

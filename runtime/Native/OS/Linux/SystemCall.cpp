@@ -155,6 +155,7 @@ static Memory *X86SystemCall(Memory *memory, State *state,
 // entry points.
 
 #define INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
+#define INTERCEPT_ALIAS(name, id) case id: return Intercept_ ##name(memory, state, intercept);
 
 template <typename ABI>
 static Memory *AMD64LibcIntercept(Memory *memory, State *state,
