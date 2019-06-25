@@ -174,6 +174,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     LOG(ERROR) << "Invalid Access Error on realloc";
     return 0;
   }
+
   if (alloc_lists.find(alloc_size) == alloc_lists.end()) {
     alloc_lists.emplace(std::make_pair(alloc_size, AllocList()));
   }

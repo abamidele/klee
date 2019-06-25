@@ -13,44 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#include "remill/Arch/Assembly.S"
+#include <dlfcn.h>
 
 #define STR_HELPER(id) #id
 #define STR(id) STR_HELPER(id)
-#define RTLD_NEXT 0xffffffffffffffff
+#define RTLD_NEXT -1
 
-TEXT_SECTION
+/*
+void *libc;
+
+__attribute__((constructor)) void init(void){
+  libc = dlopen("libc.so", RTLD_NEXT);
+}
+*/
 
 #define INTERCEPT(name, id) \
-  .globl SYMBOL(name) ; \
-   SYMBOL(name): \
-   push %rcx ; \
-   push %rdx ; \
-   push %rsi ; \
-   push %rdi ; \
-   push %r8 ; \
-   push %r9 ;  \
-   push %r10 ; \
-   push %r11 ; \
-   mov $ ##RTLD_NEXT, %rdi; \
-   .section .data; \
-   1: .string STR(id); \
-   .section .text; \
-   mov $1b, %rsi; \
-   call dlsym; \
-   pop %r11; \
-   pop %r10;  \
-   pop %r9;  \
-   pop %r8;  \
-   pop %rdi;  \
-   pop %rsi;  \
-   pop %rdx;  \
-   pop %rcx;  \
-   jmp %rax;  \
-   ret ;  \
-   int $ ##id ; \
-   ret ;
+  __attribute__((naked)) void name() { \
+    asm ( \
+      "push %%rcx; " \
+      "push %%rdx; " \
+      "push %%rsi; " \
+      "push %%rdi; " \
+      "push %%r8; " \
+      "push %%r9; " \
+      "push %%r10; " \
+      "push %%r11; " \
+      : \
+      ); \
+    register void *f asm("rax") = dlsym(RTLD_NEXT, STR(name)); \
+    asm ( \
+      "pop %%r11;"  \
+      "pop %%r10;"  \
+      "pop %%r9;"  \
+      "pop %%r8;"  \
+      "pop %%rdi;"  \
+      "pop %%rsi;"  \
+      "pop %%rdx;"  \
+      "pop %%rcx;"  \
+      "add $8, %%rsp;" \
+      "jmp %0;"  \
+      "ret ;"  \
+      "int $" STR(id) ";" \
+      "ret;"  \
+      : \
+      : "r"(f) \
+   );\
+  }
 
 #define INTERCEPT_ALIAS(name, id) \
   INTERCEPT(name, id)\
@@ -59,10 +67,13 @@ TEXT_SECTION
   INTERCEPT(__GI___libc_##name, id)
 
 #define IGNORE(name) \
-  .globl SYMBOL(name) ; \
-  SYMBOL(name): \
-  xor %eax, %eax ; \
-  ret ;
+  __attribute__((naked)) inline int name() { \
+    asm ( \
+          "xor %eax, %eax;" \
+          "ret;" \
+          : \
+      ); \
+    } \
 
 #define IGNORE_ALIAS(name) \
   IGNORE(name)\
