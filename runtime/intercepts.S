@@ -20,37 +20,57 @@
 #define STR(id) STR_HELPER(id)
 #define RTLD_NEXT 0xffffffffffffffff
 
-TEXT_SECTION
 
 #define INTERCEPT(name, id) \
-  .globl SYMBOL(name) ; \
-   SYMBOL(name): \
-   push %rcx ; \
-   push %rdx ; \
-   push %rsi ; \
-   push %rdi ; \
-   push %r8 ; \
-   push %r9 ;  \
-   push %r10 ; \
-   push %r11 ; \
-   mov $ ##RTLD_NEXT, %rdi; \
-   .section .data; \
-   1: .string STR(id); \
-   .section .text; \
-   mov $1b, %rsi; \
-   call dlsym; \
-   pop %r11; \
-   pop %r10;  \
-   pop %r9;  \
-   pop %r8;  \
-   pop %rdi;  \
-   pop %rsi;  \
-   pop %rdx;  \
-   pop %rcx;  \
-   jmp %rax;  \
-   ret ;  \
-   int $ ##id ; \
-   ret ;
+.intel_syntax noprefix \
+ DATA_SECTION ; \
+ .Laddr_ ## name : \
+ .quad .Lfind_ ## name ; \
+ CONST_SECTION ; \
+ .Lname_ ## name: \
+ .asciz #name ; \
+ TEXT_SECTION ; \
+ .globl SYMBOL(name) ; \
+SYMBOL(name): \
+ .intel_syntax noprefix \
+ jmp qword ptr [.Laddr_ ## name ] ; \
+ int $ ##id ; \
+ ret ; \
+.Lfind_ ## name : \
+   push    rax ; \
+   push    rsi ; \
+   push    rcx ; \
+   push    rdx ; \
+   push    rbx ; \
+   push    rbp ; \
+   push    r8 ; \
+   push    r9  ; \
+   push    r10  ; \
+   push    r11  ; \
+   push    r12 ; \
+   push    r13 ; \
+   push    r14 ; \
+   push    r15 ; \
+   xor edi, edi; \
+   not rdi; \
+   lea rsi, [rip + .Lname_ ## name] ; \
+  call dlsym; \
+  mov [.Laddr_ ## name], rax ; \
+   pop     r15 ; \
+   pop     r14 ; \
+   pop     r13 ; \
+   pop     r12 ; \
+   pop     r11 ; \
+   pop     r10 ; \
+   pop     r9 ; \
+   pop     r8 ; \
+   pop     rbp ; \
+   pop     rbx ; \
+   pop     rdx ; \
+   pop     rcx ; \
+   pop     rdi ; \
+   pop     rax ; \
+   jmp SYMBOL(name) ;  \TEXT_SECTION
 
 #define INTERCEPT_ALIAS(name, id) \
   INTERCEPT(name, id)\
@@ -70,6 +90,7 @@ TEXT_SECTION
   IGNORE(__libc_##name)\
   IGNORE(__GI___libc_##name)
 
+.intel_syntax noprefix
 #include "intercepts.inc"
 
 IGNORE_ALIAS(mallinfo)

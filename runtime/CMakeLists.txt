@@ -42,7 +42,7 @@ project(intercepts ASM)
 cmake_minimum_required(VERSION 3.2)
 
 set(CMAKE_ASM_CREATE_SHARED_LIBRARY ${CMAKE_C_CREATE_SHARED_LIBRARY})
-add_library( runtime-intercepts SHARED intercepts.c )
+add_library( runtime-intercepts SHARED intercepts.S )
 target_link_libraries( runtime-intercepts dl)
 
 target_include_directories(runtime-intercepts PUBLIC ${REMILL_SOURCE_DIR})

@@ -27,6 +27,7 @@ __attribute__((constructor)) void init(void){
 }
 */
 
+
 #define INTERCEPT(name, id) \
   __attribute__((naked)) void name() { \
     asm ( \
