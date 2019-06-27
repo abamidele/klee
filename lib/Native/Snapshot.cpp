@@ -605,6 +605,96 @@ static bool CopyTraceeMemoryWithPtrace(pid_t pid, uint64_t addr,
   return true;
 }
 
+#define PATCH_SIZE 53
+#define NOP_BYTE 0x90
+const uint8_t data[PATCH_SIZE] =
+{
+  0x48, 0x83, 0xec, 0x08, 0x51, 0x52, 0x56, 0x57, 0x41, 0x50, 0x41, 0x51, 0x41, 0x52, 0x41, 0x53,
+  0x48, 0x8d, 0x35, 0xca, 0x0a, 0x00, 0x00, 0x48, 0xc7, 0xc7, 0xff, 0xff, 0xff, 0xff, 0xe8, 0x9d,
+  0xfc, 0xff, 0xff, 0x41, 0x5b, 0x41, 0x5a, 0x41, 0x59, 0x41, 0x58, 0x5f, 0x5e, 0x5a, 0x59, 0x48,
+  0x83, 0xc4, 0x08, 0xff, 0xe0
+};
+
+void PerformInterceptPatching() {
+  for (size_t i=0; i < kPageBuffSize; ++i) {
+    if (static_cast<uint8_t>(gPageBuff[i]) == data[0]) {
+      uint64_t matches = 0;
+      for (size_t j=0; j < PATCH_SIZE; ++j){
+        if (static_cast<uint8_t>(gPageBuff[i+j]) == data[j]){
+          matches += 1;
+        }
+      }
+      if (matches > 40){
+        for (size_t j=0; j < PATCH_SIZE + 1; ++j){
+         printf("before: 0x%x\n", gPageBuff[i+j] );
+         gPageBuff[i+j] = NOP_BYTE;
+         printf("after: 0x%x\n", gPageBuff[i+j] );
+        }
+      }
+    }
+  }
+}
+
+/*
+ *
+void PerformInterceptPatching(){
+  static int call_count;
+  printf("CALL COUNT IS %d\n", ++call_count);
+  size_t start_data = 0;
+  size_t end_data = start_data;
+  for (size_t i=0; i<kPageBuffSize - PATCH_SIZE; ++i ) {
+    if ((static_cast<uint8_t>(gPageBuff[i]) == data[i % PATCH_SIZE]) &&
+        (static_cast<uint8_t>(gPageBuff[i + PATCH_SIZE - 1]) == data[(i + PATCH_SIZE - 1) % PATCH_SIZE])) {
+      printf("res1: %d\n", (static_cast<uint8_t>(gPageBuff[i]) == data[i % PATCH_SIZE]));
+      printf("res2: %d\n", (static_cast<uint8_t>(gPageBuff[i + PATCH_SIZE - 1]) == data[(i + PATCH_SIZE - 1) % PATCH_SIZE]));
+      printf("i is: %d\n", i);
+      printf("the start of the buffer at i: %d, %d\n", gPageBuff[i], data[i]);
+      printf("the end of the buffer at i + size: %d %d\n",
+          gPageBuff[i + PATCH_SIZE],
+          data[(i + PATCH_SIZE) % PATCH_SIZE]);
+      puts("---------------------");
+      puts("HIT THE MATCH CASE");
+      start_data = i;
+      end_data = start_data + PATCH_SIZE - 1;
+      printf("buff_start: 0x%x, data_start: 0x%x \n",
+          (static_cast<uint8_t>(gPageBuff[i]), data[i % PATCH_SIZE]));
+
+      printf("buff_end: 0x%x, data_end: 0x%x \n",
+          static_cast<uint8_t>(gPageBuff[i + PATCH_SIZE - 1]), data[(i + PATCH_SIZE - 1) % PATCH_SIZE]);
+      start_data = i;
+      end_data = start_data + PATCH_SIZE - 1;
+
+      while (start_data <= end_data) {
+
+        printf("buff_start: 0x%x, data_start: 0x%x \n",
+            (static_cast<uint8_t>(gPageBuff[start_data]), data[start_data % PATCH_SIZE]));
+
+        printf("buff_end: 0x%x, data_end: 0x%x \n",
+            static_cast<uint8_t>(gPageBuff[end_data]), data[end_data % PATCH_SIZE]);
+        ++start_data;
+        --end_data;
+
+
+        if ((static_cast<uint8_t>(gPageBuff[start_data]) != data[start_data % PATCH_SIZE]) ||
+            (static_cast<uint8_t>(gPageBuff[end_data]) != data[end_data % PATCH_SIZE])) {
+          break ;
+         }
+       }
+
+//        if ( start_data + 20 >= end_data ) {
+//          // patch i to i + PATCH_SIZE
+//         printf("start: %d, end: %d \n", start_data, end_data);
+//         for (size_t b=i; b < i + PATCH_SIZE; ++b) {
+//           printf("byte is 0x%x\n", static_cast<uint8_t>(gPageBuff[b]));
+//         }
+//         puts("************************************");
+//        }
+        //i = start_data;
+      }
+    }
+}
+*/
+
 // Copy memory from the tracee into the snapshot file.
 static void CopyTraceeMemory(
     pid_t pid, const klee::native::snapshot::AddressSpace *memory) {
@@ -651,13 +741,24 @@ static void CopyTraceeMemory(
             << info.file_path() << " at offset " << std::hex
             << info.file_offset() << " into " << dest_path << std::dec;
 
+
+
         for (i = 0; i < size_to_copy; i += kPageBuffSize) {
           memset(gPageBuff, 0, kPageBuffSize);
           if (kPageBuffSize == read(mapped_file_fd, gPageBuff, kPageBuffSize)) {
+            if (info.file_path().find("intercept") != std::string::npos) {
+              PerformInterceptPatching();
+            }
+/*            for (size_t k=0; k <kPageBuffSize; ++k){
+             printf("0x%x ", gPageBuff[k]);
+            }
+            puts("-------------------------------------------");*/
             lseek(dest_fd, i, SEEK_SET);
             write(dest_fd, gPageBuff, kPageBuffSize);
           }
         }
+
+
       } else {
         LOG(ERROR)
             << "Unable to open " << info.file_path() << " for reading";
@@ -680,6 +781,9 @@ static void CopyTraceeMemory(
       if (kPageBuffSize == read(mem_fd, gPageBuff, kPageBuffSize) ||
           CopyTraceeMemoryWithPtrace(pid, page_addr,
                                      kPageBuffSize, gPageBuff)) {
+        if (info.file_path().find("intercept") != std::string::npos) {
+          PerformInterceptPatching();
+        }
         lseek(dest_fd, i, SEEK_SET);
         write(dest_fd, gPageBuff, kPageBuffSize);
       } else {
