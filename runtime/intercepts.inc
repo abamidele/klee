@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+ASM_INTERCEPT( strtol, 0xa1 )
+ASM_INTERCEPT( realloc, 0xa4 )
 
-INTERCEPT(strtol, 0xa1)
-INTERCEPT_ALIAS(malloc, 0xa2)
-INTERCEPT_ALIAS(free, 0xa3)
-INTERCEPT_ALIAS(realloc, 0xa4)
-INTERCEPT_ALIAS(calloc, 0xa5)
+C_INTERCEPT(malloc, 0x81)
+C_INTERCEPT(calloc, 0x82)
+C_INTERCEPT(free, 0x83)
+
 /*
 INTERCEPT(_ZdaPv, 0xa6)
 INTERCEPT(_ZdlPv, 0xa7)

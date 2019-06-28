@@ -154,7 +154,8 @@ static Memory *X86SystemCall(Memory *memory, State *state,
 // 64-bit system call dispatcher for `int 0x80` and `sysenter` system call
 // entry points.
 
-#define INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
+#define ASM_INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
+#define C_INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
 #define INTERCEPT_ALIAS(name, id) case id: return Intercept_ ##name(memory, state, intercept);
 
 template <typename ABI>

@@ -605,31 +605,33 @@ static bool CopyTraceeMemoryWithPtrace(pid_t pid, uint64_t addr,
   return true;
 }
 
-#define PATCH_SIZE 53
+#define PATCH_SIZE 6
 #define NOP_BYTE 0x90
-const uint8_t data[PATCH_SIZE] =
+
+const uint8_t data[2] =
 {
-  0x48, 0x83, 0xec, 0x08, 0x51, 0x52, 0x56, 0x57, 0x41, 0x50, 0x41, 0x51, 0x41, 0x52, 0x41, 0x53,
-  0x48, 0x8d, 0x35, 0xca, 0x0a, 0x00, 0x00, 0x48, 0xc7, 0xc7, 0xff, 0xff, 0xff, 0xff, 0xe8, 0x9d,
-  0xfc, 0xff, 0xff, 0x41, 0x5b, 0x41, 0x5a, 0x41, 0x59, 0x41, 0x58, 0x5f, 0x5e, 0x5a, 0x59, 0x48,
-  0x83, 0xc4, 0x08, 0xff, 0xe0
+  0xff, 0x25
 };
+
+
 
 void PerformInterceptPatching() {
   for (size_t i=0; i < kPageBuffSize; ++i) {
     if (static_cast<uint8_t>(gPageBuff[i]) == data[0]) {
+      //printf("%x\n", static_cast<uint8_t>(gPageBuff[i]));
       uint64_t matches = 0;
       for (size_t j=0; j < PATCH_SIZE; ++j){
         if (static_cast<uint8_t>(gPageBuff[i+j]) == data[j]){
           matches += 1;
         }
       }
-      if (matches > 40){
-        for (size_t j=0; j < PATCH_SIZE + 1; ++j){
-         printf("before: 0x%x\n", gPageBuff[i+j] );
+      if (matches >= 2){
+        for (size_t j=0; j < PATCH_SIZE; ++j){
+         printf("0x%x ", gPageBuff[i+j] );
          gPageBuff[i+j] = NOP_BYTE;
-         printf("after: 0x%x\n", gPageBuff[i+j] );
+         //printf("after: 0x%x\n", gPageBuff[i+j] );
         }
+        puts("");
       }
     }
   }

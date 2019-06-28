@@ -20,79 +20,122 @@
 #define STR(id) STR_HELPER(id)
 #define RTLD_NEXT 0xffffffffffffffff
 
+.intel_syntax noprefix
 
-#define INTERCEPT(name, id) \
-.intel_syntax noprefix \
- DATA_SECTION ; \
- .Laddr_ ## name : \
- .quad .Lfind_ ## name ; \
- CONST_SECTION ; \
- .Lname_ ## name: \
- .asciz #name ; \
- TEXT_SECTION ; \
- .globl SYMBOL(name) ; \
-SYMBOL(name): \
- .intel_syntax noprefix \
- jmp qword ptr [.Laddr_ ## name ] ; \
- int $ ##id ; \
- ret ; \
-.Lfind_ ## name : \
-   push    rax ; \
-   push    rsi ; \
-   push    rcx ; \
-   push    rdx ; \
-   push    rbx ; \
-   push    rbp ; \
-   push    r8 ; \
-   push    r9  ; \
-   push    r10  ; \
-   push    r11  ; \
-   push    r12 ; \
-   push    r13 ; \
-   push    r14 ; \
-   push    r15 ; \
-   xor edi, edi; \
-   not rdi; \
-   lea rsi, [rip + .Lname_ ## name] ; \
-  call dlsym; \
-  mov [.Laddr_ ## name], rax ; \
-   pop     r15 ; \
-   pop     r14 ; \
-   pop     r13 ; \
-   pop     r12 ; \
-   pop     r11 ; \
-   pop     r10 ; \
-   pop     r9 ; \
-   pop     r8 ; \
-   pop     rbp ; \
-   pop     rbx ; \
-   pop     rdx ; \
-   pop     rcx ; \
-   pop     rdi ; \
-   pop     rax ; \
-   jmp SYMBOL(name) ;  \TEXT_SECTION
+TEXT_SECTION
 
-#define INTERCEPT_ALIAS(name, id) \
-  INTERCEPT(name, id)\
-  INTERCEPT(dl##name, id)\
-  INTERCEPT(__libc_##name, id)\
-  INTERCEPT(__GI___libc_##name, id)
+.extern SYMBOL(dlsym)
+.extern SYMBOL(intercepted_malloc)
+.extern SYMBOL(intercepted_calloc)
+.extern SYMBOL(intercepted_free)
+
+DATA_SECTION
+.Ldlsym_addr:
+   .quad SYMBOL(dlsym)
+
+.Lintercepted_malloc_addr:
+   .quad SYMBOL(intercepted_malloc)
+
+.Lintercepted_calloc_addr:
+   .quad SYMBOL(intercepted_calloc)
+
+.Lintercepted_free_addr:
+   .quad SYMBOL(intercepted_free)
+
+#define C_INTERCEPT(name, id) \
+   TEXT_SECTION ; \
+   .globl SYMBOL(name) ; \
+   SYMBOL(name): \
+       jmp       qword ptr [rip + .Lintercepted_ ## name ##_addr ] ; \
+       .balign 16, 0x90 ; \
+       int     id ; \
+       ret ; \
+
+#define ASM_INTERCEPT(name, id) \
+   DATA_SECTION ; \
+   .Laddr_ ## name : \
+       .quad .Lfind_ ## name ; \
+   .Lname_ ## name: \
+       .asciz #name ; \
+   TEXT_SECTION ; \
+   .globl SYMBOL(name) ; \
+   SYMBOL(name): \
+       jmp     qword ptr [rip + .Laddr_ ## name ] ; \
+       int     id ; \
+       ret ; \
+   .Lfind_ ## name : \
+       push    rax ; \
+       push    rdi ; \
+       push    rsi ; \
+       push    rcx ; \
+       push    rdx ; \
+       push    rbx ; \
+       push    rbp ; \
+       push    r8 ; \
+       push    r9  ; \
+       push    r10  ; \
+       push    r11  ; \
+       push    r12 ; \
+       push    r13 ; \
+       push    r14 ; \
+       push    r15 ; \
+       xor     edi, edi; \
+       not     rdi; \
+       lea     rsi, [rip + .Lname_ ## name] ; \
+       call    qword ptr [rip + .Ldlsym_addr] ; \
+       mov     qword ptr [rip + .Laddr_ ## name], rax ; \
+       pop     r15 ; \
+       pop     r14 ; \
+       pop     r13 ; \
+       pop     r12 ; \
+       pop     r11 ; \
+       pop     r10 ; \
+       pop     r9 ; \
+       pop     r8 ; \
+       pop     rbp ; \
+       pop     rbx ; \
+       pop     rdx ; \
+       pop     rcx ; \
+       pop     rsi ; \
+       pop     rdi ; \
+       pop     rax ; \
+       jmp     SYMBOL(name) ;
+
+#define ALIAS(name, other_name) \
+   TEXT_SECTION ; \
+   .globl SYMBOL(name) ; \
+   SYMBOL(name): \
+       jmp SYMBOL(other_name) ;
 
 #define IGNORE(name) \
-  .globl SYMBOL(name) ; \
-  SYMBOL(name): \
-  xor %eax, %eax ; \
-  ret ;
+   TEXT_SECTION ; \
+   .globl SYMBOL(name) ; \
+   SYMBOL(name): \
+       xor eax, eax ; \
+       ret ;
 
-#define IGNORE_ALIAS(name) \
-  IGNORE(name)\
-  IGNORE(dl##name)\
-  IGNORE(__libc_##name)\
-  IGNORE(__GI___libc_##name)
+ALIAS(__libc_malloc, malloc)
+ALIAS(__GI___libc_malloc, malloc)
+ALIAS(dlmalloc, malloc)
 
-.intel_syntax noprefix
+ALIAS(__libc_calloc, calloc)
+ALIAS(__GI___libc_calloc, calloc)
+ALIAS(dlcalloc, calloc)
+
+ALIAS(__libc_free, free)
+ALIAS(__GI___libc_free, free)
+ALIAS(dlfree, free)
+
+IGNORE(mallinfo)
+ALIAS(__libc_mallinfo, mallinfo)
+ALIAS(__GI___libc_mallinfo, mallinfo)
+
+IGNORE(mallopt)
+ALIAS(__libc_mallopt, mallopt)
+ALIAS(__GI___libc_mallopt, mallopt)
+
+IGNORE(malloc_stats)
+ALIAS(__libc_malloc_stats, malloc_stats)
+ALIAS(__GI___libc_malloc_stats, malloc_stats)
+
 #include "intercepts.inc"
-
-IGNORE_ALIAS(mallinfo)
-IGNORE_ALIAS(mallopt)
-IGNORE_ALIAS(malloc_stats)
