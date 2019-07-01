@@ -42,23 +42,26 @@ static void *reentrant_calloc(unsigned long long a, unsigned long long b) {
   return ret;
 }
 
+
+static void reentrant_free(void *ptr) {
+}
+
 static int is_reentrant = 0;
 void *(*real_malloc)(unsigned long long) = NULL;
 void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
 void (*real_free)(void *) = NULL;
 
-void *(*og_malloc)(unsigned long long) = NULL;
-
-void (*og_free)(void *) = NULL;
-
-void *(*og_calloc)(unsigned long long, unsigned long long) = NULL;
-
-
 __attribute__((initializer))
-void init() {
-  og_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
-  og_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(RTLD_NEXT, "calloc");
-  og_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
+void init(void) {
+  real_malloc = reentrant_malloc;
+  real_calloc = reentrant_calloc;
+  real_free = reentrant_free;
+  void *(*og_malloc)(unsigned long long) = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
+  void *(*og_calloc)(unsigned long long, unsigned long long) = (void *(*)(unsigned long long, unsigned long long)) dlsym(RTLD_NEXT, "calloc");
+  void (*og_free)(void *) = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
+  real_malloc = og_malloc;
+  real_calloc = og_calloc;
+  real_free = og_free;
 }
 
 void *intercepted_malloc(unsigned long long a) {
@@ -66,11 +69,9 @@ void *intercepted_malloc(unsigned long long a) {
     return reentrant_malloc(a);
   } else if (!real_malloc) {
     is_reentrant++;
-    printf("re-entrant++: %d\n", is_reentrant);
+    real_malloc = reentrant_malloc;
     real_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
     is_reentrant--;
-
-    printf("re-entrant++: %d\n", is_reentrant);
   }
   return real_malloc(a);
 }
@@ -80,11 +81,10 @@ void *intercepted_calloc(unsigned long long a, unsigned long long b) {
     return reentrant_calloc(a, b);
   } else if (!real_calloc) {
     is_reentrant++;
-    //printf("re-entrant++: %d\n", is_reentrant);
+    real_calloc = reentrant_calloc;
     real_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(
         RTLD_NEXT, "calloc");
     is_reentrant--;
-    //printf("re-entrant++: %d\n", is_reentrant);
   }
   return real_calloc(a, b);
 }
@@ -96,10 +96,9 @@ void intercepted_free(void *ptr) {
     return;
   } else if (!real_free) {
     is_reentrant++;
-    printf("re-entrant++: %d\n", is_reentrant);
+    real_free = reentrant_free;
     real_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
     is_reentrant--;
-    printf("re-entrant++: %d\n", is_reentrant);
   }
   real_free(ptr);
 }
