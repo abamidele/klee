@@ -65,40 +65,26 @@ void init(void) {
 }
 
 void *intercepted_malloc(unsigned long long a) {
-  if (is_reentrant) {
-    return reentrant_malloc(a);
-  } else if (!real_malloc) {
-    is_reentrant++;
+  if (!real_malloc) {
     real_malloc = reentrant_malloc;
     real_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
-    is_reentrant--;
   }
   return real_malloc(a);
 }
 
 void *intercepted_calloc(unsigned long long a, unsigned long long b) {
-  if (is_reentrant) {
-    return reentrant_calloc(a, b);
-  } else if (!real_calloc) {
-    is_reentrant++;
+  if (!real_calloc) {
     real_calloc = reentrant_calloc;
     real_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(
         RTLD_NEXT, "calloc");
-    is_reentrant--;
   }
   return real_calloc(a, b);
 }
 
 void intercepted_free(void *ptr) {
-  if (ptr >= &(bump_region[0]) && ptr < bump_end) {
-    return;
-  } else if (is_reentrant) {
-    return;
-  } else if (!real_free) {
-    is_reentrant++;
+  if (!real_free) {
     real_free = reentrant_free;
     real_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
-    is_reentrant--;
   }
   real_free(ptr);
 }
