@@ -56,14 +56,22 @@ DATA_SECTION
 
 
 #define C_INTERCEPT(name, id) \
+   DATA_SECTION ; \
+   .extern SYMBOL(real_ ## name) ; \
+   .Lreal_ ## name ## _addr: \
+      .quad SYMBOL(real_ ## name) ; \
    TEXT_SECTION ; \
    .globl SYMBOL(name) ; \
    SYMBOL(name): \
-       nop dword ptr [eax + 00] ; \
-       jmp       qword ptr [rip + .Lintercepted_ ## name ##_addr ] ; \
-       int     id ; \
+       nop      dword ptr [eax + 00] ; \
+       jmp      qword ptr [rip + .Lintercepted_ ## name ##_addr ] ; \
+       int      id ; \
        ret ; \
-       jmp       qword ptr [rip + .Log_ ## name ##_addr ] ; \
+       push     r10 ; \
+       mov      r10, qword ptr [rip + .Lreal_ ## name ## _addr ]; \
+       mov      r10, qword ptr [r10]; \
+       xchg     [rsp], r10 ; \
+       ret ; \
 
 #define ASM_INTERCEPT(name, id) \
    DATA_SECTION ; \
@@ -78,6 +86,8 @@ DATA_SECTION
        jmp     qword ptr [rip + .Laddr_ ## name ] ; \
        int     id ; \
        ret ; \
+   .Lfound_ ## name: \
+       jmp     qword ptr [rip + .Laddr_ ## name ] ; \
    .Lfind_ ## name : \
        push    rax ; \
        push    rdi ; \
@@ -114,7 +124,7 @@ DATA_SECTION
        pop     rsi ; \
        pop     rdi ; \
        pop     rax ; \
-       jmp     SYMBOL(name) ;
+       jmp     .Lfound_ ## name ;
 
 #define ALIAS(name, other_name) \
    TEXT_SECTION ; \

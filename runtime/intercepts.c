@@ -13,77 +13,93 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <dlfcn.h>
 
-#define STR_HELPER(id) #id
-#define STR(id) STR_HELPER(id)
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <stdlib.h>
+
+#define BUMP_REGION_SIZE 4098
 #define RTLD_NEXT -1
 
-/*
-void *libc;
+static char bump_region[BUMP_REGION_SIZE];
+static char *bump = &(bump_region[0]);
+static const char * const bump_end = &(bump_region[BUMP_REGION_SIZE]);
 
-__attribute__((constructor)) void init(void){
-  libc = dlopen("libc.so", RTLD_NEXT);
-}
-*/
-
-
-#define INTERCEPT(name, id) \
-  __attribute__((naked)) void name() { \
-    asm ( \
-      "push %%rcx; " \
-      "push %%rdx; " \
-      "push %%rsi; " \
-      "push %%rdi; " \
-      "push %%r8; " \
-      "push %%r9; " \
-      "push %%r10; " \
-      "push %%r11; " \
-      : \
-      ); \
-    register void *f asm("rax") = dlsym(RTLD_NEXT, STR(name)); \
-    asm ( \
-      "pop %%r11;"  \
-      "pop %%r10;"  \
-      "pop %%r9;"  \
-      "pop %%r8;"  \
-      "pop %%rdi;"  \
-      "pop %%rsi;"  \
-      "pop %%rdx;"  \
-      "pop %%rcx;"  \
-      "add $8, %%rsp;" \
-      "jmp %0;"  \
-      "ret ;"  \
-      "int $" STR(id) ";" \
-      "ret;"  \
-      : \
-      : "r"(f) \
-   );\
+static void *reentrant_malloc(unsigned long long size) {
+  char *ret = bump;
+  bump += size;
+  if (bump <= bump_end) {
+    return ret;
+  } else {
+    bump = &(bump_region[0]);
+    return reentrant_malloc(size);
   }
+}
 
-#define INTERCEPT_ALIAS(name, id) \
-  INTERCEPT(name, id)\
-  INTERCEPT(dl##name, id)\
-  INTERCEPT(__libc_##name, id)\
-  INTERCEPT(__GI___libc_##name, id)
+static void *reentrant_calloc(unsigned long long a, unsigned long long b) {
+  void *ret = reentrant_malloc(a * b);
+  bzero(ret, a * b);
+  return ret;
+}
 
-#define IGNORE(name) \
-  __attribute__((naked)) inline int name() { \
-    asm ( \
-          "xor %eax, %eax;" \
-          "ret;" \
-          : \
-      ); \
-    } \
+static int is_reentrant = 0;
+void *(*real_malloc)(unsigned long long) = NULL;
+void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
+void (*real_free)(void *) = NULL;
 
-#define IGNORE_ALIAS(name) \
-  IGNORE(name)\
-  IGNORE(dl##name)\
-  IGNORE(__libc_##name)\
-  IGNORE(__GI___libc_##name)
+void *(*og_malloc)(unsigned long long) = NULL;
 
-#include "intercepts.inc"
+void (*og_free)(void *) = NULL;
 
-IGNORE_ALIAS(mallinfo)
-IGNORE_ALIAS(mallopt)
-IGNORE_ALIAS(malloc_stats)
+void *(*og_calloc)(unsigned long long, unsigned long long) = NULL;
+
+
+__attribute__((initializer))
+void init() {
+  og_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
+  og_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(RTLD_NEXT, "calloc");
+  og_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
+}
+
+void *intercepted_malloc(unsigned long long a) {
+  if (is_reentrant) {
+    return reentrant_malloc(a);
+  } else if (!real_malloc) {
+    is_reentrant++;
+    printf("re-entrant++: %d\n", is_reentrant);
+    real_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
+    is_reentrant--;
+
+    printf("re-entrant++: %d\n", is_reentrant);
+  }
+  return real_malloc(a);
+}
+
+void *intercepted_calloc(unsigned long long a, unsigned long long b) {
+  if (is_reentrant) {
+    return reentrant_calloc(a, b);
+  } else if (!real_calloc) {
+    is_reentrant++;
+    //printf("re-entrant++: %d\n", is_reentrant);
+    real_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(
+        RTLD_NEXT, "calloc");
+    is_reentrant--;
+    //printf("re-entrant++: %d\n", is_reentrant);
+  }
+  return real_calloc(a, b);
+}
+
+void intercepted_free(void *ptr) {
+  if (ptr >= &(bump_region[0]) && ptr < bump_end) {
+    return;
+  } else if (is_reentrant) {
+    return;
+  } else if (!real_free) {
+    is_reentrant++;
+    printf("re-entrant++: %d\n", is_reentrant);
+    real_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
+    is_reentrant--;
+    printf("re-entrant++: %d\n", is_reentrant);
+  }
+  real_free(ptr);
+}
