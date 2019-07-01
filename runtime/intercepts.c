@@ -46,7 +46,6 @@ static void *reentrant_calloc(unsigned long long a, unsigned long long b) {
 static void reentrant_free(void *ptr) {
 }
 
-static int is_reentrant = 0;
 void *(*real_malloc)(unsigned long long) = NULL;
 void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
 void (*real_free)(void *) = NULL;
