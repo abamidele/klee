@@ -20,7 +20,7 @@ namespace {
 extern "C" {
   long strtol_intercept(addr_t nptr, addr_t endptr, int base, Memory *memory);
   addr_t malloc_intercept( Memory *memory, uint64_t size);
-  void free_intercept( Memory *memory, addr_t ptr);
+  bool free_intercept( Memory *memory, addr_t ptr);
   addr_t calloc_intercept( Memory *memory, uint64_t size);
   addr_t realloc_intercept( Memory *memory, addr_t ptr,  uint64_t size);
   size_t malloc_size( Memory *memory, addr_t ptr);
@@ -45,13 +45,21 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
   exit(0);
 }
 
+
 #define DO_INTERCEPT_MALLOC() \
   size_t alloc_size; \
   if (!intercept.TryGetArgs(memory, state, &alloc_size)) { \
     STRACE_ERROR(read, "Couldn't get args"); \
     return intercept.SetReturn(0, state, 0); \
   } \
-  addr_t ptr = malloc_intercept(memory, alloc_size); \
+  addr_t ptr; \
+  if (alloc_size > (1U << 15U)) { \
+    printf("HIT THE BIIG MALLOC CASE WITH SIZE %lx\n", alloc_size); \
+    intercept.FallBack(state); \
+    ptr = 0; \
+  } else { \
+    ptr = malloc_intercept(memory, alloc_size); \
+  } \
   return intercept.SetReturn(memory, state, ptr); \
 
 #define DO_INTERCEPT_FREE() \
@@ -59,7 +67,10 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
     if (!intercept.TryGetArgs(memory, state, &address)) { \
       STRACE_ERROR(read, "Couldn't get args"); \
     } else { \
-      free_intercept(memory, address); \
+      if (!free_intercept(memory, address)) { \
+        printf("HIT THE NATURAL FREE CASE AT ADDRESS 0x%lx\n", address); \
+        intercept.FallBack(state); \
+      } \
     } \
     return memory; \
 

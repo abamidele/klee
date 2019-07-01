@@ -28,6 +28,9 @@ TEXT_SECTION
 .extern SYMBOL(intercepted_malloc)
 .extern SYMBOL(intercepted_calloc)
 .extern SYMBOL(intercepted_free)
+.extern SYMBOL(og_malloc)
+.extern SYMBOL(og_calloc)
+.extern SYMBOL(og_free)
 
 DATA_SECTION
 .Ldlsym_addr:
@@ -42,14 +45,25 @@ DATA_SECTION
 .Lintercepted_free_addr:
    .quad SYMBOL(intercepted_free)
 
+.Log_malloc_addr:
+   .quad SYMBOL(intercepted_malloc)
+
+.Log_calloc_addr:
+   .quad SYMBOL(intercepted_calloc)
+
+.Log_free_addr:
+   .quad SYMBOL(intercepted_free)
+
+
 #define C_INTERCEPT(name, id) \
    TEXT_SECTION ; \
    .globl SYMBOL(name) ; \
    SYMBOL(name): \
+       nop dword ptr [eax + 00] ; \
        jmp       qword ptr [rip + .Lintercepted_ ## name ##_addr ] ; \
-       .balign 16, 0x90 ; \
        int     id ; \
        ret ; \
+       jmp       qword ptr [rip + .Log_ ## name ##_addr ] ; \
 
 #define ASM_INTERCEPT(name, id) \
    DATA_SECTION ; \
@@ -60,6 +74,7 @@ DATA_SECTION
    TEXT_SECTION ; \
    .globl SYMBOL(name) ; \
    SYMBOL(name): \
+       nop     dword ptr [eax + 00] ; \
        jmp     qword ptr [rip + .Laddr_ ## name ] ; \
        int     id ; \
        ret ; \

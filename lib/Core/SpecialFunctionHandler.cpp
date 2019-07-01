@@ -212,7 +212,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     
     add("strtol_intercept", handle__intercept_strtol, true),
     add("malloc_intercept", handle__intercept_malloc, true),
-    add("free_intercept", handle__intercept_free, false),
+    add("free_intercept", handle__intercept_free, true),
 	  add("calloc_intercept", handle__intercept_calloc, true),
 	  add("realloc_intercept", handle__intercept_realloc, true),
 	  add("handle_malloc_size", handle_malloc_size, true),
@@ -304,6 +304,8 @@ void SpecialFunctionHandler::handle__intercept_realloc(
   auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
+  LOG(INFO) << "REALLOC WAS CALLED ON PTR " << std::hex << ptr_uint << std::dec << " and wanted to expand to size " << size;
+  exit(0);
   uint64_t addr = mem->TryRealloc(ptr_uint, size);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
@@ -311,6 +313,8 @@ void SpecialFunctionHandler::handle__intercept_realloc(
 void SpecialFunctionHandler::handle__intercept_calloc(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  LOG(INFO) << "DIED ON CALLOC";
+  exit(0);
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
@@ -348,6 +352,7 @@ void SpecialFunctionHandler::handle__intercept_malloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
+  printf("MALLOC SIZE IS : %d and ptr is 0x%lx\n", size, addr);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
@@ -358,10 +363,19 @@ void SpecialFunctionHandler::handle__intercept_free(
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
+  klee::native::Address addr = {};
+  addr.flat = ptr;
+  if (addr.must_be_fe != 0xfe) {
+    LOG(INFO) << "NATURAL FREE ADDR IN HANDLER IS " << std::hex << ptr << std::dec;
+    executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
+    return ;
+  }
   if(!mem->TryFree(ptr)) {
     LOG(ERROR) << "invalid free :-(";
   }
+  printf("FREE IS : 0x%lx\n", addr);
 
+  executor.bindLocal(target, state, ConstantExpr::create(true, Expr::Bool));
 }
 
 

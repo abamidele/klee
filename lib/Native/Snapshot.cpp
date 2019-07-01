@@ -605,15 +605,14 @@ static bool CopyTraceeMemoryWithPtrace(pid_t pid, uint64_t addr,
   return true;
 }
 
-#define PATCH_SIZE 6
+#define PATCH_SIZE 4
 #define NOP_BYTE 0x90
 
-const uint8_t data[2] =
+
+const uint8_t data[4] =
 {
-  0xff, 0x25
+  0x67, 0x0f, 0x1f, 0x00
 };
-
-
 
 void PerformInterceptPatching() {
   for (size_t i=0; i < kPageBuffSize; ++i) {
@@ -625,11 +624,11 @@ void PerformInterceptPatching() {
           matches += 1;
         }
       }
-      if (matches >= 2){
-        for (size_t j=0; j < PATCH_SIZE; ++j){
+      if (matches == 4){
+        for (size_t j=0; j < PATCH_SIZE + 6; ++j){
          printf("0x%x ", gPageBuff[i+j] );
          gPageBuff[i+j] = NOP_BYTE;
-         //printf("after: 0x%x\n", gPageBuff[i+j] );
+         printf("after: 0x%x\n", gPageBuff[i+j] );
         }
         puts("");
       }

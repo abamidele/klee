@@ -311,6 +311,10 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
     //LOG(INFO) << " hit the heap write case";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
+      LOG(ERROR) << "SIZE IS " << address.size;
+      for (auto& pairs: alloc_lists){
+        LOG(ERROR) << "size : " << pairs.first;
+      }
       LOG(ERROR) << "Invalid Memory Access In Malloced Memory Region On Write";
       return false;
     }

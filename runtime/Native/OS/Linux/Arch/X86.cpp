@@ -238,6 +238,10 @@ class Amd64LibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
         return 0;
     }
   }
+
+  void FallBack(State *state) const {
+    ++state->gpr.rip.aword;
+  }
 };
 
 extern "C" {
@@ -321,8 +325,8 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
       memory = AMD64LibcIntercept(memory, &state, intercept);
       if (intercept.Completed()) {
         ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
-        state.gpr.rip.aword = ret_addr;
-        task.last_pc = ret_addr;
+        //state.gpr.rip.aword = ret_addr;
+        task.last_pc = state.gpr.rip.aword;
         task.location = kTaskStoppedAfterHyperCall;
         task.status = kTaskStatusRunnable;
         task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);

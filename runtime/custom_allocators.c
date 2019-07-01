@@ -47,6 +47,20 @@ static void *(*real_malloc)(unsigned long long) = NULL;
 static void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
 static void (*real_free)(void *) = NULL;
 
+void *(*og_malloc)(unsigned long long) = NULL;
+
+void (*og_free)(void *) = NULL;
+
+void *(*og_calloc)(unsigned long long, unsigned long long) = NULL;
+
+
+__attribute__((initializer))
+void init() {
+  og_malloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "malloc");
+  og_calloc = (void *(*)(unsigned long long, unsigned long long)) dlsym(RTLD_NEXT, "calloc");
+  og_free = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
+}
+
 void *intercepted_malloc(unsigned long long a) {
   if (is_reentrant) {
     return reentrant_malloc(a);
