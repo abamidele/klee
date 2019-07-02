@@ -34,15 +34,15 @@ union Address {
   } __attribute__((packed));
 };
 
-static uint8_t under_flow_check = 0x0f;
-static uint8_t special_malloc_byte = 0xfe;
+static uint8_t under_flow_check = 0x0a;
+static uint8_t special_malloc_byte = 0xa;
 
 class AllocList {
  public:
   uint64_t Allocate(Address alloc_size);
   bool TryFree(Address addr);
-  bool TryRead(Address addr, uint8_t *byte_out);
-  bool TryWrite(Address addr, uint8_t byte);
+  bool TryRead(uint64_t addr, uint8_t *byte_out);
+  bool TryWrite(uint64_t addr, uint8_t byte);
 
   std::vector<bool> free_list;
   std::vector<std::shared_ptr<uint8_t[]>> allocations;

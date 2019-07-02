@@ -118,7 +118,7 @@ bool AddressSpace::TryFree(uint64_t addr) {
 
   // Realloc of a contained address.
   if (address.offset != 0) {
-    // TODO(sae): Report?
+    // TODO(sais): Report?
     return 0;
   }
 
@@ -160,14 +160,14 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   Address address = {};
   address.flat = addr;
 
-  if (address.must_be_0x1 != 0x1 ||
+  if (address.must_be_0x1 != 0x1 &&
       address.must_be_0xa != 0xa) {
     return 0;
   }
 
   // Realloc of a contained address.
   if (address.offset != 0) {
-    // TODO(sae): Report?
+    // TODO(sai): Report?
     return 0;
   }
 
@@ -208,7 +208,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     if (byte == kSymbolicByte) {
       auto it = symbolic_memory.find(addr + i);
       if (it != it_end) {
-        symbolic_memory.insert_or_assign(it->first, it->second);
+        symbolic_memory[it->first] =  it->second;
         symbolic_memory.erase(it->first);
       }
     }
@@ -244,8 +244,8 @@ bool AddressSpace::IsDead(void) const {
 bool AddressSpace::CanRead(uint64_t addr) const {
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
-    ;
+  if (address.must_be_0xa == 0xa &&
+      address.must_be_0x1 == 0x1) {
     return true;
   }
   return page_is_readable.count(AlignDownToPage(addr & addr_mask));
@@ -254,7 +254,8 @@ bool AddressSpace::CanRead(uint64_t addr) const {
 bool AddressSpace::CanWrite(uint64_t addr) const {
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa &&
+      address.must_be_0x1 == 0x1) {
     return true;
   }
   return page_is_writable.count(AlignDownToPage(addr & addr_mask));
@@ -267,7 +268,8 @@ bool AddressSpace::CanExecute(uint64_t addr) const {
 bool AddressSpace::CanReadAligned(uint64_t addr) const {
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa &&
+      address.must_be_0x1 == 0x1) {
     return true;
   }
   return page_is_readable.count(addr);
@@ -276,7 +278,8 @@ bool AddressSpace::CanReadAligned(uint64_t addr) const {
 bool AddressSpace::CanWriteAligned(uint64_t addr) const {
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa &&
+      address.must_be_0x1 == 0x1) {
     return true;
   }
   return page_is_writable.count(addr);
@@ -292,7 +295,7 @@ bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa) {
     //LOG(INFO) << "HIT THE HEAP READ CASE !!!!!";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
@@ -330,7 +333,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   Address address = { };
   address.flat = addr;
   // TODO(sai) check for underflow overflow stuff with special byte 0f
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa) {
     //LOG(INFO) << " hit the heap write case";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
@@ -385,7 +388,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = { };
   address.flat = addr;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa) {
     //LOG(INFO) << "HIT THE HEAP READ CASE !!!!!";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
@@ -409,7 +412,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
 	const auto addr = addr_ & addr_mask; \
 	Address address = {}; \
 	address.flat = addr; \
-	if (address.must_be_fe == klee::native::special_malloc_byte) { \
+	if (address.must_be_0xa == 0xa) { \
 		return TryRead(addr, val_out, sizeof(type)); \
 		\
 	} else { \
@@ -660,7 +663,7 @@ void AddressSpace::RemoveMap(uint64_t base_, size_t size) {
 bool AddressSpace::IsMapped(uint64_t find) const {
   Address address = { };
   address.flat = find;
-  if (address.must_be_fe == klee::native::special_malloc_byte) {
+  if (address.must_be_0xa == 0xa) {
     return true;
   }
   if (is_dead) {

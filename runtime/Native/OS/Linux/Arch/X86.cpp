@@ -320,17 +320,16 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     case AsyncHyperCall::kX86IntN: {
       printf("0x%lx\n", state.hyper_call_vector);
       puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
-      switch_to_normal_malloc = false;
       HandleLibcIntercept intercept;
-      memory = HandleLibcIntercept(memory, &state, intercept);
-      printf("SWITCH MALLOC FLAG %d\n", switch_to_normal_malloc);
       ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
       if (intercept.Completed()) {
+        puts("USING ALLOCATOR VERSION");
         state.gpr.rip.aword = ret_addr;
         task.last_pc = ret_addr;
 
       // If the intercept didn't complete, then skip over the `ret` instruction.
       } else {
+        puts("USING NORMAL VERSION");
         state.gpr.rip.aword = ret_addr + 1;
         task.last_pc = ret_addr + 1;
       }

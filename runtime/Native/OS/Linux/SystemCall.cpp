@@ -155,13 +155,13 @@ static Memory *X86SystemCall(Memory *memory, State *state,
 // entry points.
 
 template <typename ABI>
-static Memory *HandleLibcIntercept(Memory *memory, State *state,
+static Memory *HandleLibcInterceptCall(Memory *memory, State *state,
                                    const ABI &intercept) {
   const auto interrupt_num = intercept.GetInterruptNum(memory, state);
   switch (interrupt_num) {
 #define ASM_INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
 #define C_INTERCEPT(name, id) case id: return Intercept_ ##name(memory, state, intercept);
-#define INTERCEPT_ALIAS(name, id) case id: return Intercept_ ##name(memory, state, intercept);
+
 #include "runtime/intercepts.inc"
     default:
       STRACE_ERROR(libc_unsupported, ANSI_COLOR_MAGENTA "nr=%" PRIuADDR, interrupt_num);

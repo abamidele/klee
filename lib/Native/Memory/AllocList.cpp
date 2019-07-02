@@ -23,10 +23,14 @@ namespace native {
 uint64_t AllocList::Allocate(Address addr) {
 
   // Try to re-use a random one.
+  LOG(INFO) << "hit alloc case";
   size_t free_slot;
   bool found_free = false;
   size_t max_j = free_list.size();
-  auto i = static_cast<size_t>(rand()) % max_j;
+  LOG(INFO) << "after the size";
+  if (max_j > 0) {
+  uint64_t i = rand() % max_j;
+  LOG(INFO) << "before random replacement";
   for (size_t j = 0; j < max_j; ++j) {
     free_slot = (i + j) % max_j;
     if (free_list[free_slot]) {
@@ -34,7 +38,8 @@ uint64_t AllocList::Allocate(Address addr) {
       break;
     }
   }
-
+  }
+  LOG(INFO) << "after random replacement";
   auto mem = new uint8_t[addr.size];
 
   //LOG(INFO) << "free_slot is " << free_slot;
@@ -67,7 +72,7 @@ bool AllocList::TryFree(Address address) {
     return false;
   }
 
-  auto &is_free = free_list[alloc_index];
+  auto is_free = free_list[alloc_index];
 
   if (is_free) {
     LOG(ERROR)
@@ -75,7 +80,7 @@ bool AllocList::TryFree(Address address) {
     return true;  // To let it continue.
   }
   //LOG(INFO) << "the address freed: " << addr;
-  is_free = true;
+  free_list[alloc_index] = true;
   return true;
 }
 

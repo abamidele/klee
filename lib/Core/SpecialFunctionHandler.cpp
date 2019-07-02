@@ -365,7 +365,7 @@ void SpecialFunctionHandler::handle__intercept_free(
   auto mem = executor.Memory(state, mem_uint);
   klee::native::Address addr = {};
   addr.flat = ptr;
-  if (addr.must_be_fe != 0xfe) {
+  if (addr.must_be_0xa != 0xa) {
     LOG(INFO) << "NATURAL FREE ADDR IN HANDLER IS " << std::hex << ptr << std::dec;
     executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
     return ;

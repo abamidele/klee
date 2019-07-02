@@ -24,7 +24,7 @@
 static char bump_region[BUMP_REGION_SIZE];
 static const char * const bump_start = &(bump_region[0]);
 static const char * const bump_end = &(bump_region[BUMP_REGION_SIZE]);
-static char *bump = bump_start;
+static char *bump = &(bump_region[0]);
 
 static void *reentrant_malloc(unsigned long long size) {
   char *ret = bump;
@@ -100,7 +100,7 @@ void *intercepted_realloc(void *old, unsigned long long a) {
     real_realloc = reentrant_realloc;
     real_realloc = (void *(*)(unsigned long long)) dlsym(RTLD_NEXT, "realloc");
   }
-  return real_realloc(a);
+  return real_realloc(old, a);
 }
 
 void intercepted_free(void *ptr) {
