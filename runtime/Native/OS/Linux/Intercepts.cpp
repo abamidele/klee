@@ -56,7 +56,7 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
   if (alloc_size > (1U << 15U)) { \
     printf("HIT THE BIIG MALLOC CASE WITH SIZE %lx\n", alloc_size); \
     switch_to_normal_malloc = true ; \
-    return intercept.SetReturn(memory, state, 0x13337); \
+    return memory ; \
   } else { \
     ptr = malloc_intercept(memory, alloc_size);\
     return intercept.SetReturn(memory, state, ptr); \

@@ -203,7 +203,7 @@ class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
 
 // 64-bit libc/regular function call ABI.
 
-class Amd64LibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
+class HandleLibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
  // TODO(sai) support variable length arguments
  public:
   COMMON_X86_METHODS
@@ -300,6 +300,7 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
 
 #if 64 == ADDRESS_SIZE_BITS
     case AsyncHyperCall::kX86SysCall: {
+default_syscall:
       Amd64SyscallSystemCall syscall;
       memory = AMD64SystemCall(memory, &state, syscall);
       if(task.status == kTaskStatusExited) {
@@ -323,10 +324,13 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
       break;
     }
     case AsyncHyperCall::kX86IntN: {
+      if (state.hyper_call_vector == 0x80) {
+        goto default_syscall;
+      }
       printf("0x%lx\n", state.hyper_call_vector);
       puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
       switch_to_normal_malloc = false;
-      Amd64LibcIntercept intercept;
+      HandleLibcIntercept intercept;
       memory = AMD64LibcIntercept(memory, &state, intercept);
       printf("SWITCH MALLOC FLAG %d\n", switch_to_normal_malloc);
       if (intercept.Completed()) {
