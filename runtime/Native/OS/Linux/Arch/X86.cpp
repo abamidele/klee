@@ -202,10 +202,12 @@ class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
 
 
 // 64-bit libc/regular function call ABI.
+
 class Amd64LibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
  // TODO(sai) support variable length arguments
  public:
   COMMON_X86_METHODS
+
   addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
     return ret_addr;
   }
@@ -239,9 +241,10 @@ class Amd64LibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
     }
   }
 
-  void FallBack(State *state) const {
-    ++state->gpr.rip.aword;
+  addr_t FallBack(addr_t ret_addr) {
+    return ret_addr + 1;
   }
+
 };
 
 extern "C" {
@@ -294,6 +297,7 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     break;
 #endif
 
+
 #if 64 == ADDRESS_SIZE_BITS
     case AsyncHyperCall::kX86SysCall: {
       Amd64SyscallSystemCall syscall;
@@ -321,12 +325,18 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     case AsyncHyperCall::kX86IntN: {
       printf("0x%lx\n", state.hyper_call_vector);
       puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
+      switch_to_normal_malloc = false;
       Amd64LibcIntercept intercept;
       memory = AMD64LibcIntercept(memory, &state, intercept);
+      printf("SWITCH MALLOC FLAG %d\n", switch_to_normal_malloc);
       if (intercept.Completed()) {
         ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
-        //state.gpr.rip.aword = ret_addr;
-        task.last_pc = state.gpr.rip.aword;
+        state.gpr.rip.aword = ret_addr;
+        if (switch_to_normal_malloc){
+          task.last_pc = intercept.FallBack(ret_addr);
+        } else {
+          task.last_pc = ret_addr;
+        }
         task.location = kTaskStoppedAfterHyperCall;
         task.status = kTaskStatusRunnable;
         task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);

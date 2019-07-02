@@ -17,6 +17,7 @@
 #pragma once
 
 extern "C" {
+static bool switch_to_normal_malloc;
 
 __attribute__((format(printf, 1, 2)))
 void __kleemill_strace(const char *format, ...) {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include "runtime/Native/Intrinsics.h"
 namespace {
 
 
@@ -55,12 +55,12 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
   addr_t ptr; \
   if (alloc_size > (1U << 15U)) { \
     printf("HIT THE BIIG MALLOC CASE WITH SIZE %lx\n", alloc_size); \
-    intercept.FallBack(state); \
-    ptr = 0; \
+    switch_to_normal_malloc = true ; \
+    return intercept.SetReturn(memory, state, 0x13337); \
   } else { \
-    ptr = malloc_intercept(memory, alloc_size); \
+    ptr = malloc_intercept(memory, alloc_size);\
+    return intercept.SetReturn(memory, state, ptr); \
   } \
-  return intercept.SetReturn(memory, state, ptr); \
 
 #define DO_INTERCEPT_FREE() \
     addr_t address; \
@@ -69,7 +69,7 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
     } else { \
       if (!free_intercept(memory, address)) { \
         printf("HIT THE NATURAL FREE CASE AT ADDRESS 0x%lx\n", address); \
-        intercept.FallBack(state); \
+        switch_to_normal_malloc = true ; \
       } \
     } \
     return memory; \
