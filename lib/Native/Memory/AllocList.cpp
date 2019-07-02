@@ -20,101 +20,105 @@
 namespace klee {
 namespace native {
 
-  AllocList::AllocList() {}
-  
-  uint64_t AllocList::Allocate(size_t alloc_size) {
-    if (alloc_size == 0 ){
-      LOG(FATAL) << "tried to malloc something of size 0";
-    } 
+uint64_t AllocList::Allocate(Address addr) {
 
-    Address address = {};
-    address.must_be_0f = 0x0f;
-    address.size = alloc_size;
-
-    
-    size_t free_slot; 
-	for(free_slot=0; free_slot < free_list.size(); ++free_slot) {
-      if (free_list[free_slot]) {
-        break;
-      }
+  // Try to re-use a random one.
+  size_t free_slot;
+  bool found_free = false;
+  size_t max_j = free_list.size();
+  auto i = static_cast<size_t>(rand()) % max_j;
+  for (size_t j = 0; j < max_j; ++j) {
+    free_slot = (i + j) % max_j;
+    if (free_list[free_slot]) {
+      found_free = true;
+      break;
     }
-    //LOG(INFO) << "free_slot is " << free_slot;
-	if (free_slot == free_list.size()){
-      //LOG(INFO) << "a new allocation is being pushed back on the AllocList";
-	  address.alloc_index = allocations.size();
-      allocations.emplace_back(new uint8_t[alloc_size]);
-      free_list.push_back(false);
-      //LOG(INFO) << "allocation count is " << free_list.size();
-    } else {
-      //LOG(INFO) << "A free slot at " << free_slot << " was found";
-	  address.alloc_index = free_slot;
-      allocations[free_slot].reset((new uint8_t[alloc_size]));
-      free_list[free_slot] = false;
-    }
-
-    address.must_be_fe = special_malloc_byte;
-    //LOG(INFO) << "the address returned was " << address.flat;
-    
-    return address.flat;
   }
 
-  bool AllocList::TryFree(uint64_t addr) {
-    Address address = {};
-    address.flat = addr;
-    //LOG(INFO) << "free is at " << address.flat;
-	auto alloc_index = address.alloc_index; 
-    //LOG(INFO) << "alloc_index was: " << alloc_index;
-    //LOG(INFO) << "free list size is " << free_list.size();
-    if (free_list.at(alloc_index)){
-      LOG(ERROR) << "detected a double free on address " << addr;
-      return false;
-    }
-    //LOG(INFO) << "the address freed: " << addr;
-    free_list[alloc_index] = true;
-    return true;
+  auto mem = new uint8_t[addr.size];
+
+  //LOG(INFO) << "free_slot is " << free_slot;
+  if (!found_free) {
+    //LOG(INFO) << "a new allocation is being pushed back on the AllocList";
+    addr.alloc_index = allocations.size();
+    allocations.emplace_back(mem);
+    free_list.push_back(false);
+    //LOG(INFO) << "allocation count is " << free_list.size();
+  } else {
+    //LOG(INFO) << "A free slot at " << free_slot << " was found";
+    addr.alloc_index = free_slot;
+    allocations[free_slot].reset(mem);
+    free_list[free_slot] = false;
   }
+
+  //LOG(INFO) << "the address returned was " << address.flat;
+
+  return addr.flat;
+}
+
+bool AllocList::TryFree(Address address) {
+  //LOG(INFO) << "free is at " << address.flat;
+  auto alloc_index = address.alloc_index;
+  //LOG(INFO) << "alloc_index was: " << alloc_index;
+  //LOG(INFO) << "free list size is " << free_list.size();
+  if (alloc_index >= free_list.size()) {
+    LOG(ERROR)
+        << "Free of unallocated memory";
+    return false;
+  }
+
+  auto &is_free = free_list[alloc_index];
+
+  if (is_free) {
+    LOG(ERROR)
+        << "detected a double free on address " << address.flat;
+    return true;  // To let it continue.
+  }
+  //LOG(INFO) << "the address freed: " << addr;
+  is_free = true;
+  return true;
+}
 
 #define MEMORY_ACCESS_CHECKS(addr, type) \
-	Address address = {}; \
+    Address address = {}; \
     address.flat = addr;\
     auto alloc_index = address.alloc_index;\
     if (alloc_index >= allocations.size()){\
       LOG(ERROR) << "Invalid Memory Access Error At " << addr;\
- 	  return false; \
+      return false; \
     } else if (free_list.at(alloc_index)) {\
       LOG(ERROR) << "UAF Detected Tried To " << type << " Corrupted Data At " << addr;\
-	  return false;\
-	} else if (address.must_be_0f != under_flow_check) {\
-      LOG(ERROR) << "Failed Underlow/Overflow Check On " << type << " At " << addr;\
-	  return false;\
- 	}\
+      return false;\
+    } else if (address.must_be_0xa != 0xa || address.must_be_0x1 != 0x1) {\
+        LOG(ERROR) << "Failed Underlow/Overflow Check On " << type << " At " << addr;\
+      return false;\
+    }\
 
 
-  bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
-    MEMORY_ACCESS_CHECKS(addr, "Read");
-    //LOG(INFO) << "TRY READ CASE WAS HIT IN THE ALLOCATOR!!!!";
-    //LOG(INFO) << (int)allocations[alloc_index][address.offset];
-	*byte_out = allocations[alloc_index][address.offset];
-	return true;
+bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
+  MEMORY_ACCESS_CHECKS(addr, "Read");
+  //LOG(INFO) << "TRY READ CASE WAS HIT IN THE ALLOCATOR!!!!";
+  //LOG(INFO) << (int)allocations[alloc_index][address.offset];
+  *byte_out = allocations[alloc_index][address.offset];
+  return true;
+}
+
+bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
+  // still need to do a ref count check for copy on write
+  MEMORY_ACCESS_CHECKS(addr, "Write");
+  auto &alloc_buffer = allocations[alloc_index];
+  //LOG(INFO) << "ref count for buffer was " << alloc_buffer.use_count();
+  if (alloc_buffer.use_count() > 1) {
+    auto old_array = alloc_buffer.get();
+    auto new_array = new uint8_t[address.size];
+    memcpy(new_array, old_array, address.size);
+    alloc_buffer.reset(new_array);
   }
 
-  bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
-    // still need to do a ref count check for copy on write
-    MEMORY_ACCESS_CHECKS(addr, "Write");
-    auto &alloc_buffer = allocations[alloc_index];
-    //LOG(INFO) << "ref count for buffer was " << alloc_buffer.use_count();
-    if (alloc_buffer.use_count() > 1) {
-      auto old_array = alloc_buffer.get();
-      alloc_buffer.reset(new uint8_t[address.size]);
-      for (size_t i=0; i<address.size; ++i) {
-        alloc_buffer[i] = old_array[i];
-      }
-    }
-
- 	alloc_buffer[address.offset] = byte;
-	//LOG(INFO) << "written byte was " << (int)allocations[alloc_index][address.offset];
-    return true;
-  }
+  alloc_buffer[address.offset] = byte;
+  //LOG(INFO) << "written byte was " << (int)allocations[alloc_index][address.offset];
+  return true;
+}
 
 #undef MEMORY_ACCESS_CHECKS
 

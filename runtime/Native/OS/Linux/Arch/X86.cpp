@@ -203,7 +203,7 @@ class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
 
 // 64-bit libc/regular function call ABI.
 
-class HandleLibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
+class HandleLibcIntercept : public SystemCallABI<HandleLibcIntercept> {
  // TODO(sai) support variable length arguments
  public:
   COMMON_X86_METHODS
@@ -240,11 +240,6 @@ class HandleLibcIntercept : public SystemCallABI<Amd64SyscallSystemCall> {
         return 0;
     }
   }
-
-  addr_t FallBack(addr_t ret_addr) {
-    return ret_addr + 1;
-  }
-
 };
 
 extern "C" {
@@ -300,7 +295,6 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
 
 #if 64 == ADDRESS_SIZE_BITS
     case AsyncHyperCall::kX86SysCall: {
-default_syscall:
       Amd64SyscallSystemCall syscall;
       memory = AMD64SystemCall(memory, &state, syscall);
       if(task.status == kTaskStatusExited) {
@@ -324,33 +318,26 @@ default_syscall:
       break;
     }
     case AsyncHyperCall::kX86IntN: {
-      if (state.hyper_call_vector == 0x80) {
-        goto default_syscall;
-      }
       printf("0x%lx\n", state.hyper_call_vector);
       puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
       switch_to_normal_malloc = false;
       HandleLibcIntercept intercept;
-      memory = AMD64LibcIntercept(memory, &state, intercept);
+      memory = HandleLibcIntercept(memory, &state, intercept);
       printf("SWITCH MALLOC FLAG %d\n", switch_to_normal_malloc);
+      ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
       if (intercept.Completed()) {
-        ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
         state.gpr.rip.aword = ret_addr;
-        if (switch_to_normal_malloc){
-          task.last_pc = intercept.FallBack(ret_addr);
-        } else {
-          task.last_pc = ret_addr;
-        }
-        task.location = kTaskStoppedAfterHyperCall;
-        task.status = kTaskStatusRunnable;
-        task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
-      } else {
         task.last_pc = ret_addr;
-        task.location = kTaskStoppedBeforeHyperCall;
-        task.status = kTaskStatusResumable;
-        task.continuation = __remill_async_hyper_call;
+
+      // If the intercept didn't complete, then skip over the `ret` instruction.
+      } else {
+        state.gpr.rip.aword = ret_addr + 1;
+        task.last_pc = ret_addr + 1;
       }
-    break;
+      task.location = kTaskStoppedAtCallTarget;
+      task.status = kTaskStatusRunnable;
+      task.continuation = __kleemill_get_lifted_function(memory, task.last_pc);
+      break;
     }
 
 #endif

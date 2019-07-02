@@ -130,70 +130,85 @@ bool AddressSpace::TryFree(uint64_t addr) {
 }
 
 uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
-  if (alloc_size >= (1U << 15U)) {
-    LOG(FATAL) << "an allocation of this size must be mmapped!";
+  if (alloc_size == 0) {
+    return 0;
   }
-  auto alloc_list_pair = alloc_lists.find(alloc_size);
-  if (alloc_list_pair != alloc_lists.end()) {
-    return alloc_list_pair->second.Allocate(alloc_size);
-  }
-  auto &alloc_list = alloc_lists[alloc_size];
-  //LOG(INFO) << "malloced new buffer of size " << alloc_size;
 
-  return alloc_list.Allocate(alloc_size);
+  Address address = {};
+  address.size = alloc_size;
+
+  // The size was truncated, need tro fall back to the real malloc.
+  if (address.size != alloc_size) {
+    return 0;
+  }
+
+  address.must_be_0x1 = 0x1;
+  address.must_be_0xa = 0xa;
+
+  return alloc_lists[alloc_size].Allocate(address);
 }
 
 uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
-  Address address = { };
+  Address address = {};
   address.flat = addr;
-  auto size = address.size;
-  if (alloc_size >= (1U << 15)) {
-    LOG(ERROR) << "an allocation of this size must be mmapped";
+
+  if (address.must_be_0x1 != 0x1 ||
+      address.must_be_0xa != 0xa) {
     return 0;
-  } else if (alloc_size < size) {
-    LOG(ERROR) << "cannot realloc a size less than the current allocation size";
-    return 0;
-  } else if (address.must_be_0f == klee::native::under_flow_check
-      && address.must_be_fe == special_malloc_byte ) {
-    LOG(ERROR) << "cannot realloc on a corrupted address";
   }
 
-  auto alloc_list_pair = alloc_lists.find(size);
-  if (alloc_list_pair == alloc_lists.end()) {
-    LOG(ERROR) << "This address has not been allocated and cannot be realloced";
+  // Realloc of a contained address.
+  if (address.offset != 0) {
+    // TODO(sae): Report?
     return 0;
   }
-  auto alloc_index = address.alloc_index;
-  auto &old_alloc_list = alloc_list_pair->second;
-  if (alloc_index < old_alloc_list.allocations.size()) {
-    if (old_alloc_list.free_list[alloc_index]) {
-      LOG(ERROR) << "Cannot realloc on a freed memory region";
-      return 0;
-    }
-  } else {
+
+  Address new_address = {};
+  new_address.size = alloc_size;
+  if (new_address.size != alloc_size) {
+    return 0;
+  }
+
+  if (address.size == alloc_size) {
+    return addr;
+  }
+
+  auto &old_alloc_list = alloc_lists[address.size];
+  auto &new_alloc_list = alloc_lists[alloc_size];
+
+  const auto old_size = address.size;
+  const auto old_alloc_index = address.alloc_index;
+
+  if (old_alloc_index >= old_alloc_list.allocations.size()) {
     LOG(ERROR) << "Invalid Access Error on realloc";
     return 0;
   }
 
-  if (alloc_lists.find(alloc_size) == alloc_lists.end()) {
-    alloc_lists.emplace(std::make_pair(alloc_size, AllocList()));
+  if (old_alloc_list.free_list[old_alloc_index]) {
+    LOG(ERROR) << "Cannot realloc on a freed memory region";
+    return 0;
   }
-  uint64_t new_addr = alloc_lists[alloc_size].Allocate(alloc_size);
-  Address new_address = { };
-  new_address.flat = new_addr;
 
-  for (size_t i = 0; i < size; ++i) {
-    uint8_t byte = old_alloc_list.allocations[alloc_index][i];
+  new_address.flat = new_alloc_list.Allocate(new_address);
+
+  // Migrate the old data.
+  auto &old_bytes = old_alloc_list.allocations[old_alloc_index];
+  auto &new_bytes = new_alloc_list.allocations[new_address.alloc_index];
+  const auto it_end = symbolic_memory.end();
+  for (size_t i = 0; i < old_size; ++i) {
+    uint8_t byte = old_bytes[i];
     if (byte == kSymbolicByte) {
-      if (symbolic_memory.find(addr + i) != symbolic_memory.end()) {
-        symbolic_memory[new_addr + i] = symbolic_memory[addr + i];
+      auto it = symbolic_memory.find(addr + i);
+      if (it != it_end) {
+        symbolic_memory.insert_or_assign(it->first, it->second);
+        symbolic_memory.erase(it->first);
       }
     }
-    alloc_lists[alloc_size].allocations[new_address.alloc_index][i] = byte;
+    new_bytes[i] = byte;
   }
 
   TryFree(addr);
-  return new_addr;
+  return new_address.flat;
 }
 
 // Clear out the contents of this address space.

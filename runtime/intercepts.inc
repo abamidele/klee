@@ -14,26 +14,70 @@
  * limitations under the License.
  */
 
-ASM_INTERCEPT( strtol, 0xa1 )
-ASM_INTERCEPT( realloc, 0xa4 )
+#ifndef ASM_INTERCEPT
+# define ASM_INTERCEPT(name, num)
+#endif
+
+#ifndef C_INTERCEPT
+# define C_INTERCEPT(name, num)
+#endif
+
+#ifndef ALIAS
+# define ALIAS(name, other_name)
+#endif
+
+#ifndef IGNORE
+# define IGNORE(name)
+#endif
+
+//ASM_INTERCEPT(strtol, 0xa1 )
 
 C_INTERCEPT(malloc, 0x81)
 C_INTERCEPT(calloc, 0x82)
-C_INTERCEPT(free, 0x83)
+C_INTERCEPT(realloc, 0x83)
+C_INTERCEPT(free, 0x84)
+ASM_INTERCEPT(memalign, 0x85)
+ASM_INTERCEPT(malloc_usable_size, 0x86)
 
-/*
-INTERCEPT(_ZdaPv, 0xa6)
-INTERCEPT(_ZdlPv, 0xa7)
-INTERCEPT(_Znaj, 0xa8)
-INTERCEPT(_Znwj, 0xa9)
-INTERCEPT(_Znam, 0xaa)
-INTERCEPT(_Znwm, 0xab)
+ALIAS(__libc_malloc, malloc)
+ALIAS(__GI___libc_malloc, malloc)
+ALIAS(dlmalloc, malloc)
+ALIAS(pvalloc, malloc)
+ALIAS(valloc, malloc)
+ALIAS(_Znaj, malloc)
+ALIAS(_Znwj, malloc)
+ALIAS(_Znam, malloc)
+ALIAS(_Znwm, malloc)
 
-INTERCEPT_ALIAS(memalign, 0xac)
-INTERCEPT_ALIAS(valloc, 0xad)
-INTERCEPT_ALIAS(independent_calloc, 0xb0)
-INTERCEPT_ALIAS(independent_comalloc, 0xb1)
-INTERCEPT_ALIAS(pvalloc, 0xb2)
-INTERCEPT_ALIAS(malloc_trim, 0xb3)
-INTERCEPT_ALIAS(malloc_usable_size, 0xb4)
-*/
+ALIAS(aligned_alloc, memalign)
+
+ALIAS(__libc_calloc, calloc)
+ALIAS(__GI___libc_calloc, calloc)
+ALIAS(dlcalloc, calloc)
+
+ALIAS(__libc_free, free)
+ALIAS(__GI___libc_free, free)
+ALIAS(dlfree, free)
+ALIAS(_ZdaPv, free)
+ALIAS(_ZdlPv, free);
+
+IGNORE(mallinfo)
+IGNORE(__libc_mallinfo)
+IGNORE(__GI___libc_mallinfo)
+
+IGNORE(mallopt)
+IGNORE(__libc_mallopt)
+IGNORE(__GI___libc_mallopt)
+
+IGNORE(malloc_stats)
+IGNORE(__libc_malloc_stats)
+IGNORE(__GI___libc_malloc_stats)
+
+IGNORE(malloc_trim)
+IGNORE(__libc_malloc_trim)
+IGNORE(__GI___libc_malloc_trim)
+
+#undef ASM_INTERCEPT
+#undef C_INTERCEPT
+#undef ALIAS
+#undef IGNORE

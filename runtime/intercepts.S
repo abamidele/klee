@@ -25,41 +25,19 @@
 TEXT_SECTION
 
 .extern SYMBOL(dlsym)
-.extern SYMBOL(intercepted_malloc)
-.extern SYMBOL(intercepted_calloc)
-.extern SYMBOL(intercepted_free)
-.extern SYMBOL(og_malloc)
-.extern SYMBOL(og_calloc)
-.extern SYMBOL(og_free)
 
 DATA_SECTION
 .Ldlsym_addr:
    .quad SYMBOL(dlsym)
-
-.Lintercepted_malloc_addr:
-   .quad SYMBOL(intercepted_malloc)
-
-.Lintercepted_calloc_addr:
-   .quad SYMBOL(intercepted_calloc)
-
-.Lintercepted_free_addr:
-   .quad SYMBOL(intercepted_free)
-
-.Log_malloc_addr:
-   .quad SYMBOL(intercepted_malloc)
-
-.Log_calloc_addr:
-   .quad SYMBOL(intercepted_calloc)
-
-.Log_free_addr:
-   .quad SYMBOL(intercepted_free)
-
 
 #define C_INTERCEPT(name, id) \
    DATA_SECTION ; \
    .extern SYMBOL(real_ ## name) ; \
    .Lreal_ ## name ## _addr: \
       .quad SYMBOL(real_ ## name) ; \
+   .extern SYMBOL(intercepted_ ## name) ; \
+   .Lintercepted_ ## name ## _addr: \
+      .quad SYMBOL(intercepted_ ## name) ; \
    TEXT_SECTION ; \
    .globl SYMBOL(name) ; \
    SYMBOL(name): \
@@ -138,29 +116,5 @@ DATA_SECTION
    SYMBOL(name): \
        xor eax, eax ; \
        ret ;
-
-ALIAS(__libc_malloc, malloc)
-ALIAS(__GI___libc_malloc, malloc)
-ALIAS(dlmalloc, malloc)
-
-ALIAS(__libc_calloc, calloc)
-ALIAS(__GI___libc_calloc, calloc)
-ALIAS(dlcalloc, calloc)
-
-ALIAS(__libc_free, free)
-ALIAS(__GI___libc_free, free)
-ALIAS(dlfree, free)
-
-IGNORE(mallinfo)
-ALIAS(__libc_mallinfo, mallinfo)
-ALIAS(__GI___libc_mallinfo, mallinfo)
-
-IGNORE(mallopt)
-ALIAS(__libc_mallopt, mallopt)
-ALIAS(__GI___libc_mallopt, mallopt)
-
-IGNORE(malloc_stats)
-ALIAS(__libc_malloc_stats, malloc_stats)
-ALIAS(__GI___libc_malloc_stats, malloc_stats)
 
 #include "intercepts.inc"
