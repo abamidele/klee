@@ -108,22 +108,30 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
 }
 
 bool AddressSpace::TryFree(uint64_t addr) {
-  Address address = { };
+  Address address = {};
   address.flat = addr;
-  uint64_t size = address.size;
-  auto alloc_list_pair = alloc_lists.find(size);
-  if (alloc_list_pair != alloc_lists.end()) {
-    //LOG(INFO) << "freeing up buffer of size " << size;
-    bool can_free = alloc_list_pair->second.TryFree(addr);
-    if (can_free) {
-      for (size_t i = 0; i < address.size; ++i) {
-        auto sym_byte_pair = symbolic_memory.find(addr + i);
-        if (sym_byte_pair != symbolic_memory.end()) {
-          symbolic_memory.erase(addr + i);
-        }
+
+  if (address.must_be_0x1 != 0x1 ||
+      address.must_be_0xa != 0xa) {
+    return 0;
+  }
+
+  // Realloc of a contained address.
+  if (address.offset != 0) {
+    // TODO(sae): Report?
+    return 0;
+  }
+
+  auto &alloc_list = alloc_lists[address.size];
+  bool can_free = alloc_list.TryFree(address);
+  if (can_free) {
+    for (size_t i = 0; i < address.size; ++i) {
+      auto sym_byte_pair = symbolic_memory.find(addr + i);
+      if (sym_byte_pair != symbolic_memory.end()) {
+        symbolic_memory.erase(addr + i);
       }
-      return can_free;
     }
+    return can_free;
   }
   LOG(ERROR) << "Invalid free at address " << addr << " :-(";
   return false;
