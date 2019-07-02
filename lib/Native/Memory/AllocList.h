@@ -39,13 +39,14 @@ static uint8_t special_malloc_byte = 0xa;
 
 class AllocList {
  public:
-  uint64_t Allocate(Address alloc_size);
+  uint64_t Allocate(Address addr);
   bool TryFree(Address addr);
   bool TryRead(uint64_t addr, uint8_t *byte_out);
   bool TryWrite(uint64_t addr, uint8_t byte);
 
   std::vector<bool> free_list;
   std::vector<std::shared_ptr<uint8_t[]>> allocations;
+  unsigned num_free{0};
 };
 
 }  // namespace native

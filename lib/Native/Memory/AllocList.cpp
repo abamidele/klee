@@ -23,52 +23,43 @@ namespace native {
 uint64_t AllocList::Allocate(Address addr) {
 
   // Try to re-use a random one.
-  LOG(INFO) << "hit alloc case";
   size_t free_slot;
   bool found_free = false;
-  size_t max_j = free_list.size();
-  LOG(INFO) << "after the size";
-  if (max_j > 0) {
-  uint64_t i = rand() % max_j;
-  LOG(INFO) << "before random replacement";
-  for (size_t j = 0; j < max_j; ++j) {
-    free_slot = (i + j) % max_j;
-    if (free_list[free_slot]) {
-      found_free = true;
-      break;
+
+  if (auto max_j = free_list.size()) {
+    uint64_t i = static_cast<size_t>(rand()) % max_j;
+    for (size_t j = 0; j < max_j; ++j) {
+      free_slot = (i + j) % max_j;
+      if (free_list[free_slot]) {
+        found_free = true;
+        break;
+      }
     }
   }
-  }
-  LOG(INFO) << "after random replacement";
+
   auto mem = new uint8_t[addr.size];
 
-  //LOG(INFO) << "free_slot is " << free_slot;
   if (!found_free) {
-    //LOG(INFO) << "a new allocation is being pushed back on the AllocList";
     addr.alloc_index = allocations.size();
     allocations.emplace_back(mem);
     free_list.push_back(false);
-    //LOG(INFO) << "allocation count is " << free_list.size();
+
   } else {
-    //LOG(INFO) << "A free slot at " << free_slot << " was found";
+    num_free--;
     addr.alloc_index = free_slot;
     allocations[free_slot].reset(mem);
     free_list[free_slot] = false;
   }
 
-  //LOG(INFO) << "the address returned was " << address.flat;
-
   return addr.flat;
 }
 
 bool AllocList::TryFree(Address address) {
-  //LOG(INFO) << "free is at " << address.flat;
   auto alloc_index = address.alloc_index;
-  //LOG(INFO) << "alloc_index was: " << alloc_index;
-  //LOG(INFO) << "free list size is " << free_list.size();
   if (alloc_index >= free_list.size()) {
     LOG(ERROR)
-        << "Free of unallocated memory";
+        << "Free of unallocated memory (size=" << address.size << ", entry="
+        << alloc_index << ")";
     return false;
   }
 
@@ -76,10 +67,12 @@ bool AllocList::TryFree(Address address) {
 
   if (is_free) {
     LOG(ERROR)
-        << "detected a double free on address " << address.flat;
+        << "Double free on " << std::hex << address.flat << std::dec
+        << " (size=" << address.size << ", entry=" << alloc_index << ")";
     return true;  // To let it continue.
   }
-  //LOG(INFO) << "the address freed: " << addr;
+
+  num_free++;
   free_list[alloc_index] = true;
   return true;
 }
@@ -87,17 +80,14 @@ bool AllocList::TryFree(Address address) {
 #define MEMORY_ACCESS_CHECKS(addr, type) \
     Address address = {}; \
     address.flat = addr;\
-    auto alloc_index = address.alloc_index;\
+    const auto alloc_index = address.alloc_index;\
     if (alloc_index >= allocations.size()){\
       LOG(ERROR) << "Invalid Memory Access Error At " << addr;\
       return false; \
     } else if (free_list.at(alloc_index)) {\
       LOG(ERROR) << "UAF Detected Tried To " << type << " Corrupted Data At " << addr;\
       return false;\
-    } else if (address.must_be_0xa != 0xa || address.must_be_0x1 != 0x1) {\
-        LOG(ERROR) << "Failed Underlow/Overflow Check On " << type << " At " << addr;\
-      return false;\
-    }\
+    }
 
 
 bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {

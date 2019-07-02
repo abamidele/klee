@@ -79,13 +79,28 @@ AddressSpace::AddressSpace(void) :
 }
 
 AddressSpace::AddressSpace(const AddressSpace &parent) :
-    maps(parent.maps.size()), page_to_map(parent.page_to_map.size()), wnx_page_to_map(
-        parent.wnx_page_to_map.size()), min_addr(parent.min_addr), addr_mask(
-        parent.addr_mask), invalid(parent.invalid), page_is_readable(
-        parent.page_is_readable), page_is_writable(parent.page_is_writable), page_is_executable(
-        parent.page_is_executable), trace_heads(parent.trace_heads), symbolic_memory(
-        parent.symbolic_memory), alloc_lists(parent.alloc_lists), is_dead(
-        parent.is_dead) {
+    maps(parent.maps.size()),
+    page_to_map(parent.page_to_map.size()),
+    wnx_page_to_map(parent.wnx_page_to_map.size()),
+    min_addr(parent.min_addr),
+    addr_mask(parent.addr_mask),
+    invalid(parent.invalid),
+    page_is_readable(parent.page_is_readable),
+    page_is_writable(parent.page_is_writable),
+    page_is_executable(parent.page_is_executable),
+    trace_heads(parent.trace_heads),
+    symbolic_memory(parent.symbolic_memory),
+    is_dead(parent.is_dead) {
+
+  // Only copy the lists with non-full free lists.
+  for (const auto &size_list : parent.alloc_lists) {
+    if (size_list.second.num_free == size_list.second.free_list.size()) {
+      continue;
+    } else {
+      alloc_lists.emplace(size_list.first, size_list.second);
+    }
+  }
+
   // TODO(sai) add a thing in here that properly copies over the AllocList map
   unsigned i = 0;
   for (const auto &range : parent.maps) {
@@ -147,7 +162,7 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
 
   // The size was truncated, need tro fall back to the real malloc.
   if (address.size != alloc_size) {
-    return 0;
+    return ~0ULL;
   }
 
   address.must_be_0x1 = 0x1;
@@ -162,7 +177,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
 
   if (address.must_be_0x1 != 0x1 &&
       address.must_be_0xa != 0xa) {
-    return 0;
+    return ~0ULL;
   }
 
   // Realloc of a contained address.
@@ -174,7 +189,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   Address new_address = {};
   new_address.size = alloc_size;
   if (new_address.size != alloc_size) {
-    return 0;
+    return ~0ULL;
   }
 
   if (address.size == alloc_size) {
@@ -332,9 +347,9 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   auto in_stream = reinterpret_cast<const uint8_t *>(val);
   Address address = { };
   address.flat = addr;
-  // TODO(sai) check for underflow overflow stuff with special byte 0f
-  if (address.must_be_0xa == 0xa) {
-    //LOG(INFO) << " hit the heap write case";
+
+  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
+
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
       LOG(ERROR) << "SIZE IS " << address.size;
@@ -353,7 +368,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
     return true;
   } else {
     for (auto page_addr = AlignDownToPage(addr), end_addr = addr + size;
-        page_addr < end_addr; page_addr += kPageSize) {
+         page_addr < end_addr; page_addr += kPageSize) {
 
       if (!CanWriteAligned(page_addr)) {
         return false;
@@ -388,7 +403,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = { };
   address.flat = addr;
-  if (address.must_be_0xa == 0xa) {
+  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
     //LOG(INFO) << "HIT THE HEAP READ CASE !!!!!";
     auto alloc_list_pair = alloc_lists.find(address.size);
     if (alloc_list_pair == alloc_lists.end()) {
@@ -412,7 +427,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
 	const auto addr = addr_ & addr_mask; \
 	Address address = {}; \
 	address.flat = addr; \
-	if (address.must_be_0xa == 0xa) { \
+	if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) { \
 		return TryRead(addr, val_out, sizeof(type)); \
 		\
 	} else { \

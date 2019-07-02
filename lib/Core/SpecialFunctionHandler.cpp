@@ -320,8 +320,8 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
   if (addr){
-	uint8_t byte=0;
-	for (size_t i = 0; i < size; ++i){
+    uint8_t byte=0;
+    for (size_t i = 0; i < size; ++i){
       (void) mem->TryWrite(addr+i, byte);
     }
   }

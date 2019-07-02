@@ -43,6 +43,8 @@ size_t malloc_size( Memory *memory, addr_t ptr);
 //  exit(0);
 //}
 
+static constexpr addr_t kBadAddr = ~static_cast<addr_t>(0);
+
 template <typename ABI>
 static Memory *Intercept_malloc(Memory *memory, State *state,
                                 const ABI &intercept) {
@@ -52,8 +54,8 @@ static Memory *Intercept_malloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  auto ptr = malloc_intercept(memory, alloc_size);
-  if (!ptr) {
+  const auto ptr = malloc_intercept(memory, alloc_size);
+  if (ptr == kBadAddr) {
     STRACE_ERROR(libc_malloc, "Falling back to real malloc for size=%" PRIxADDR,
                  alloc_size);
     return memory;
@@ -90,8 +92,8 @@ static Memory *Intercept_calloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  auto ptr = calloc_intercept(memory, num * size);
-  if (!ptr) {
+  const auto ptr = calloc_intercept(memory, num * size);
+  if (ptr == kBadAddr) {
     STRACE_ERROR(libc_calloc, "Falling back to real calloc for num=%" PRIxADDR
                  ", size=%" PRIxADDR, num, size);
     return memory;
@@ -109,14 +111,14 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  ptr = realloc_intercept(memory, ptr, alloc_size);
-  if (!ptr) {
+  const auto new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR
                  ", size=%" PRIxADDR, ptr, alloc_size);
     return memory;
   }
 
-  return intercept.SetReturn(memory, state, ptr);
+  return intercept.SetReturn(memory, state, new_ptr);
 }
 
 template <typename ABI>
@@ -128,8 +130,8 @@ static Memory *Intercept_memalign(Memory *memory, State *state,
     STRACE_ERROR(libc_memalign, "Couldn't get args");
     return intercept.SetReturn(0, state, 0);
   }
-  auto ptr = malloc_intercept(memory, size);
-  if (!ptr) {
+  const auto ptr = malloc_intercept(memory, size);
+  if (ptr == kBadAddr) {
     STRACE_ERROR(libc_memalign, "Falling back to real memalign for align=%"
                  PRIxADDR ", size=%" PRIxADDR, alignment, size);
     return memory;
@@ -147,7 +149,7 @@ static Memory *Intercept_malloc_usable_size(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  auto size = malloc_size(memory, ptr);
+  const auto size = malloc_size(memory, ptr);
   if (!size) {
     STRACE_ERROR(
         libc_malloc_usable_size, "Falling back to real malloc_usable_size for ptr=%"
