@@ -321,6 +321,7 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
       printf("0x%lx\n", state.hyper_call_vector);
       puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
       HandleLibcIntercept intercept;
+      memory = HandleLibcInterceptCall(memory, &state, intercept);
       ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
       if (intercept.Completed()) {
         puts("USING ALLOCATOR VERSION");

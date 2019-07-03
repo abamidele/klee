@@ -159,6 +159,8 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
 
   Address address = {};
   address.size = alloc_size;
+  LOG(INFO) << "alloc_size: " << alloc_size;
+  LOG(INFO) << "address size: " << address.size;
 
   // The size was truncated, need tro fall back to the real malloc.
   if (address.size != alloc_size) {
