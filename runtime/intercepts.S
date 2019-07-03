@@ -32,16 +32,17 @@ DATA_SECTION
 
 #define C_INTERCEPT(name, id) \
    DATA_SECTION ; \
-   .extern SYMBOL(real_ ## name) ; \
+      .extern SYMBOL(real_ ## name) ; \
    .Lreal_ ## name ## _addr: \
       .quad SYMBOL(real_ ## name) ; \
-   .extern SYMBOL(intercepted_ ## name) ; \
+      .extern SYMBOL(intercepted_ ## name) ; \
    .Lintercepted_ ## name ## _addr: \
       .quad SYMBOL(intercepted_ ## name) ; \
    TEXT_SECTION ; \
-   .globl SYMBOL(name) ; \
+      .align 16 ; \
+      ud2 ; ud2 ; ud2 ; ud2 ; \
+      .globl SYMBOL(name) ; \
    SYMBOL(name): \
-       nop      dword ptr [eax + 00] ; \
        jmp      qword ptr [rip + .Lintercepted_ ## name ##_addr ] ; \
        int      id ; \
        ret ; \
@@ -58,9 +59,10 @@ DATA_SECTION
    .Lname_ ## name: \
        .asciz #name ; \
    TEXT_SECTION ; \
-   .globl SYMBOL(name) ; \
+      .align 16 ; \
+      ud2 ; ud2 ; ud2 ; ud2 ; \
+      .globl SYMBOL(name) ; \
    SYMBOL(name): \
-       nop     dword ptr [eax + 00] ; \
        jmp     qword ptr [rip + .Laddr_ ## name ] ; \
        int     id ; \
        ret ; \
