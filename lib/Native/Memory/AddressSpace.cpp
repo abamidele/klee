@@ -122,6 +122,12 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
   return 0 != trace_heads.count(static_cast<uint64_t>(pc));
 }
 
+static constexpr uint64_t kBadAddr = ~0ULL;
+static constexpr uint64_t kReallocInternalPtr = ~0ULL - 1ULL;
+static constexpr uint64_t kReallocTooBig = ~0ULL - 2ULL;
+static constexpr uint64_t kReallocInvalidPtr = ~0ULL - 3ULL;
+static constexpr uint64_t kReallocFreedPtr = ~0ULL - 4ULL;
+
 bool AddressSpace::TryFree(uint64_t addr) {
   Address address = {};
   address.flat = addr;
@@ -179,19 +185,26 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
 
   if (address.must_be_0x1 != 0x1 ||
       address.must_be_0xa != 0xa) {
-    return ~0ULL;
+    return kBadAddr;
   }
 
   // Realloc of a contained address.
   if (address.offset != 0) {
     // TODO(sai): Report?
-    return 0;
+    LOG(ERROR)
+        << "Realloc of internal pointer with size " << address.size
+        << ", index " << address.alloc_index << ", and offset "
+        << std::hex << address.offset << std::dec;
+    return kReallocInternalPtr;
   }
 
   Address new_address = {};
   new_address.size = alloc_size;
   if (new_address.size != alloc_size) {
-    return ~0ULL;
+    LOG(ERROR)
+        << "Realloc of size " << address.size << " to " << alloc_size
+        << " has to be handled by native.";
+    return kReallocTooBig;
   }
 
   if (address.size == alloc_size) {
@@ -205,16 +218,17 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   const auto old_alloc_index = address.alloc_index;
 
   if (old_alloc_index >= old_alloc_list.allocations.size()) {
-    LOG(ERROR) << "Invalid Access Error on realloc";
-    return 0;
+    LOG(ERROR) << "Bad old realloc address";
+    return kReallocInvalidPtr;
   }
 
   if (old_alloc_list.free_list[old_alloc_index]) {
     LOG(ERROR) << "Cannot realloc on a freed memory region";
-    return 0;
+    return kReallocFreedPtr;
   }
 
-  new_address.flat = new_alloc_list.Allocate(new_address);
+  const auto new_addr = new_alloc_list.Allocate(new_address);
+  new_address.flat = new_addr;
 
   // Migrate the old data.
   auto &old_bytes = old_alloc_list.allocations[old_alloc_index];
@@ -225,14 +239,14 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     if (byte == kSymbolicByte) {
       auto it = symbolic_memory.find(addr + i);
       if (it != it_end) {
-        symbolic_memory[it->first] =  it->second;
+        symbolic_memory[new_addr + i] = it->second;
         symbolic_memory.erase(it->first);
       }
     }
     new_bytes[i] = byte;
   }
 
-  TryFree(addr);
+  CHECK(TryFree(addr));
   return new_address.flat;
 }
 
