@@ -43,7 +43,7 @@ size_t malloc_size( Memory *memory, addr_t ptr);
 //  exit(0);
 //}
 
-static constexpr addr_t kBadAddr = ~static_cast<addr_t>(0);
+static constexpr addr_t kBadAddr = ~0ULL;
 
 template <typename ABI>
 static Memory *Intercept_malloc(Memory *memory, State *state,
@@ -55,6 +55,8 @@ static Memory *Intercept_malloc(Memory *memory, State *state,
   }
 
   const auto ptr = malloc_intercept(memory, alloc_size);
+  printf("ptr: 0x%lx\n", ptr);
+  printf("BAdAddr: 0x%lx\n", kBadAddr);
   if (ptr == kBadAddr) {
     STRACE_ERROR(libc_malloc, "Falling back to real malloc for size=%" PRIxADDR,
                  alloc_size);
@@ -112,6 +114,8 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
   }
 
   const auto new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  printf("new ptr: 0x%lx\n", new_ptr);
+
   if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR
                  ", size=%" PRIxADDR, ptr, alloc_size);

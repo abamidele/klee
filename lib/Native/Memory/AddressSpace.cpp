@@ -177,7 +177,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   Address address = {};
   address.flat = addr;
 
-  if (address.must_be_0x1 != 0x1 &&
+  if (address.must_be_0x1 != 0x1 ||
       address.must_be_0xa != 0xa) {
     return ~0ULL;
   }

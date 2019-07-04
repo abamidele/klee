@@ -304,8 +304,6 @@ void SpecialFunctionHandler::handle__intercept_realloc(
   auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  LOG(INFO) << "REALLOC WAS CALLED ON PTR " << std::hex << ptr_uint << std::dec << " and wanted to expand to size " << size;
-  exit(0);
   uint64_t addr = mem->TryRealloc(ptr_uint, size);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
@@ -313,8 +311,6 @@ void SpecialFunctionHandler::handle__intercept_realloc(
 void SpecialFunctionHandler::handle__intercept_calloc(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-  LOG(INFO) << "DIED ON CALLOC";
-  exit(0);
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
