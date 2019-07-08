@@ -199,6 +199,8 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   }
 
   Address new_address = {};
+  new_address.must_be_0xa = 0xa;
+  new_address.must_be_0x1 = 0x1;
   new_address.size = alloc_size;
   if (new_address.size != alloc_size) {
     LOG(ERROR)
@@ -226,6 +228,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     LOG(ERROR) << "Cannot realloc on a freed memory region";
     return kReallocFreedPtr;
   }
+
 
   const auto new_addr = new_alloc_list.Allocate(new_address);
   new_address.flat = new_addr;

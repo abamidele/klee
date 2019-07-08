@@ -26,22 +26,22 @@ addr_t realloc_intercept( Memory *memory, addr_t ptr,  uint64_t size);
 size_t malloc_size( Memory *memory, addr_t ptr);
 }  // extern C
 
-//template <typename ABI>
-//static Memory *Intercept_strtol(Memory *memory, State *state,
-//                                const ABI &intercept) {
-//  addr_t nptr = 0;
-//  addr_t endptr = 0;
-//  int base = 0;
-//
-//  if (!intercept.TryGetArgs(memory, state, &nptr, &endptr, &base)) {
-//    STRACE_ERROR(libc_strtol, "Couldn't get args");
-//    exit(1);
-//  }
-//
-//  long number = strtol_intercept(nptr, endptr, base, memory);
-//
-//  exit(0);
-//}
+template <typename ABI>
+static Memory *Intercept_strtol(Memory *memory, State *state,
+                                const ABI &intercept) {
+  addr_t nptr = 0;
+  addr_t endptr = 0;
+  int base = 0;
+
+  if (!intercept.TryGetArgs(memory, state, &nptr, &endptr, &base)) {
+    STRACE_ERROR(libc_strtol, "Couldn't get args");
+    exit(1);
+  }
+
+  long number = strtol_intercept(nptr, endptr, base, memory);
+
+  exit(0);
+}
 
 
 static constexpr addr_t kBadAddr = ~0ULL;
@@ -116,13 +116,13 @@ template <typename ABI>
 static Memory *Intercept_realloc(Memory *memory, State *state,
                                  const ABI &intercept) {
   addr_t ptr;
-  addr_t alloc_size;
+  size_t alloc_size;
   if (!intercept.TryGetArgs(memory, state, &ptr, &alloc_size)) {
     STRACE_ERROR(libc_realloc, "Couldn't get args");
     return intercept.SetReturn(memory, state, 0);
   }
 
-  const auto new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  addr_t new_ptr = realloc_intercept(memory, ptr, alloc_size);
 
   if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR

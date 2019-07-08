@@ -30,7 +30,7 @@
 # define IGNORE(name)
 #endif
 
-//ASM_INTERCEPT(strtol, 0xa1 )
+ASM_INTERCEPT(strtol, 0xa1 )
 
 C_INTERCEPT(malloc, 0x81)
 C_INTERCEPT(calloc, 0x82)

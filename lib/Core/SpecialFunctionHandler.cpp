@@ -125,6 +125,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("klee_get_errno", handleGetErrno, true),
 #ifndef __APPLE__
     add("__errno_location", handleErrnoLocation, true),
+
 #else
     add("__error", handleErrnoLocation, true),
 #endif
@@ -304,6 +305,10 @@ void SpecialFunctionHandler::handle__intercept_realloc(
   auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
+  //LOG(INFO) << "ptr is : " << std::hex << ptr_uint;
+  //LOG(INFO) << "mem is : " << mem_uint;
+  //LOG(INFO) << "size is : " << size;
+
   uint64_t addr = mem->TryRealloc(ptr_uint, size);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
@@ -335,7 +340,7 @@ void SpecialFunctionHandler::handle__intercept_strtol(
   auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
   ref<Expr> read_byte;
   int size = 0;
-  LOG(INFO) << "CONGRATZZZZ  U DID THE THING";
+  //LOG(INFO) << "CONGRATZZZZ  U DID THE THING";
 
   exit(0);
  }
@@ -348,7 +353,7 @@ void SpecialFunctionHandler::handle__intercept_malloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  printf("MALLOC SIZE IS : %d and ptr is 0x%lx\n", size, addr);
+  //printf("MALLOC SIZE IS : %d and ptr is 0x%lx\n", size, addr);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
@@ -362,14 +367,14 @@ void SpecialFunctionHandler::handle__intercept_free(
   klee::native::Address addr = {};
   addr.flat = ptr;
   if (addr.must_be_0xa != 0xa) {
-    LOG(INFO) << "NATURAL FREE ADDR IN HANDLER IS " << std::hex << ptr << std::dec;
+    //LOG(INFO) << "NATURAL FREE ADDR IN HANDLER IS " << std::hex << ptr << std::dec;
     executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
     return ;
   }
   if(!mem->TryFree(ptr)) {
     LOG(ERROR) << "invalid free :-(";
   }
-  printf("FREE IS : 0x%lx\n", addr);
+  //printf("FREE IS : 0x%lx\n", addr);
 
   executor.bindLocal(target, state, ConstantExpr::create(true, Expr::Bool));
 }

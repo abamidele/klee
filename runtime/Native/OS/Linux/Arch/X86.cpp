@@ -61,11 +61,9 @@ CR8Reg gCR8;
   } \
 
 
-
-
 // 32-bit `int 0x80` system call ABI.
-class X86Int0x80SystemCall : public SystemCallABI<X86Int0x80SystemCall> {
- public:
+class X86Int0x80SystemCall: public SystemCallABI<X86Int0x80SystemCall> {
+public:
   COMMON_X86_METHODS
 
   addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
@@ -84,27 +82,27 @@ class X86Int0x80SystemCall : public SystemCallABI<X86Int0x80SystemCall> {
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64_compat.S.html#283
   addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
-      case 0:
-        return state->gpr.rbx.aword;
-      case 1:
-        return state->gpr.rcx.aword;
-      case 2:
-        return state->gpr.rdx.aword;
-      case 3:
-        return state->gpr.rsi.aword;
-      case 4:
-        return state->gpr.rdi.aword;
-      case 5:
-        return state->gpr.rbp.aword;
-      default:
-        return 0;
+    case 0:
+      return state->gpr.rbx.aword;
+    case 1:
+      return state->gpr.rcx.aword;
+    case 2:
+      return state->gpr.rdx.aword;
+    case 3:
+      return state->gpr.rsi.aword;
+    case 4:
+      return state->gpr.rdi.aword;
+    case 5:
+      return state->gpr.rbp.aword;
+    default:
+      return 0;
     }
   }
 };
 
 // 32-bit `sysenter` ABI.
-class X86SysEnter32SystemCall : public SystemCallABI<X86SysEnter32SystemCall> {
- public:
+class X86SysEnter32SystemCall: public SystemCallABI<X86SysEnter32SystemCall> {
+public:
   COMMON_X86_METHODS
 
   // Find the return address of this system call.
@@ -143,27 +141,27 @@ class X86SysEnter32SystemCall : public SystemCallABI<X86SysEnter32SystemCall> {
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64_compat.S.html#38
   addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
-      case 0:
-        return state->gpr.rbx.aword;
-      case 1:
-        return state->gpr.rcx.aword;
-      case 2:
-        return state->gpr.rdx.aword;
-      case 3:
-        return state->gpr.rsi.aword;
-      case 4:
-        return state->gpr.rdi.aword;
-      case 5:
-        return ReadMemory<addr_t>(memory, state->gpr.rbp.aword);
-      default:
-        return 0;
+    case 0:
+      return state->gpr.rbx.aword;
+    case 1:
+      return state->gpr.rcx.aword;
+    case 2:
+      return state->gpr.rdx.aword;
+    case 3:
+      return state->gpr.rsi.aword;
+    case 4:
+      return state->gpr.rdi.aword;
+    case 5:
+      return ReadMemory<addr_t>(memory, state->gpr.rbp.aword);
+    default:
+      return 0;
     }
   }
 };
 
 // 64-bit `syscall` system call ABI.
-class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
- public:
+class Amd64SyscallSystemCall: public SystemCallABI<Amd64SyscallSystemCall> {
+public:
   COMMON_X86_METHODS
 
   addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
@@ -182,30 +180,29 @@ class Amd64SyscallSystemCall : public SystemCallABI<Amd64SyscallSystemCall> {
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64.S.html#106
   addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
-      case 0:
-        return state->gpr.rdi.aword;
-      case 1:
-        return state->gpr.rsi.aword;
-      case 2:
-        return state->gpr.rdx.aword;
-      case 3:
-        return state->gpr.r10.aword;
-      case 4:
-        return state->gpr.r8.aword;
-      case 5:
-        return state->gpr.r9.aword;
-      default:
-        return 0;
+    case 0:
+      return state->gpr.rdi.aword;
+    case 1:
+      return state->gpr.rsi.aword;
+    case 2:
+      return state->gpr.rdx.aword;
+    case 3:
+      return state->gpr.r10.aword;
+    case 4:
+      return state->gpr.r8.aword;
+    case 5:
+      return state->gpr.r9.aword;
+    default:
+      return 0;
     }
   }
 };
 
-
 // 64-bit libc/regular function call ABI.
 
-class HandleLibcIntercept : public SystemCallABI<HandleLibcIntercept> {
- // TODO(sai) support variable length arguments
- public:
+class HandleLibcIntercept: public SystemCallABI<HandleLibcIntercept> {
+  // TODO(sai) support variable length arguments
+public:
   COMMON_X86_METHODS
 
   addr_t GetReturnAddress(Memory *, State *, addr_t ret_addr) const {
@@ -224,20 +221,20 @@ class HandleLibcIntercept : public SystemCallABI<HandleLibcIntercept> {
   // See https://code.woboq.org/linux/linux/arch/x86/entry/entry_64.S.html#106
   addr_t GetArg(Memory *&memory, State *state, int i) const {
     switch (i) {
-      case 0:
-        return state->gpr.rdi.aword;
-      case 1:
-        return state->gpr.rsi.aword;
-      case 2:
-        return state->gpr.rdx.aword;
-      case 3:
-        return state->gpr.rcx.aword;
-      case 4:
-        return state->gpr.r8.aword;
-      case 5:
-        return state->gpr.r9.aword;
-      default:
-        return 0;
+    case 0:
+      return state->gpr.rdi.aword;
+    case 1:
+      return state->gpr.rsi.aword;
+    case 2:
+      return state->gpr.rdx.aword;
+    case 3:
+      return state->gpr.rcx.aword;
+    case 4:
+      return state->gpr.r8.aword;
+    case 5:
+      return state->gpr.r9.aword;
+    default:
+      return 0;
     }
   }
 };
@@ -245,7 +242,7 @@ class HandleLibcIntercept : public SystemCallABI<HandleLibcIntercept> {
 extern "C" {
 
 Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
-                                  Memory *memory) {
+    Memory *memory) {
   auto &task = reinterpret_cast<linux_task &>(state);
   switch (state.hyper_call) {
 #if 32 == ADDRESS_SIZE_BITS
@@ -292,7 +289,6 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     break;
 #endif
 
-
 #if 64 == ADDRESS_SIZE_BITS
     case AsyncHyperCall::kX86SysCall: {
       Amd64SyscallSystemCall syscall;
@@ -318,21 +314,45 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
       break;
     }
     case AsyncHyperCall::kX86IntN: {
-      printf("0x%lx\n", state.hyper_call_vector);
-      puts("HIT THE INTERRUPTT IN THE BIT CASE AND SHOULD ACCURATELY PARSE OUT SYSCALL");
       HandleLibcIntercept intercept;
       memory = HandleLibcInterceptCall(memory, &state, intercept);
       ret_addr = intercept.GetReturnAddress(memory, &state, ret_addr);
+
+//      printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+//          //__remill_read_memory_8(memory, ret_addr),
+//          __remill_read_memory_8(memory, ret_addr+1),
+//          __remill_read_memory_8(memory, ret_addr + 2),
+//          __remill_read_memory_8(memory, ret_addr+3),
+//          __remill_read_memory_8(memory,  ret_addr+4),
+//          __remill_read_memory_8(memory, ret_addr+5),
+//          __remill_read_memory_8(memory,ret_addr + 6),
+//          __remill_read_memory_8(memory,ret_addr + 7),
+//          __remill_read_memory_8(memory, ret_addr +8),
+//          __remill_read_memory_8(memory, ret_addr+9),
+//          __remill_read_memory_8(memory, ret_addr + 10),
+//          __remill_read_memory_8(memory, ret_addr+11),
+//          __remill_read_memory_8(memory,  ret_addr+12),
+//          __remill_read_memory_8(memory, ret_addr+13),
+//          __remill_read_memory_8(memory,ret_addr + 14),
+//          __remill_read_memory_8(memory,ret_addr + 15),
+//          __remill_read_memory_8(memory, ret_addr +16),
+//          __remill_read_memory_8(memory, ret_addr+17),
+//          __remill_read_memory_8(memory, ret_addr + 18),
+//          __remill_read_memory_8(memory, ret_addr+19),
+//          __remill_read_memory_8(memory,  ret_addr+20),
+//          __remill_read_memory_8(memory, ret_addr+21),
+//          __remill_read_memory_8(memory,ret_addr + 22),
+//          __remill_read_memory_8(memory,ret_addr + 23)
+//      );
+      //exit(0);
       if (intercept.Completed()) {
-        puts("USING ALLOCATOR VERSION");
         state.gpr.rip.aword = ret_addr;
         task.last_pc = ret_addr;
 
       // If the intercept didn't complete, then skip over the `ret` instruction.
       } else {
-        puts("USING NORMAL VERSION");
         state.gpr.rip.aword = ret_addr + 1;
-        task.last_pc = ret_addr + 1;
+        task.last_pc = ret_addr;
       }
       task.location = kTaskStoppedAtCallTarget;
       task.status = kTaskStatusRunnable;
@@ -341,12 +361,13 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
     }
 
 #endif
-    default:
-      task.last_pc = ret_addr;
-      task.location = kTaskStoppedBeforeUnhandledHyperCall;
-      task.status = kTaskStatusError;
-      task.continuation = __kleemill_at_unhandled_hypercall;
-      break;
+  default:
+    puts("hit default case");
+    task.last_pc = ret_addr;
+    task.location = kTaskStoppedBeforeUnhandledHyperCall;
+    task.status = kTaskStatusError;
+    task.continuation = __kleemill_at_unhandled_hypercall;
+    break;
   }
 
   if (task.status == kTaskStatusRunnable) {
@@ -359,101 +380,97 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
 }
 
 Memory *__remill_sync_hyper_call(X86State &state, Memory *mem,
-                                 SyncHyperCall::Name call) {
+    SyncHyperCall::Name call) {
 
   auto &task = reinterpret_cast<linux_task &>(state);
   task.time_stamp_counter += 500;
 
   switch (call) {
-    case SyncHyperCall::kInvalid:
-      task.location = kTaskStoppedAtError;
-      task.last_pc = CurrentPC(state);
-      break;
+  case SyncHyperCall::kInvalid:
+    task.location = kTaskStoppedAtError;
+    task.last_pc = CurrentPC(state);
+    break;
 
-    case SyncHyperCall::kX86SetSegmentES:
-      STRACE_ERROR(sync_hyper_call, "kX86SetSegmentES index=%u rpi=%u ti=%u",
-                   state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
-      break;
+  case SyncHyperCall::kX86SetSegmentES:
+    STRACE_ERROR(sync_hyper_call, "kX86SetSegmentES index=%u rpi=%u ti=%u",
+        state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
+    break;
 
-    case SyncHyperCall::kX86SetSegmentSS:
-      STRACE_ERROR(sync_hyper_call, "kX86SetSegmentSS index=%u rpi=%u ti=%u",
-                   state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
-      break;
+  case SyncHyperCall::kX86SetSegmentSS:
+    STRACE_ERROR(sync_hyper_call, "kX86SetSegmentSS index=%u rpi=%u ti=%u",
+        state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
+    break;
 
-    case SyncHyperCall::kX86SetSegmentDS:
-      STRACE_ERROR(sync_hyper_call, "kX86SetSegmentDS index=%u rpi=%u ti=%u",
-                   state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
-      break;
+  case SyncHyperCall::kX86SetSegmentDS:
+    STRACE_ERROR(sync_hyper_call, "kX86SetSegmentDS index=%u rpi=%u ti=%u",
+        state.seg.es.index, state.seg.es.rpi, state.seg.es.ti);
+    break;
 
-    case SyncHyperCall::kX86SetSegmentGS:
-      if (kLinuxMinIndexForTLSInGDT <= state.seg.gs.index
-          && kLinuxMaxIndexForTLSInGDT >= state.seg.gs.index) {
-        auto index = state.seg.gs.index;
-        state.addr.gs_base.dword = task.tls_slots[index
-            - kLinuxMinIndexForTLSInGDT].base_addr;
-      } else {
-        STRACE_ERROR(sync_hyper_call, "kX86SetSegmentGS index=%u rpi=%u ti=%u",
-                     state.seg.gs.index, state.seg.gs.rpi, state.seg.gs.ti);
-      }
-      break;
-
-    case SyncHyperCall::kX86SetSegmentFS:
-      if (kLinuxMinIndexForTLSInGDT <= state.seg.fs.index
-          && kLinuxMaxIndexForTLSInGDT >= state.seg.fs.index) {
-        auto index = state.seg.fs.index;
-        state.addr.fs_base.dword = task.tls_slots[index
-            - kLinuxMinIndexForTLSInGDT].base_addr;
-        STRACE_ERROR(sync_hyper_call,
-                     "kX86SetSegmentFS index=%u rpi=%u ti=%u fsbase=%x", index,
-                     state.seg.fs.rpi, state.seg.fs.ti,
-                     state.addr.fs_base.dword);
-      } else {
-        STRACE_ERROR(sync_hyper_call, "kX86SetSegmentFS index=%u rpi=%u ti=%u",
-                     state.seg.fs.index, state.seg.fs.rpi, state.seg.fs.ti);
-      }
-      break;
-
-    case SyncHyperCall::kX86CPUID: {
-      auto eax = state.gpr.rax.dword;
-      auto ecx = state.gpr.rcx.dword;
-
-      state.gpr.rax.aword = 0;
-      state.gpr.rbx.aword = 0;
-      state.gpr.rcx.aword = 0;
-      state.gpr.rdx.aword = 0;
-      STRACE_ERROR(
-          sync_hyper_call, "kX86CPUID eax=%x ecx=%x -> eax=0 ebx=0 ecx=0 edx=0",
-          eax, ecx);
-      break;
+  case SyncHyperCall::kX86SetSegmentGS:
+    if (kLinuxMinIndexForTLSInGDT <= state.seg.gs.index
+        && kLinuxMaxIndexForTLSInGDT >= state.seg.gs.index) {
+      auto index = state.seg.gs.index;
+      state.addr.gs_base.dword = task.tls_slots[index
+          - kLinuxMinIndexForTLSInGDT].base_addr;
+    } else {
+      STRACE_ERROR(sync_hyper_call, "kX86SetSegmentGS index=%u rpi=%u ti=%u",
+          state.seg.gs.index, state.seg.gs.rpi, state.seg.gs.ti);
     }
+    break;
 
-    case SyncHyperCall::kX86ReadTSC:
-      state.gpr.rax.aword = static_cast<uint32_t>(task.time_stamp_counter);
-      state.gpr.rdx.aword =
-        static_cast<uint32_t>(task.time_stamp_counter >> 32);
-      STRACE_SUCCESS(sync_hyper_call, "kX86ReadTSC eax=%x edx=%x",
-                      state.gpr.rax.dword, state.gpr.rdx.dword);
-      break;
-
-    case SyncHyperCall::kX86ReadTSCP:
-      state.gpr.rax.aword = static_cast<uint32_t>(task.time_stamp_counter);
-      state.gpr.rdx.aword =
-          static_cast<uint32_t>(task.time_stamp_counter >> 32);
-      state.gpr.rcx.aword = 0;  // Processor 0.
-      break;
-
-    case SyncHyperCall::kX86EmulateInstruction:
-    case SyncHyperCall::kAMD64EmulateInstruction:
+  case SyncHyperCall::kX86SetSegmentFS:
+    if (kLinuxMinIndexForTLSInGDT <= state.seg.fs.index
+        && kLinuxMaxIndexForTLSInGDT >= state.seg.fs.index) {
+      auto index = state.seg.fs.index;
+      state.addr.fs_base.dword = task.tls_slots[index
+          - kLinuxMinIndexForTLSInGDT].base_addr;
       STRACE_ERROR(sync_hyper_call,
-          "Unsupported instruction at %" PRIxADDR, state.gpr.rip.aword);
-      task.location = kTaskStoppedAtUnsupportedInstruction;
-      task.last_pc = CurrentPC(state);
-      // how to add pausing here?? With time stamp counter??
-      abort();
-      break;
+          "kX86SetSegmentFS index=%u rpi=%u ti=%u fsbase=%x", index,
+          state.seg.fs.rpi, state.seg.fs.ti, state.addr.fs_base.dword);
+    } else {
+      STRACE_ERROR(sync_hyper_call, "kX86SetSegmentFS index=%u rpi=%u ti=%u",
+          state.seg.fs.index, state.seg.fs.rpi, state.seg.fs.ti);
+    }
+    break;
 
-    default:
-      abort();
+  case SyncHyperCall::kX86CPUID: {
+    auto eax = state.gpr.rax.dword;
+    auto ecx = state.gpr.rcx.dword;
+
+    state.gpr.rax.aword = 0;
+    state.gpr.rbx.aword = 0;
+    state.gpr.rcx.aword = 0;
+    state.gpr.rdx.aword = 0;
+    STRACE_ERROR(sync_hyper_call,
+        "kX86CPUID eax=%x ecx=%x -> eax=0 ebx=0 ecx=0 edx=0", eax, ecx);
+    break;
+  }
+
+  case SyncHyperCall::kX86ReadTSC:
+    state.gpr.rax.aword = static_cast<uint32_t>(task.time_stamp_counter);
+    state.gpr.rdx.aword = static_cast<uint32_t>(task.time_stamp_counter >> 32);
+    STRACE_SUCCESS(sync_hyper_call, "kX86ReadTSC eax=%x edx=%x",
+        state.gpr.rax.dword, state.gpr.rdx.dword);
+    break;
+
+  case SyncHyperCall::kX86ReadTSCP:
+    state.gpr.rax.aword = static_cast<uint32_t>(task.time_stamp_counter);
+    state.gpr.rdx.aword = static_cast<uint32_t>(task.time_stamp_counter >> 32);
+    state.gpr.rcx.aword = 0;  // Processor 0.
+    break;
+
+  case SyncHyperCall::kX86EmulateInstruction:
+  case SyncHyperCall::kAMD64EmulateInstruction:
+    STRACE_ERROR(sync_hyper_call,
+        "Unsupported instruction at %" PRIxADDR, state.gpr.rip.aword);
+    task.location = kTaskStoppedAtUnsupportedInstruction;
+    task.last_pc = CurrentPC(state);
+    // how to add pausing here?? With time stamp counter??
+    abort();
+    break;
+
+  default:
+    abort();
   }
 
   return mem;
