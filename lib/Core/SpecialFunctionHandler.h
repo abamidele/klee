@@ -243,8 +243,8 @@ class SpecialFunctionHandler {
   HANDLER(handle__intercept_calloc);
   HANDLER(handle__intercept_realloc);
   HANDLER(handle_malloc_size);
-  HANDLER(handle_independent_calloc);
-  HANDLER(handle_independent_comalloc);
+//  HANDLER(handle_independent_calloc);
+//  HANDLER(handle_independent_comalloc);
 
 #undef HANDLER
 };

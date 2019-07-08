@@ -45,10 +45,13 @@ static Memory *Intercept_strtol(Memory *memory, State *state,
 
 
 static constexpr addr_t kBadAddr = ~0ULL;
+
 static constexpr addr_t kReallocInternalPtr = ~0ULL - 1ULL;
 static constexpr addr_t kReallocTooBig = ~0ULL - 2ULL;
 static constexpr addr_t kReallocInvalidPtr = ~0ULL - 3ULL;
 static constexpr addr_t kReallocFreedPtr = ~0ULL - 4ULL;
+
+static constexpr addr_t kMallocTooBig = ~0ULL - 1ULL;
 
 template <typename ABI>
 static Memory *Intercept_malloc(Memory *memory, State *state,
@@ -59,9 +62,19 @@ static Memory *Intercept_malloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
+  if (!alloc_size) {
+    STRACE_SUCCESS(libc_malloc, "size=0, ptr=0");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
   const auto ptr = malloc_intercept(memory, alloc_size);
   if (ptr == kBadAddr) {
     STRACE_ERROR(libc_malloc, "Falling back to real malloc for size=%" PRIxADDR,
+                 alloc_size);
+    return memory;
+
+  } else if (ptr == kMallocTooBig) {
+    STRACE_ERROR(libc_malloc, "Malloc for size=%" PRIxADDR " too big",
                  alloc_size);
     return memory;
 
@@ -100,11 +113,23 @@ static Memory *Intercept_calloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  const auto ptr = calloc_intercept(memory, num * size);
+  addr_t alloc_size = num * size;
+  if (!alloc_size) {
+    STRACE_SUCCESS(libc_calloc, "num=%" PRIxADDR ", size=%" PRIxADDR ", ptr=0", num, size);
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  const auto ptr = calloc_intercept(memory, alloc_size);
   if (ptr == kBadAddr) {
     STRACE_ERROR(libc_calloc, "Falling back to real calloc for num=%" PRIxADDR
                  ", size=%" PRIxADDR, num, size);
     return memory;
+
+  } else if (ptr == kMallocTooBig) {
+    STRACE_ERROR(libc_calloc, "Calloc for size=%" PRIxADDR " too big",
+                 alloc_size);
+    return memory;
+
   } else {
     STRACE_SUCCESS(libc_calloc, "num=%" PRIdADDR ", size=%" PRIdADDR ", ptr=%" PRIxADDR,
                    num, size, ptr);
@@ -122,7 +147,12 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  addr_t new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  addr_t new_ptr = 0;
+  if (!ptr) {
+    new_ptr = malloc_intercept(memory, alloc_size);
+  } else {
+    new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  }
 
   if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR

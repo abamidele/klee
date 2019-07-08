@@ -128,49 +128,49 @@ static constexpr uint64_t kReallocTooBig = ~0ULL - 2ULL;
 static constexpr uint64_t kReallocInvalidPtr = ~0ULL - 3ULL;
 static constexpr uint64_t kReallocFreedPtr = ~0ULL - 4ULL;
 
+
+static constexpr uint64_t kMallocTooBig = ~0ULL - 1ULL;
+
 bool AddressSpace::TryFree(uint64_t addr) {
   Address address = {};
   address.flat = addr;
 
   if (address.must_be_0x1 != 0x1 ||
       address.must_be_0xa != 0xa) {
-    return 0;
+    return false;
   }
 
   // Realloc of a contained address.
   if (address.offset != 0) {
-    // TODO(sais): Report?
-    return 0;
+    LOG(ERROR)
+        << "Freeing internal pointer " << std::hex << addr << std::dec;
+    // TODO(sai): Eventually do something more interesting here.
+    address.offset = 0;
   }
 
   auto &alloc_list = alloc_lists[address.size];
-  bool can_free = alloc_list.TryFree(address);
-  if (can_free) {
-    for (size_t i = 0; i < address.size; ++i) {
-      auto sym_byte_pair = symbolic_memory.find(addr + i);
-      if (sym_byte_pair != symbolic_memory.end()) {
-        symbolic_memory.erase(addr + i);
-      }
-    }
-    return can_free;
+  if (!alloc_list.TryFree(address)) {
+    return true;
   }
-  LOG(ERROR) << "Invalid free at address " << addr << " :-(";
-  return false;
+
+  for (size_t i = 0; i < address.size; ++i) {
+    symbolic_memory.erase(addr + i);
+  }
+
+  return true;
 }
 
 uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
-  if (alloc_size == 0) {
+  if (!alloc_size) {
     return 0;
   }
 
   Address address = {};
   address.size = alloc_size;
-  LOG(INFO) << "alloc_size: " << alloc_size;
-  LOG(INFO) << "address size: " << address.size;
 
   // The size was truncated, need tro fall back to the real malloc.
   if (address.size != alloc_size) {
-    return ~0ULL;
+    return kMallocTooBig;
   }
 
   address.must_be_0x1 = 0x1;
@@ -195,6 +195,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
         << "Realloc of internal pointer with size " << address.size
         << ", index " << address.alloc_index << ", and offset "
         << std::hex << address.offset << std::dec;
+
     return kReallocInternalPtr;
   }
 
@@ -202,6 +203,8 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   new_address.must_be_0xa = 0xa;
   new_address.must_be_0x1 = 0x1;
   new_address.size = alloc_size;
+  new_address.offset = 0;
+
   if (new_address.size != alloc_size) {
     LOG(ERROR)
         << "Realloc of size " << address.size << " to " << alloc_size
@@ -229,7 +232,6 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     return kReallocFreedPtr;
   }
 
-
   const auto new_addr = new_alloc_list.Allocate(new_address);
   new_address.flat = new_addr;
 
@@ -250,7 +252,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   }
 
   CHECK(TryFree(addr));
-  return new_address.flat;
+  return new_addr;
 }
 
 // Clear out the contents of this address space.

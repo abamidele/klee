@@ -217,73 +217,75 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 	  add("calloc_intercept", handle__intercept_calloc, true),
 	  add("realloc_intercept", handle__intercept_realloc, true),
 	  add("handle_malloc_size", handle_malloc_size, true),
-    add("independent_calloc", handle_independent_calloc, true),
-	  add("independent_comalloc", handle_independent_comalloc, true)
+//    add("independent_calloc", handle_independent_calloc, true),
+//	  add("independent_comalloc", handle_independent_comalloc, true)
 
 #undef addDNR
 #undef add
 };
-
-void SpecialFunctionHandler::handle_independent_calloc(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
-  auto mem_uint = mem_val->getZExtValue();
-  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
-  auto size_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
-
-  auto mem = executor.Memory(state, mem_uint);
-  addr_t addr;
-  uint8_t byte = 0;
-  for (size_t i = n_elements_uint; i > 0; --i){
-    if (addr = mem->TryMalloc(size_uint)){
-      for (size_t i = 0; i < size_uint; ++i){
-        (void) mem->TryWrite(addr+i, byte);
-       }
-    }
-  }
-
-  addr_t saved_addr = mem->TryMalloc(8);
-  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(addr,64), mem, mem_val);
-
-  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
-}
-
-void SpecialFunctionHandler::handle_independent_comalloc(
-    ExecutionState &state, KInstruction *target,
-    std::vector<ref<Expr>> &arguments) {
-
-  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
-  auto mem_uint = mem_val->getZExtValue();
-  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
-  auto sizes_addr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
-
-  auto mem = executor.Memory(state, mem_uint);
-  addr_t addr;
-  size_t size_uint;
-  addr_t first_address;
-  for (size_t i = 0; i < n_elements_uint; ++i) {
-   MemoryReadResult val;
-   auto size_val = runtime_read_memory(mem, sizes_addr + i,8,val);
-   if (auto const_size = dyn_cast<ConstantExpr>(size_val)) {
-     size_uint = const_size->getZExtValue();
-   } else {
-     ref<ConstantExpr> const_val;
-     executor.solver->getValue(state, size_val, const_val );
-     executor.addConstraint(state,EqExpr::create(const_val, size_val));
-     size_uint = const_val->getZExtValue();
-   }
-   (void) mem->TryMalloc(size_uint);
-    if (!i){
-     first_address = addr;
-    }
-  }
-
-  addr_t saved_addr = mem->TryMalloc(8);
-  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(first_address,64), mem, mem_val);
-
-  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
-}
+//
+//void SpecialFunctionHandler::handle_independent_calloc(
+//    ExecutionState &state, KInstruction *target,
+//    std::vector<ref<Expr>> &arguments) {
+//  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
+//  auto mem_uint = mem_val->getZExtValue();
+//  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+//  auto size_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
+//
+//  auto mem = executor.Memory(state, mem_uint);
+//  addr_t addr;
+//  uint8_t byte = 0;
+//  for (size_t i = n_elements_uint; i > 0; --i){
+//    cauto addr = mem->TryMalloc(size_uint);
+//
+//    if (0 < reinterpret_cast<int64_t>(addr)) {
+//      for (size_t i = 0; i < size_uint; ++i){
+//        (void) mem->TryWrite(addr+i, byte);
+//       }
+//    }
+//  }
+//
+//  addr_t saved_addr = mem->TryMalloc(8);
+//  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(addr,64), mem, mem_val);
+//
+//  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
+//}
+//
+//void SpecialFunctionHandler::handle_independent_comalloc(
+//    ExecutionState &state, KInstruction *target,
+//    std::vector<ref<Expr>> &arguments) {
+//
+//  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
+//  auto mem_uint = mem_val->getZExtValue();
+//  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+//  auto sizes_addr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
+//
+//  auto mem = executor.Memory(state, mem_uint);
+//  addr_t addr;
+//  size_t size_uint;
+//  addr_t first_address;
+//  for (size_t i = 0; i < n_elements_uint; ++i) {
+//   MemoryReadResult val;
+//   auto size_val = runtime_read_memory(mem, sizes_addr + i,8,val);
+//   if (auto const_size = dyn_cast<ConstantExpr>(size_val)) {
+//     size_uint = const_size->getZExtValue();
+//   } else {
+//     ref<ConstantExpr> const_val;
+//     executor.solver->getValue(state, size_val, const_val );
+//     executor.addConstraint(state,EqExpr::create(const_val, size_val));
+//     size_uint = const_val->getZExtValue();
+//   }
+//   (void) mem->TryMalloc(size_uint);
+//    if (!i){
+//     first_address = addr;
+//    }
+//  }
+//
+//  addr_t saved_addr = mem->TryMalloc(8);
+//  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(first_address,64), mem, mem_val);
+//
+//  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
+//}
 
 void SpecialFunctionHandler::handle_malloc_size(
     ExecutionState &state, KInstruction *target,
@@ -295,7 +297,14 @@ void SpecialFunctionHandler::handle_malloc_size(
   klee::native::Address address = {};
   address.flat = addr;
 
-  executor.bindLocal(target, state, ConstantExpr::create(address.size, 64));
+  if (address.must_be_0x1 == 0x1 && address.must_be_0xa == 0xa) {
+    executor.bindLocal(target, state, ConstantExpr::create(address.size, 64));
+
+  } else {
+    LOG(ERROR)
+        << "Can't determine size of address=" << std::hex << addr << std::dec;
+    executor.bindLocal(target, state, ConstantExpr::create(0, 64));
+  }
 }
 
 void SpecialFunctionHandler::handle__intercept_realloc(
@@ -320,7 +329,7 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  if (addr){
+  if (0 < reinterpret_cast<int64_t>(addr)) {
     uint8_t byte=0;
     for (size_t i = 0; i < size; ++i){
       (void) mem->TryWrite(addr+i, byte);
@@ -340,10 +349,9 @@ void SpecialFunctionHandler::handle__intercept_strtol(
   auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
   ref<Expr> read_byte;
   int size = 0;
-  //LOG(INFO) << "CONGRATZZZZ  U DID THE THING";
 
   exit(0);
- }
+}
 
 
 void SpecialFunctionHandler::handle__intercept_malloc(
@@ -353,7 +361,6 @@ void SpecialFunctionHandler::handle__intercept_malloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  //printf("MALLOC SIZE IS : %d and ptr is 0x%lx\n", size, addr);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
@@ -364,19 +371,7 @@ void SpecialFunctionHandler::handle__intercept_free(
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  klee::native::Address addr = {};
-  addr.flat = ptr;
-  if (addr.must_be_0xa != 0xa) {
-    //LOG(INFO) << "NATURAL FREE ADDR IN HANDLER IS " << std::hex << ptr << std::dec;
-    executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
-    return ;
-  }
-  if(!mem->TryFree(ptr)) {
-    LOG(ERROR) << "invalid free :-(";
-  }
-  //printf("FREE IS : 0x%lx\n", addr);
-
-  executor.bindLocal(target, state, ConstantExpr::create(true, Expr::Bool));
+  executor.bindLocal(target, state, ConstantExpr::create(mem->TryFree(ptr), Expr::Bool));
 }
 
 
@@ -384,7 +379,7 @@ void SpecialFunctionHandler::handle__intercept_free(
 void SpecialFunctionHandler::handle__symbolic_stdin(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-    executor.bindLocal(target, state, ConstantExpr::create( executor.symbolicStdin, Expr::Bool));
+  executor.bindLocal(target, state, ConstantExpr::create(executor.symbolicStdin, Expr::Bool));
 }
 
 
@@ -582,7 +577,6 @@ ref<Expr> SpecialFunctionHandler::runtime_read_memory(
   //LOG(INFO) << "all_symbolic: " << all_symbolic;
   
   if (!any_symbolic) {
-    //LOG(INFO) << "HIT ALL CONCRETE CASE!!!!!";
     return ConstantExpr::create(val.as_qword, num_bytes * 8);
   }
 
