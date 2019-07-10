@@ -134,12 +134,14 @@ bool AddressSpace::TryFree(uint64_t addr) {
 
   if (address.must_be_0x1 != 0x1 ||
       address.must_be_0xa != 0xa) {
+    LOG(ERROR) << "address is in improper format";
     return 0;
   }
 
   // Realloc of a contained address.
   if (address.offset != 0) {
     // TODO(sais): Report?
+    LOG(ERROR) << "free at invalid offset for address " << std::hex << addr << std::dec;
     return 0;
   }
 
@@ -182,6 +184,9 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
 uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   Address address = {};
   address.flat = addr;
+  if (alloc_size >= (1U << 15U)) {
+    return kBadAddr;
+  }
 
   if (address.must_be_0x1 != 0x1 ||
       address.must_be_0xa != 0xa) {

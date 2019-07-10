@@ -351,6 +351,7 @@ Memory *__remill_async_hyper_call(State &state, addr_t ret_addr,
 
       // If the intercept didn't complete, then skip over the `ret` instruction.
       } else {
+        intercept.SetReturn(memory, &state, state.gpr.rax.aword);
         state.gpr.rip.aword = ret_addr + 1;
         task.last_pc = ret_addr;
       }

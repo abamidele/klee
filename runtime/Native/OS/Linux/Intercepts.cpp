@@ -87,6 +87,7 @@ static Memory *Intercept_free(Memory *memory, State *state,
     return memory;
   }
 
+  STRACE_SUCCESS(libc_free, "free of ptr=%" PRIxADDR, address);
   return intercept.SetReturn(memory, state, 0);
 }
 
@@ -121,8 +122,12 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     STRACE_ERROR(libc_realloc, "Couldn't get args");
     return intercept.SetReturn(memory, state, 0);
   }
-
-  addr_t new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  addr_t new_ptr;
+  if (!ptr) {
+    new_ptr = malloc_intercept(memory, alloc_size);
+  } else {
+    new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  }
 
   if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR
