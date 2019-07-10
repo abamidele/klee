@@ -27,6 +27,10 @@ static const char * const bump_end = &(bump_region[BUMP_REGION_SIZE]);
 static char *bump = &(bump_region[0]);
 
 static void *reentrant_malloc(unsigned long long size) {
+  if (!size) {
+    return NULL;
+  }
+
   char *ret = bump;
   bump += size;
   if (bump <= bump_end) {
@@ -39,13 +43,17 @@ static void *reentrant_malloc(unsigned long long size) {
 
 static void *reentrant_calloc(unsigned long long a, unsigned long long b) {
   void *ret = reentrant_malloc(a * b);
-  bzero(ret, a * b);
+  if (ret) {
+    bzero(ret, a * b);
+  }
   return ret;
 }
 
 static void *reentrant_realloc(void *old, unsigned long long size) {
   void *ret = reentrant_malloc(size);
-  memcpy(ret, old, size);
+  if (old) {
+    memcpy(ret, old, size);
+  }
   return ret;
 }
 
