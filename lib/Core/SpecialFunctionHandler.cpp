@@ -291,18 +291,17 @@ void SpecialFunctionHandler::handle_malloc_size(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
-  auto size_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
+  auto addr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  uint64_t addr;
   klee::native::Address address = {};
-  address.flat = addr;
+  address.flat = addr_uint;
 
   if (address.must_be_0x1 == 0x1 && address.must_be_0xa == 0xa) {
     executor.bindLocal(target, state, ConstantExpr::create(address.size, 64));
 
   } else {
     LOG(ERROR)
-        << "Can't determine size of address=" << std::hex << addr << std::dec;
+        << "Can't determine size of address=" << std::hex << addr_uint << std::dec;
     executor.bindLocal(target, state, ConstantExpr::create(0, 64));
   }
 }
