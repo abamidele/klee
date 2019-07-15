@@ -216,7 +216,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("free_intercept", handle__intercept_free, true),
 	  add("calloc_intercept", handle__intercept_calloc, true),
 	  add("realloc_intercept", handle__intercept_realloc, true),
-	  add("handle_malloc_size", handle_malloc_size, true),
+	  add("malloc_size", handle_malloc_size, true),
 //    add("independent_calloc", handle_independent_calloc, true),
 //	  add("independent_comalloc", handle_independent_comalloc, true)
 
@@ -329,7 +329,7 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  if (0 < reinterpret_cast<int64_t>(addr)) {
+  if (0 < reinterpret_cast<uint64_t>(addr)) {
     uint8_t byte=0;
     for (size_t i = 0; i < size; ++i){
       (void) mem->TryWrite(addr+i, byte);
