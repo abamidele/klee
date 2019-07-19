@@ -24,6 +24,10 @@ bool free_intercept( Memory *memory, addr_t ptr);
 addr_t calloc_intercept( Memory *memory, uint64_t size);
 addr_t realloc_intercept( Memory *memory, addr_t ptr,  uint64_t size);
 size_t malloc_size( Memory *memory, addr_t ptr);
+addr_t memset_intercept(Memory * memory, void *s, int c, size_t n);
+addr_t memcpy_intercept(Memory * memory, void * dest, void * src, size_t n);
+addr_t memmove_intercept(Memory * memory, void *dest, void *src, size_t n);
+addr_t strcpy_intercept(Memory *memory, addr_t dest, addr_t src);
 }  // extern C
 
 template <typename ABI>
@@ -103,6 +107,114 @@ static Memory *Intercept_free(Memory *memory, State *state,
   STRACE_SUCCESS(libc_free, "free of ptr=%" PRIxADDR, address);
   return intercept.SetReturn(memory, state, 0);
 }
+
+/*
+
+template <typename ABI>
+static Memory *Intercept_memset(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s;
+  int c;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &s, &c, &n)) {
+    STRACE_ERROR(libc_memset, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memset_intercept(memory, s, c, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memset, "Falling back to real memset for s=% c=% n=%" PRIxADDR,
+                 s, c, n);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_memset, "successful memset for of ptr=%" PRIxADDR, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+
+}
+
+template <typename ABI>
+static Memory *Intercept_memcpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t dest;
+  addr_t src;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_memset, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memcpy_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memcpy, "Falling back to real memset for dest=% src=% n=%" PRIxADDR,
+                 dest, src, n);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_memcpy, "Successful memcpy for ptr=%" PRIxADDR, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_memmove(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t dest;
+  addr_t src;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_memset, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memmove_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memmove, "Falling back to real memmove for dest=% src=% n=%" PRIxADDR,
+                 dest, src, n);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_memmove, "successful memmove for ptr=%" PRIxADDR, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strcpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+
+  addr_t dest;
+  addr_t src;
+
+  if (!intercept.TryGetArgs(memory, state, &dest, &src)) {
+    STRACE_ERROR(libc_memset, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = strcpy_intercept(memory, dest, src);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_strcpy, "Falling back to real strcpy for dest=% src=%" PRIxADDR,
+                 dest, src);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_strcpy, "successful strcpy for ptr=%" PRIxADDR, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+*/
+
+template <typename ABI>
+static Memory *Intercept_strncmp(Memory *memory, State *state,
+                              const ABI &intercept) {
+  return memory;
+}
+
+template <typename ABI>
+static Memory *Intercept_strcmp(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s1;
+  addr_t s2;
+  if (!intercept.TryGetArgs(memory, state, &s1, &s2)) {
+    STRACE_ERROR(libc_strcmp, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+  return memory;
+}
+
 
 template <typename ABI>
 static Memory *Intercept_calloc(Memory *memory, State *state,

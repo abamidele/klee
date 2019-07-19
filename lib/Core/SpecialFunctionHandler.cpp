@@ -219,10 +219,37 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 	  add("malloc_size", handle_malloc_size, true),
 //    add("independent_calloc", handle_independent_calloc, true),
 //	  add("independent_comalloc", handle_independent_comalloc, true)
+	  add("memset_intercept", handle_memset_intercept, true),
+	  add("memcpy_intercept" , handle_memcpy_intercept, true),
+	  add("memmove_intercept", handle_memmove_intercept, true),
+	  add("strcpy_intercept", handle_strcpy_intercept, true),
 
 #undef addDNR
 #undef add
 };
+
+void SpecialFunctionHandler::handle_memset_intercept(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+
+
+}
+
+void SpecialFunctionHandler::handle_memcpy_intercept(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+}
+
+void SpecialFunctionHandler::handle_memmove_intercept(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+}
+
+void SpecialFunctionHandler::handle_strcpy_intercept(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+}
+
 //
 //void SpecialFunctionHandler::handle_independent_calloc(
 //    ExecutionState &state, KInstruction *target,

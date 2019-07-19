@@ -65,6 +65,45 @@ void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
 void *(*real_realloc)(void *, unsigned long long) = NULL;
 void (*real_free)(void *) = NULL;
 
+void *(*real_memset)(void *, int, size_t) = NULL;
+void *(*real_memmove)(void *, void *, size_t) = NULL;
+void *(*real_memcpy)(void *, void *, size_t) = NULL;
+char *(*real_strcpy)(char *, const char *) = NULL;
+//int (*real_strcmp)(const char *, const char *) = NULL;
+//int (*real_strncmp)(const char *, const char *, size_t) = NULL;
+
+int intercepted_strcmp(volatile const char *a, volatile const char *b) {
+  while (*a && *a == *b) {
+    ++a, ++b;
+  }
+  return *a - *b;
+}
+
+int intercepted_strncmp(volatile const char *s1,
+    volatile const char *s2, size_t n) {
+  if (n == 0) {
+    return (0);
+  }
+  do {
+    if (*s1 != *s2++) {
+      return (*(unsigned char *)s1 -
+        *(unsigned char *)(s2 - 1));
+    }
+    if (*s1++ == 0) {
+      break;
+    }
+  } while (--n != 0);
+  return (0);
+}
+
+int real_strncmp(volatile const char *a,
+    volatile const char *b, size_t n) {
+  return intercepted_strncmp(a,b,n);
+}
+
+int real_strcmp(volatile const char *a, volatile const char *b) {
+  return intercepted_strcmp(a,b);
+}
 __attribute__((initializer))
 void init(void) {
   real_malloc = reentrant_malloc;
@@ -80,10 +119,20 @@ void init(void) {
   bump = bump_start;
   void (*og_free)(void *) = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
   bump = bump_start;
+  real_memset = (void * (*)(void *, int, size_t)) dlsym(RTLD_NEXT, "memset");
+  bump = bump_start;
+  real_memmove = (void * (*)(void *, void *, size_t)) dlsym(RTLD_NEXT, "memmove");
+  bump = bump_start;
+  real_memcpy = (void * (*)(void *, void *, size_t)) dlsym(RTLD_NEXT, "memcpy");
+  bump = bump_start;
+  real_strcpy = (char * (*)(char *, const char *)) dlsym(RTLD_NEXT, "strcpy");
+  bump = bump_start;
+
   real_malloc = og_malloc;
   real_calloc = og_calloc;
   real_realloc = og_realloc;
   real_free = og_free;
+
 }
 
 void *intercepted_malloc(unsigned long long a) {
