@@ -94,7 +94,7 @@ bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
   //LOG(INFO) << "TRY READ CASE WAS HIT IN THE ALLOCATOR!!!!";
   //LOG(INFO) << (int)allocations[alloc_index][address.offset];
   if (address.offset >= address.size){
-    if (address.size < 8 && address.offset < 8) {
+    if (address.size < 16 && address.offset < 16) {
       LOG(WARNING) << "Read Heap Overflow" << " on address " << std::hex << addr
           << std::dec << " of byte " << *byte_out << "offset is " << address.offset << " and size is " << address.size;
     } else {
@@ -113,7 +113,7 @@ bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
   // still need to do a ref count check for copy on write
   MEMORY_ACCESS_CHECKS(addr, "Write");
   if (address.offset >= address.size){
-    if (address.size < 8 && address.offset < 8) {
+    if (address.size < 0 && address.offset < 0) {
       LOG(WARNING) << "Write Heap Overflow" << " on address " << std::hex << addr
           << std::dec << " of byte " << byte << "offset is " << address.offset << " and size is " << address.size;
     } else {

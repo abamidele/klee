@@ -206,12 +206,6 @@ static Memory *Intercept_strncmp(Memory *memory, State *state,
 template <typename ABI>
 static Memory *Intercept_strcmp(Memory *memory, State *state,
                               const ABI &intercept) {
-  addr_t s1;
-  addr_t s2;
-  if (!intercept.TryGetArgs(memory, state, &s1, &s2)) {
-    STRACE_ERROR(libc_strcmp, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
   return memory;
 }
 
@@ -332,5 +326,6 @@ static Memory *Intercept_malloc_usable_size(Memory *memory, State *state,
   }
   return intercept.SetReturn(memory, state, size);
 }
+
 
 }  // namespace

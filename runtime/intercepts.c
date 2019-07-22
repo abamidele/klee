@@ -140,9 +140,42 @@ void init(void) {
   real_realloc = og_realloc;
   real_free = og_free;
 
-  real_strcmp = intercepted_strcmp;
-  real_strncmp = intercepted_strncmp;
+  real_strcmp = &intercepted_strcmp;
+  real_strncmp = &intercepted_strncmp;
 }
+
+char * __findenv(const char *name, int *offset)
+{
+  extern char **environ;
+  int len, i;
+  const char *np;
+  char **p, *cp;
+  if (name == NULL || environ == NULL)
+    return (NULL);
+  for (np = name; *np && *np != '='; ++np)
+    ;
+  len = np - name;
+  for (p = environ; (cp = *p) != NULL; ++p) {
+    for (np = name, i = len; i && *cp; i--)
+      if (*cp++ != *np++)
+        break;
+    if (i == 0 && *cp++ == '=') {
+      *offset = p - environ;
+      return (cp);
+    }
+  }
+  return (NULL);
+}
+/*
+ * getenv --
+ *  Returns ptr to value associated with name, if any, else NULL.
+ */
+char *
+getenv(const char *name) {
+  int offset;
+  return (__findenv(name, &offset));
+}
+
 
 void *intercepted_malloc(unsigned long long a) {
   if (!real_malloc) {
