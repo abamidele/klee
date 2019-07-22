@@ -69,18 +69,26 @@ void *(*real_memset)(void *, int, size_t) = NULL;
 void *(*real_memmove)(void *, void *, size_t) = NULL;
 void *(*real_memcpy)(void *, void *, size_t) = NULL;
 char *(*real_strcpy)(char *, const char *) = NULL;
-//int (*real_strcmp)(const char *, const char *) = NULL;
-//int (*real_strncmp)(const char *, const char *, size_t) = NULL;
+int (*real_strcmp)(const char *, const char *) = NULL;
+int (*real_strncmp)(const char *, const char *, size_t) = NULL;
+
 
 int intercepted_strcmp(volatile const char *a, volatile const char *b) {
+  write(2, "HIT STRCMP!\n", 12);
   while (*a && *a == *b) {
     ++a, ++b;
   }
   return *a - *b;
 }
 
+/****EXPERIMENTAL*****/
+char *setlocale(int category, const char *locale){
+  return "en_US.UTF-8";
+}
+
 int intercepted_strncmp(volatile const char *s1,
     volatile const char *s2, size_t n) {
+  write(2, "HIT STRNCMP!\n", 13);
   if (n == 0) {
     return (0);
   }
@@ -96,14 +104,13 @@ int intercepted_strncmp(volatile const char *s1,
   return (0);
 }
 
-int real_strncmp(volatile const char *a,
-    volatile const char *b, size_t n) {
-  return intercepted_strncmp(a,b,n);
-}
-
-int real_strcmp(volatile const char *a, volatile const char *b) {
+/*
+int strcmp(volatile const char *a, volatile const char *b) {
+  //write(0, "HIT STRCMP!\n", 12);
   return intercepted_strcmp(a,b);
 }
+*/
+
 __attribute__((initializer))
 void init(void) {
   real_malloc = reentrant_malloc;
@@ -133,6 +140,8 @@ void init(void) {
   real_realloc = og_realloc;
   real_free = og_free;
 
+  real_strcmp = intercepted_strcmp;
+  real_strncmp = intercepted_strncmp;
 }
 
 void *intercepted_malloc(unsigned long long a) {
