@@ -24,9 +24,9 @@ bool free_intercept( Memory *memory, addr_t ptr);
 addr_t calloc_intercept( Memory *memory, uint64_t size);
 addr_t realloc_intercept( Memory *memory, addr_t ptr,  uint64_t size);
 size_t malloc_size( Memory *memory, addr_t ptr);
-addr_t memset_intercept(Memory * memory, void *s, int c, size_t n);
-addr_t memcpy_intercept(Memory * memory, void * dest, void * src, size_t n);
-addr_t memmove_intercept(Memory * memory, void *dest, void *src, size_t n);
+addr_t memset_intercept(Memory * memory, addr_t s, int c, size_t n);
+addr_t memcpy_intercept(Memory * memory, addr_t dest, addr_t src, size_t n);
+addr_t memmove_intercept(Memory * memory, addr_t dest, addr_t src, size_t n);
 addr_t strcpy_intercept(Memory *memory, addr_t dest, addr_t src);
 }  // extern C
 
@@ -107,8 +107,6 @@ static Memory *Intercept_free(Memory *memory, State *state,
   STRACE_SUCCESS(libc_free, "free of ptr=%" PRIxADDR, address);
   return intercept.SetReturn(memory, state, 0);
 }
-
-/*
 
 template <typename ABI>
 static Memory *Intercept_memset(Memory *memory, State *state,
@@ -195,7 +193,7 @@ static Memory *Intercept_strcpy(Memory *memory, State *state,
   STRACE_SUCCESS(libc_strcpy, "successful strcpy for ptr=%" PRIxADDR, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
-*/
+
 
 template <typename ABI>
 static Memory *Intercept_strncmp(Memory *memory, State *state,

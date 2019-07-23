@@ -69,11 +69,11 @@ void *(*real_memset)(void *, int, size_t) = NULL;
 void *(*real_memmove)(void *, void *, size_t) = NULL;
 void *(*real_memcpy)(void *, void *, size_t) = NULL;
 char *(*real_strcpy)(char *, const char *) = NULL;
-int (*real_strcmp)(const char *, const char *) = NULL;
-int (*real_strncmp)(const char *, const char *, size_t) = NULL;
+//int (*real_strcmp)(const char *, const char *) = NULL;
+//int (*real_strncmp)(const char *, const char *, size_t) = NULL;
 
 
-int intercepted_strcmp(volatile const char *a, volatile const char *b) {
+int strcmp(volatile const char *a, volatile const char *b) {
   write(2, "HIT STRCMP!\n", 12);
   while (*a && *a == *b) {
     ++a, ++b;
@@ -86,7 +86,7 @@ char *setlocale(int category, const char *locale){
   return "en_US.UTF-8";
 }
 
-int intercepted_strncmp(volatile const char *s1,
+int strncmp(volatile const char *s1,
     volatile const char *s2, size_t n) {
   write(2, "HIT STRNCMP!\n", 13);
   if (n == 0) {
@@ -140,8 +140,8 @@ void init(void) {
   real_realloc = og_realloc;
   real_free = og_free;
 
-  real_strcmp = &intercepted_strcmp;
-  real_strncmp = &intercepted_strncmp;
+  //real_strcmp = &intercepted_strcmp;
+  //real_strncmp = &intercepted_strncmp;
 }
 
 char * __findenv(const char *name, int *offset)
@@ -170,8 +170,7 @@ char * __findenv(const char *name, int *offset)
  * getenv --
  *  Returns ptr to value associated with name, if any, else NULL.
  */
-char *
-getenv(const char *name) {
+char * getenv(const char *name) {
   int offset;
   return (__findenv(name, &offset));
 }
@@ -209,3 +208,20 @@ void intercepted_free(void *ptr) {
   }
   real_free(ptr);
 }
+
+void *intercepted_memset(void * a, int c, size_t n) {
+  return real_memset(a,c,n);
+}
+void * intercepted_memmove(void * a, void * s, size_t n) {
+  return real_memmove(a,s,n);
+}
+
+void *intercepted_memcpy(void *dest, void *src, size_t n) {
+  return real_memcpy(dest, src, n);
+}
+
+
+char *intercepted_strcpy(char *dest, const char *src) {
+  return real_strcpy(dest, src);
+}
+

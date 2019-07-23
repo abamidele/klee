@@ -232,22 +232,122 @@ void SpecialFunctionHandler::handle_memset_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
 
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto s = executor.toUnique(state, arguments[1]); 
+  auto constant = executor.toUnique(state, arguments[2]);
+  auto n = executor.toUnique(state, arguments[3]);
 
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
+  auto s_uint = dyn_cast<ConstantExpr>(s) -> getZExtValue();
+  auto c_uint = dyn_cast<ConstantExpr>(constant) -> getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+ 
+  auto mem = executor.Memory(state, mem_uint);
+  if (mem -> CanWrite(s_uint)) {
+    for (size_t i=0; i < n_uint; ++i) {
+      if (!mem->TryWrite(s_uint + i, static_cast<uint8_t>(c_uint))) {
+      } else {
+        LOG(ERROR) << "illegal write during memset to address " << 
+            std::hex << s_uint + 1 << std::dec;
+      }
+    }
+    executor.bindLocal(target, state, s);
+  } else {
+    executor.bindLocal(target, state, ConstantExpr::create(~0ULL, 64));
+  }
 }
 
 void SpecialFunctionHandler::handle_memcpy_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto dest = executor.toUnique(state, arguments[1]); 
+  auto src = executor.toUnique(state, arguments[2]);
+  auto n = executor.toUnique(state, arguments[3]);
+
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+
+  auto mem = executor.Memory(state, mem_uint);
+  
+  if ( abs(dest_uint - src_uint) < n_uint) {
+    LOG(WARNING) << "Addresses overlap on memcpy";
+    executor.bindLocal(target, state, ConstantExpr::create(0, 64));
+    return ;
+  }
+
+  for (size_t i=0; i < n_uint; ++i) {
+    MemoryReadResult result = {};
+    auto val = runtime_read_memory(mem, src_uint+i, 1, result);
+    runtime_write_8(state, dest_uint+i,val, mem, mem_ptr);
+  }
+  executor.bindLocal(target, state, dest);
 }
 
 void SpecialFunctionHandler::handle_memmove_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto dest = executor.toUnique(state, arguments[1]); 
+  auto src = executor.toUnique(state, arguments[2]);
+  auto n = executor.toUnique(state, arguments[3]);
+
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+
+  auto mem = executor.Memory(state, mem_uint);
+
+  std::vector<ref<Expr>> read_array;
+  read_array.reserve(n_uint);
+
+  for (size_t i=0; i < n_uint; ++i) {
+    MemoryReadResult result = {};
+    read_array.push_back(runtime_read_memory(mem, src_uint+i, 1, result));
+  }
+
+  for (size_t k=0; k<read_array.size(); ++k) {
+    (void) runtime_write_8(state, dest_uint+k, read_array[k], mem, mem_ptr);
+  }
+
+  executor.bindLocal(target, state, dest);
 }
 
 void SpecialFunctionHandler::handle_strcpy_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto dest = executor.toUnique(state, arguments[1]);
+  auto src = executor.toUnique(state, arguments[2]);
+
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
+
+  auto mem = executor.Memory(state, mem_uint);
+  uint8_t val1;
+  uint8_t val2;
+  if (mem->TryRead(src_uint, &val1) && mem->TryRead(dest_uint, &val2)) {
+    size_t offs = 1;
+
+    while ( val1 != 0 ) {
+      MemoryReadResult result = {};
+      auto val = runtime_read_memory(mem, src_uint + offs, 1, result);
+      runtime_write_8(state, dest_uint + offs, val, mem, mem_ptr);
+      val1 = result.as_byte;
+      ++offs;
+    }
+  } else {
+    executor.bindLocal(target, state, ConstantExpr::create(~0UL, 64));
+    return;
+  }
+
+
+  executor.bindLocal(target, state, dest);
 }
 
 //
