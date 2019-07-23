@@ -245,10 +245,12 @@ void SpecialFunctionHandler::handle_memset_intercept(
   auto mem = executor.Memory(state, mem_uint);
   if (mem -> CanWrite(s_uint)) {
     for (size_t i=0; i < n_uint; ++i) {
-      if (!mem->TryWrite(s_uint + i, static_cast<uint8_t>(c_uint))) {
+      if (mem->TryWrite(s_uint + i, static_cast<uint8_t>(c_uint))) {
+        LOG(INFO) << "Successful write of " << c_uint << " to " << std::hex <<
+            s_uint + i << std::dec;
       } else {
         LOG(ERROR) << "illegal write during memset to address " << 
-            std::hex << s_uint + 1 << std::dec;
+            std::hex << s_uint + i << std::dec;
       }
     }
     executor.bindLocal(target, state, s);
@@ -272,19 +274,29 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
   auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
+  LOG(INFO) << "src on memcpy is " << std::hex << src_uint << std::dec;
+  LOG(INFO) << "dest on memcpy is " << std::hex << dest_uint << std::dec;
   
-  if ( abs(dest_uint - src_uint) < n_uint) {
-    LOG(WARNING) << "Addresses overlap on memcpy";
-    executor.bindLocal(target, state, ConstantExpr::create(0, 64));
-    return ;
+  if ( std::min<uint64_t>(dest_uint, src_uint) +  n_uint >
+       std::max<uint64_t>(dest_uint, src_uint) ) {
+    LOG(WARNING) << "Addresses overlap on  memcpy";
   }
 
   for (size_t i=0; i < n_uint; ++i) {
     MemoryReadResult result = {};
-    auto val = runtime_read_memory(mem, src_uint+i, 1, result);
-    runtime_write_8(state, dest_uint+i,val, mem, mem_ptr);
+    if (mem->TryRead(src_uint, &result.as_byte)) {
+      auto val = runtime_read_memory(mem, src_uint+i, 1, result);
+      LOG(INFO) << result.as_qword;
+      //runtime_write_8(state, dest_uint+i,val, mem, mem_ptr);
+      mem->TryWrite(dest_uint+i, result.as_byte);
+      val -> dump();
+    } else {
+      LOG(ERROR) << "Could not read src region at address " << std::hex
+          << src_uint + i << std::dec;
+    }
   }
-  executor.bindLocal(target, state, dest);
+
+  executor.bindLocal(target, state, ConstantExpr::create(dest_uint, 64));
 }
 
 void SpecialFunctionHandler::handle_memmove_intercept(

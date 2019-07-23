@@ -42,8 +42,8 @@ C_INTERCEPT(memcpy, 0x88)
 C_INTERCEPT(memmove, 0x89)
 C_INTERCEPT(strcpy, 0x90)
 
-// C_INTERCEPT(strncmp, 0x91)
-// C_INTERCEPT(strcmp, 0x92)
+//  C_INTERCEPT(strncmp, 0x91)
+//  C_INTERCEPT(strcmp, 0x92)
 
 ASM_INTERCEPT(memalign, 0x85)
 ASM_INTERCEPT(malloc_usable_size, 0x86)

@@ -137,7 +137,7 @@ static Memory *Intercept_memcpy(Memory *memory, State *state,
   addr_t src;
   size_t n;
   if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
-    STRACE_ERROR(libc_memset, "Couldn't get args");
+    STRACE_ERROR(libc_memcpy, "Couldn't get args");
     return intercept.SetReturn(memory, state, 0);
   }
 
