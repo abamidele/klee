@@ -209,19 +209,56 @@ void intercepted_free(void *ptr) {
   real_free(ptr);
 }
 
-void *intercepted_memset(void * a, int c, size_t n) {
-  return real_memset(a,c,n);
-}
-void * intercepted_memmove(void * a, void * s, size_t n) {
-  return real_memmove(a,s,n);
-}
-
-void *intercepted_memcpy(void *dest, void *src, size_t n) {
-  return real_memcpy(dest, src, n);
+void *intercepted_memset(volatile void * a, volatile int c, size_t n) {
+  int i;
+  char *s = (char*) a;
+  for(i=0; i<n; i++) {
+    s[i]=c;
+  }
 }
 
+void * intercepted_memmove(volatile void * a, volatile void * s, size_t n) {
+  char *src = (char *)s;
+  char *dest = (char *)a;
 
-char *intercepted_strcpy(char *dest, const char *src) {
-  return real_strcpy(dest, src);
+  char temp[n];
+
+  for (int i=0; i<n; i++) {
+    temp[i] = src[i];
+  }
+
+  for (int i=0; i<n; i++) {
+    dest[i] = temp[i];
+  }
+}
+
+void *intercepted_memcpy(volatile void *dest_addr,
+    volatile void *src_addr, size_t n) {
+
+  char *dest = (char *)dest_addr;
+  char *src = (char *)src_addr;
+
+  for (size_t i=0; i < n; ++i){
+    dest[i] = src[i];
+  }
+
+  return dest;
+}
+
+
+char *intercepted_strcpy(volatile char *dest, volatile const char *src) {
+  // return if no memory is allocated to the destination
+    if (dest == NULL)
+      return NULL;
+    char *ptr = dest;
+
+    while (*src != '\0')
+    {
+      *dest = *src;
+      dest++;
+      src++;
+    }
+    *dest = '\0';
+    return ptr;
 }
 

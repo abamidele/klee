@@ -37,10 +37,10 @@ C_INTERCEPT(calloc, 0x82)
 C_INTERCEPT(realloc, 0x83)
 C_INTERCEPT(free, 0x84)
 
-//C_INTERCEPT(memset, 0x87)
-//C_INTERCEPT(memcpy, 0x88)
+C_INTERCEPT(memset, 0x87)
+C_INTERCEPT(memcpy, 0x88)
 C_INTERCEPT(memmove, 0x89)
-//C_INTERCEPT(strcpy, 0x90)
+C_INTERCEPT(strcpy, 0x90)
 
 // C_INTERCEPT(strncmp, 0x91)
 // C_INTERCEPT(strcmp, 0x92)
