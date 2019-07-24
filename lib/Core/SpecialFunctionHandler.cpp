@@ -278,10 +278,10 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
     uint8_t val;
     if (!mem->TryRead(src_uint + i, &val)) {
       LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + 1 << std::dec << " During memcpy";
+          src_uint + i << std::dec << " During memcpy";
     } else if (!mem->TryWrite(dest_uint+i, val)) {
       LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
-          src_uint + 1 << std::dec << " During memcpy";
+          src_uint + i << std::dec << " During memcpy";
 
     } else if (val == klee::native::kSymbolicByte ) {
     // copy symbol from src_uint + i to dest_uint + i
@@ -312,20 +312,27 @@ void SpecialFunctionHandler::handle_memmove_intercept(
   auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
+  for (size_t i=1; i<=n_uint; ++i) {
+    uint8_t val;
+    if (!mem->TryRead(src_uint + n_uint - i, &val)) {
+      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
+          src_uint + n_uint - i << std::dec << " During memmove";
+    } else if (!mem->TryWrite(dest_uint + n_uint - i, val)) {
+      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
+          src_uint + n_uint - i << std::dec << " During memmove";
 
-  std::vector<ref<Expr>> read_array;
-  read_array.reserve(n_uint);
-
-  for (size_t i=0; i < n_uint; ++i) {
-    MemoryReadResult result = {};
-    read_array.push_back(runtime_read_memory(mem, src_uint+i, 1, result));
+    } else if (val == klee::native::kSymbolicByte ) {
+    // copy symbol from src_uint + i to dest_uint + i
+      mem->symbolic_memory[dest_uint + n_uint - i] =
+          mem->symbolic_memory[src_uint + n_uint - i];
+    } else {
+      auto sym_pair = mem->symbolic_memory.find(dest_uint + n_uint - i);
+      if (sym_pair != mem->symbolic_memory.end()){
+        mem->symbolic_memory.erase(sym_pair);
+      }
+    // erase symbolic val at dest_uint+i
+    }
   }
-
-  for (size_t k=0; k<read_array.size(); ++k) {
-    (void) runtime_write_8(state, dest_uint+k, read_array[k], mem, mem_ptr);
-  }
-
-  executor.bindLocal(target, state, dest);
 }
 
 void SpecialFunctionHandler::handle_strcpy_intercept(
@@ -340,25 +347,28 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
   auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
-  uint8_t val1;
-  uint8_t val2;
-  if (mem->TryRead(src_uint, &val1) && mem->TryRead(dest_uint, &val2)) {
-    size_t offs = 1;
-
-    while ( val1 != 0 ) {
-      MemoryReadResult result = {};
-      auto val = runtime_read_memory(mem, src_uint + offs, 1, result);
-      runtime_write_8(state, dest_uint + offs, val, mem, mem_ptr);
-      val1 = result.as_byte;
-      ++offs;
-    }
-  } else {
-    executor.bindLocal(target, state, ConstantExpr::create(~0UL, 64));
-    return;
-  }
-
-
   executor.bindLocal(target, state, dest);
+  uint8_t val;
+  uint64_t i = 0;
+  do {
+    if (!mem->TryRead(src_uint + i, &val)) {
+      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
+          src_uint + i << std::dec << " During strcpy";
+    } else if (!mem->TryWrite(dest_uint+i, val)) {
+      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
+          src_uint + i << std::dec << " During strcpy";
+
+    } else if (val == klee::native::kSymbolicByte ) {
+    // copy symbol from src_uint + i to dest_uint + i
+      mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
+    } else {
+      auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()){
+        mem->symbolic_memory.erase(sym_pair);
+      }
+    // erase symbolic val at dest_uint+i
+    }
+  } while (val != 0);
 }
 
 //

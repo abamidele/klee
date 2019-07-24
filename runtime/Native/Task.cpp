@@ -469,6 +469,7 @@ Memory *__remill_fetch_and_xor_64(Memory *memory, addr_t addr,
 
 extern "C" linux_task *__kleemill_create_task(State *state,
                                               Memory *memory);
+
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
     return EXIT_FAILURE;
@@ -488,6 +489,45 @@ int main(int argc, char *argv[3], char *envp[]) {
   __kleemill_fini();
   return EXIT_SUCCESS;
 }
+
+// ----------------USE ME FOR DEMO ----------------------
+/*
+int main(int argc, char *argv[3], char *envp[]) {
+  puts("in main");
+  if (argc != 3) {
+    return EXIT_FAILURE;
+  } else if (strcmp("klee-exec", argv[0])) {
+    return EXIT_FAILURE;
+  }
+  Memory *memory = nullptr;
+  memcpy(&memory, argv[2], sizeof(memory));
+  __kleemill_init(memory);
+  State *state = reinterpret_cast<State *>(argv[1]);
+
+  uint32_t sym_u32;
+  klee_make_symbolic(&sym_u32, sizeof sym_u32, "sym_u32");
+
+  uint64_t sym_u64 = 0;
+  klee_make_symbolic(&sym_u64, sizeof sym_u64, "sym_u64");
+  klee_assume(sym_u64 <= 2);
+
+  __remill_write_memory_32(memory, state->gpr.rsp.aword, sym_u32);
+  //__remill_write_memory_8(memory, state->gpr.rsp.aword + 1 + a, sym_byte2);
+  uint8_t res = __remill_read_memory_8(memory, state->gpr.rsp.aword + sym_u64);
+
+  if (res > 0x25) {
+    puts("You lose: ");
+  } else {
+    puts("You Win: ");
+  }
+  printf("0x%x\n", static_cast<uint32_t>(klee_get_value_i32(res)));
+  __kleemill_fini();
+  puts("done");
+  return EXIT_SUCCESS;
+}
+*/
+
+// ----------------USE ME FOR DEMO ----------------------
 
 /*
 int main(int argc, char *argv[3], char *envp[]) {
@@ -588,7 +628,7 @@ int main(int argc, char *argv[3], char *envp[]) {
 
   uint64_t sym_u64 = 0;
   klee_make_symbolic(&sym_u64, sizeof sym_u64, "sym_u64");
-  klee_assume(sym_u64 <= 1);
+  klee_assume(sym_u64 <= 2);
 
   __remill_write_memory_32(memory, state->gpr.rsp.aword, sym_u32);
   //__remill_write_memory_8(memory, state->gpr.rsp.aword + 1 + a, sym_byte2);
@@ -605,6 +645,7 @@ int main(int argc, char *argv[3], char *envp[]) {
   return EXIT_SUCCESS;
 }
 */
+
 /*
 int main(int argc, char *argv[3], char *envp[]) {
   if (argc != 3) {
