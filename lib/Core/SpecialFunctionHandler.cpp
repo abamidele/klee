@@ -274,25 +274,24 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
   auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
-  LOG(INFO) << "src on memcpy is " << std::hex << src_uint << std::dec;
-  LOG(INFO) << "dest on memcpy is " << std::hex << dest_uint << std::dec;
-  
-  if ( std::min<uint64_t>(dest_uint, src_uint) +  n_uint >
-       std::max<uint64_t>(dest_uint, src_uint) ) {
-    LOG(WARNING) << "Addresses overlap on  memcpy";
-  }
+  for (size_t i=0; i<n_uint; ++i) {
+    uint8_t val;
+    if (!mem->TryRead(src_uint + i, &val)) {
+      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
+          src_uint + 1 << std::dec << " During memcpy";
+    } else if (!mem->TryWrite(dest_uint+i, val)) {
+      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
+          src_uint + 1 << std::dec << " During memcpy";
 
-  for (size_t i=0; i < n_uint; ++i) {
-    MemoryReadResult result = {};
-    if (mem->TryRead(src_uint, &result.as_byte)) {
-      auto val = runtime_read_memory(mem, src_uint+i, 1, result);
-      LOG(INFO) << result.as_qword;
-      //runtime_write_8(state, dest_uint+i,val, mem, mem_ptr);
-      mem->TryWrite(dest_uint+i, result.as_byte);
-      val -> dump();
+    } else if (val == klee::native::kSymbolicByte ) {
+    // copy symbol from src_uint + i to dest_uint + i
+      mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
     } else {
-      LOG(ERROR) << "Could not read src region at address " << std::hex
-          << src_uint + i << std::dec;
+      auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()){
+        mem->symbolic_memory.erase(sym_pair);
+      }
+    // erase symbolic val at dest_uint+i
     }
   }
 

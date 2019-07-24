@@ -220,14 +220,8 @@ void * intercepted_memmove(volatile void * a, volatile void * s, size_t n) {
   volatile char *src = (volatile char *)s;
   volatile char *dest = (volatile char *)a;
 
-  char temp[n];
-
-  for (size_t i=0; i<n; i++) {
-    temp[i] = src[i];
-  }
-
-  for (size_t i=0; i<n; i++) {
-    dest[i] = temp[i];
+  for (size_t i = 1; i <= n; ++i) {
+    dest[n - i] = src[n - i];
   }
 }
 
