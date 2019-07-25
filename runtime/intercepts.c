@@ -69,6 +69,8 @@ void *(*real_memset)(void *, int, size_t) = NULL;
 void *(*real_memmove)(void *, void *, size_t) = NULL;
 void *(*real_memcpy)(void *, void *, size_t) = NULL;
 char *(*real_strcpy)(char *, const char *) = NULL;
+char *(*real_strncpy)(char *, const char *, size_t) = NULL;
+char *(*real_strlen)(char *) = NULL;
 //int (*real_strcmp)(const char *, const char *) = NULL;
 //int (*real_strncmp)(const char *, const char *, size_t) = NULL;
 
@@ -133,6 +135,10 @@ void init(void) {
   real_memcpy = (void * (*)(void *, void *, size_t)) dlsym(RTLD_NEXT, "memcpy");
   bump = bump_start;
   real_strcpy = (char * (*)(char *, const char *)) dlsym(RTLD_NEXT, "strcpy");
+  bump = bump_start;
+  real_strncpy = (char * (*)(char *, const char *, size_t)) dlsym(RTLD_NEXT, "strncpy");
+  bump = bump_start;
+  real_strlen = (size_t (*)(char *)) dlsym(RTLD_NEXT, "strlen");
   bump = bump_start;
 
   real_malloc = og_malloc;
@@ -253,5 +259,34 @@ char *intercepted_strcpy(volatile char *dest, volatile const char *src) {
     }
     *dest = '\0';
     return ptr;
+}
+
+char *intercepted_strncpy(volatile char *dest,
+    volatile const char *src, size_t n) {
+  // return if no memory is allocated to the destination
+    size_t i = 0;
+    if (dest == NULL)
+      return NULL;
+    volatile char *ptr = dest;
+
+    while (*src != '\0') {
+      if (i == n) {
+        break;
+      }
+      *dest = *src;
+      dest++;
+      src++;
+      ++i;
+    }
+    *dest = '\0';
+    return ptr;
+}
+
+char *intercepted_strlen(volatile const char *str) {
+  volatile const char *s = str;
+  while (*s) {
+    ++s;
+  }
+  return (size_t) (s - str);
 }
 

@@ -28,6 +28,8 @@ addr_t memset_intercept(Memory * memory, addr_t s, int c, size_t n);
 addr_t memcpy_intercept(Memory * memory, addr_t dest, addr_t src, size_t n);
 addr_t memmove_intercept(Memory * memory, addr_t dest, addr_t src, size_t n);
 addr_t strcpy_intercept(Memory *memory, addr_t dest, addr_t src);
+addr_t strncpy_intercept(Memory *memory, addr_t dest, addr_t src, size_t n);
+size_t strlen_intercept(Memory *memory, addr_t s);
 }  // extern C
 
 template <typename ABI>
@@ -190,8 +192,56 @@ static Memory *Intercept_strcpy(Memory *memory, State *state,
                  dest, src);
     return memory;
   }
+
   STRACE_SUCCESS(libc_strcpy, "successful strcpy for ptr=%" PRIxADDR, ptr);
   return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strncpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+
+  addr_t dest;
+  addr_t src;
+  size_t n;
+
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_strncpy, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = strncpy_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_strncpy, "Falling back to real strncpy for dest=% src=%" PRIxADDR,
+                 dest, src);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_strncpy, "successful strncpy for ptr=%" PRIxADDR, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strlen(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s;
+
+  if (!intercept.TryGetArgs(memory, state,&s)) {
+    STRACE_ERROR(libc_strlen, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  size_t size = strlen_intercept(memory, s);
+
+  if (size == kBadAddr) {
+    STRACE_ERROR(libc_strlen, "Falling back to real strlen for %" PRIxADDR, s);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_strlen, "successful strlen for ptr=% of size %" PRIxADDR,
+      s, size);
+
+  return intercept.SetReturn(memory, state, size);
 }
 
 
