@@ -352,24 +352,16 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   auto mem = executor.Memory(state, mem_uint);
   executor.bindLocal(target, state, dest);
   uint8_t val;
-  if (!mem->TryRead(src_uint, &val)) {
-    executor.terminateStateOnError(
-        state, "Failed Read on strcpy from src" , Executor::Assert);
-  }
+  uint64_t i = 0;
 
   LOG(INFO) << "src: " << std::hex << src_uint << std::dec;
   LOG(INFO) << "dest: " << std::hex << dest_uint << std::dec;
   for (size_t i=0; i < n_uint; ++i){
-    if (val == 0) {
-      // LOG(INFO) << "just broke strcpy loop";
-      break;
-    }
-    // LOG(INFO) << "In strcpy loop val is " << (char)val;
     if (!mem->TryRead(src_uint + i, &val)) {
       LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + i << std::dec << " During strncpy";
+          src_uint + i << std::dec << " During strcnpy";
       executor.terminateStateOnError(
-          state, "Failed Read on strcpy from src" , Executor::Assert);
+          state, "Failed Read on strncpy from src" , Executor::Assert);
     } else if (!mem->TryWrite(dest_uint+i, val)) {
       LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
           src_uint + i << std::dec << " During strncpy";
@@ -378,13 +370,37 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
 
     } else if (val == klee::native::kSymbolicByte ) {
     // copy symbol from src_uint + i to dest_uint + i
-      mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
-    } else {
-      auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
-      if (sym_pair != mem->symbolic_memory.end()){
-        mem->symbolic_memory.erase(sym_pair);
+
+      auto sym_pair = mem->symbolic_memory.find(src_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()) {
+        bool res;
+        (void) executor.solver->mayBeTrue(state,
+          EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
+          res);
+        if (res) {
+          const uint8_t zero = 0;
+          executor.addConstraint(state,
+              EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
+              ));
+          if(!mem->TryWrite(dest_uint + i, zero)){
+          }
+          else {
+            mem->symbolic_memory.erase(mem->symbolic_memory.find(dest_uint + i));
+          }
+          val = 0;
+
+        }
       }
-    // erase symbolic val at dest_uint+i
+
+    } else {
+        auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
+        if (sym_pair != mem->symbolic_memory.end()){
+          mem->symbolic_memory.erase(sym_pair);
+      }
+    }
+
+    if (!val) {
+      break;
     }
   }
 }
@@ -401,10 +417,6 @@ void SpecialFunctionHandler::handle_strlen_intercept(
 
     auto mem = executor.Memory(state, mem_uint);
     uint8_t val;
-    if (!mem->TryRead(s_uint, &val)) {
-      executor.terminateStateOnError(
-          state, "Failed Read on strlen from src" , Executor::Assert);
-    }
     size_t i;
     for (i=0;; ++i){
       // LOG(INFO) << "In strcpy loop val is " << (char)val;
@@ -413,23 +425,26 @@ void SpecialFunctionHandler::handle_strlen_intercept(
             s_uint + i << std::dec << " During strlen";
             executor.terminateStateOnError(
             state, "Failed Read on strcpy from src" , Executor::Assert);
+            break;
       }
 
       if (val == klee::native::kSymbolicByte ) {
       // copy symbol from src_uint + i to dest_uint + i
         auto sym_pair = mem->symbolic_memory.find(s_uint + i);
-        if (sym_pair != mem->symbolic_memory.end()){
+        if (sym_pair != mem->symbolic_memory.end()) {
           bool res;
           (void) executor.solver->mayBeTrue(state,
               EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
               res);
           if (res) {
             const uint8_t zero = 0;
+            executor.addConstraint(state,
+                EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
+                ));
             if(!mem->TryWrite(s_uint + i, zero)){
-              executor.terminateStateOnError(
-              state, "Failed to zero out on symbolic strlen" , Executor::Assert);
+            } else {
+              mem->symbolic_memory.erase(sym_pair);
             }
-            mem->symbolic_memory.erase(sym_pair);
             break;
           }
         }
@@ -458,18 +473,10 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
   executor.bindLocal(target, state, dest);
   uint8_t val;
   uint64_t i = 0;
-  if (!mem->TryRead(src_uint, &val)) {
-    executor.terminateStateOnError(
-        state, "Failed Read on strcpy from src" , Executor::Assert);
-  }
 
   LOG(INFO) << "src: " << std::hex << src_uint << std::dec;
   LOG(INFO) << "dest: " << std::hex << dest_uint << std::dec;
   for (size_t i=0;; ++i){
-    if (val == 0) {
-      // LOG(INFO) << "just broke strcpy loop";
-      break;
-    }
     // LOG(INFO) << "In strcpy loop val is " << (char)val;
     if (!mem->TryRead(src_uint + i, &val)) {
       LOG(ERROR) << "Cannot Read from Src " << std::hex <<
@@ -484,13 +491,38 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
 
     } else if (val == klee::native::kSymbolicByte ) {
     // copy symbol from src_uint + i to dest_uint + i
-      mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
-    } else {
-      auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
-      if (sym_pair != mem->symbolic_memory.end()){
-        mem->symbolic_memory.erase(sym_pair);
+
+      auto sym_pair = mem->symbolic_memory.find(src_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()) {
+        bool res;
+        (void) executor.solver->mayBeTrue(state,
+          EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
+          res);
+        if (res) {
+          const uint8_t zero = 0;
+          executor.addConstraint(state,
+              EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
+              ));
+          if(!mem->TryWrite(dest_uint + i, zero)){
+          }
+          else {
+            mem->symbolic_memory.erase(mem->symbolic_memory.find(dest_uint + i));
+          }
+          val = 0;
+
+        }
       }
+
+    } else {
     // erase symbolic val at dest_uint+i
+        auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
+        if (sym_pair != mem->symbolic_memory.end()){
+          mem->symbolic_memory.erase(sym_pair);
+      }
+    }
+
+    if (!val) {
+      break;
     }
   }
 }
