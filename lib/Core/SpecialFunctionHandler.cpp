@@ -287,10 +287,7 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
     // copy symbol from src_uint + i to dest_uint + i
       mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
     } else {
-      auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
-      if (sym_pair != mem->symbolic_memory.end()){
-        mem->symbolic_memory.erase(sym_pair);
-      }
+      mem->symbolic_memory.erase(dest_uint + i);
     // erase symbolic val at dest_uint+i
     }
   }
@@ -326,11 +323,7 @@ void SpecialFunctionHandler::handle_memmove_intercept(
       mem->symbolic_memory[dest_uint + n_uint - i] =
           mem->symbolic_memory[src_uint + n_uint - i];
     } else {
-      auto sym_pair = mem->symbolic_memory.find(dest_uint + n_uint - i);
-      if (sym_pair != mem->symbolic_memory.end()){
-        mem->symbolic_memory.erase(sym_pair);
-      }
-    // erase symbolic val at dest_uint+i
+      mem->symbolic_memory.erase(dest_uint + n_uint -i);
     }
   }
 }
@@ -385,7 +378,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
           if(!mem->TryWrite(dest_uint + i, zero)){
           }
           else {
-            mem->symbolic_memory.erase(mem->symbolic_memory.find(dest_uint + i));
+            mem->symbolic_memory.erase(dest_uint + i);
           }
           val = 0;
 
@@ -393,10 +386,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
       }
 
     } else {
-        auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
-        if (sym_pair != mem->symbolic_memory.end()){
-          mem->symbolic_memory.erase(sym_pair);
-      }
+        mem->symbolic_memory.erase(dest_uint + i);
     }
 
     if (!val) {
@@ -506,7 +496,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
           if(!mem->TryWrite(dest_uint + i, zero)){
           }
           else {
-            mem->symbolic_memory.erase(mem->symbolic_memory.find(dest_uint + i));
+            mem->symbolic_memory.erase(dest_uint + i);
           }
           val = 0;
 
@@ -515,10 +505,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
 
     } else {
     // erase symbolic val at dest_uint+i
-        auto sym_pair = mem->symbolic_memory.find(dest_uint + i);
-        if (sym_pair != mem->symbolic_memory.end()){
-          mem->symbolic_memory.erase(sym_pair);
-      }
+       mem->symbolic_memory.erase(dest_uint + i);
     }
 
     if (!val) {
