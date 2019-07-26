@@ -1293,7 +1293,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
       if (auto const_addr = llvm::dyn_cast<klee::ConstantExpr>(addr_val)) { \
         auto addr_uint = const_addr->getZExtValue(); \
         MemoryReadResult result = {}; \
-        if (memory->TryRead(addr_uint, &(result.bits_type))) { \
+        if (memory->TryRead(addr_uint, result.as_bytes, num_bytes)) { \
           executor.bindLocal( \
               target, state, runtime_read_memory(memory, addr_uint, \
                                                  num_bytes, result)); \

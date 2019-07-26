@@ -45,7 +45,7 @@ class AllocList {
   bool TryWrite(uint64_t addr, uint8_t byte);
 
   std::vector<bool> free_list;
-  std::vector<std::shared_ptr<uint8_t[]>> allocations;
+  std::vector<std::shared_ptr<std::vector<uint8_t>>> allocations;
   unsigned num_free{0};
 };
 

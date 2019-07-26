@@ -48,11 +48,11 @@ class StateContinuation {
 };
 
 union MemoryReadResult {
+  uint8_t as_bytes[8];
   uint64_t as_qword;
   uint32_t as_dword;
   uint16_t as_word;
   uint8_t as_byte;
-  uint8_t as_bytes[8];
 };
 
 static_assert(sizeof(MemoryReadResult) == sizeof(uint64_t),

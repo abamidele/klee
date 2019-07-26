@@ -432,7 +432,9 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   const auto addr = addr_ & addr_mask;
   Address address = { };
   address.flat = addr;
-  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
+  // NOTE(pag): We don't check `address.must_be_0x1 == 0x1` here, but instead
+  //            in `AllocList::TryRead` to report a possible underflow.
+  if (address.must_be_0xa == 0xa) {
     auto &alloc_list = alloc_lists[address.size];
     return alloc_list.TryRead(addr, val_out);
   } else {
@@ -445,7 +447,9 @@ bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
   const auto addr = addr_ & addr_mask;
   Address address = { };
   address.flat = addr;
-  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
+  // NOTE(pag): We don't check `address.must_be_0x1 == 0x1` here, but instead
+  //            in `AllocList::TryRead` to report a possible underflow.
+  if (address.must_be_0xa == 0xa) {
     auto &alloc_list = alloc_lists[address.size];
     return alloc_list.TryWrite(addr, val);
   } else {
