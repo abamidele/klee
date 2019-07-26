@@ -447,6 +447,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   return FindRange(addr).Read(addr, val_out);
 }
 
+#if 0
 #define MAKE_TRY_READ(type) \
 		bool AddressSpace::TryRead(uint64_t addr_, type *val_out) { \
 	const auto addr = addr_ & addr_mask; \
@@ -481,6 +482,7 @@ MAKE_TRY_READ(float)
 MAKE_TRY_READ(double)
 
 #undef MAKE_TRY_READ
+#endif
 
 bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
   const auto addr = addr_ & addr_mask;
@@ -491,6 +493,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
   }
 }
 
+#if 0
 #define MAKE_TRY_WRITE(type) \
 		bool AddressSpace::TryWrite(uint64_t addr_, type val) { \
 	const auto addr = addr_ & addr_mask; \
@@ -517,6 +520,7 @@ MAKE_TRY_WRITE(uint64_t)
 MAKE_TRY_WRITE(float)
 MAKE_TRY_WRITE(double)
 #undef MAKE_TRY_WRITE
+#endif
 
 // Return the virtual address of the memory backing `addr`.
 void *AddressSpace::ToReadWriteVirtualAddress(uint64_t addr_) {

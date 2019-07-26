@@ -215,78 +215,64 @@ void intercepted_free(void *ptr) {
   real_free(ptr);
 }
 
-void *intercepted_memset(volatile void * a, volatile int c, size_t n) {
-  volatile char *s = (volatile char*) a;
-  for(size_t i=0; i<n; i++) {
-    s[i]=c;
+void *intercepted_memset(volatile char *dest, int val, size_t n) {
+  char ch = (char) val;
+  for (size_t i = 0; i < n; i++) {
+    dest[i] = ch;
   }
-}
-
-void * intercepted_memmove(volatile void * a, volatile void * s, size_t n) {
-  volatile char *src = (volatile char *)s;
-  volatile char *dest = (volatile char *)a;
-
-  for (size_t i = 1; i <= n; ++i) {
-    dest[n - i] = src[n - i];
-  }
-}
-
-void *intercepted_memcpy(volatile void *dest_addr,
-    volatile void *src_addr, size_t n) {
-
-  volatile char *dest = (volatile char *)dest_addr;
-  volatile char *src = (volatile char *)src_addr;
-
-  for (size_t i=0; i < n; ++i){
-    dest[i] = src[i];
-  }
-
   return dest;
 }
 
+void *intercepted_memmove(volatile char * dest, volatile char * src, size_t n) {
+  if (dest < src) {
+    for (size_t i = 0; i < n; ++i) {
+      dest[i] = src[i];
+    }
+  } else {
+    for (size_t i = 1; i <= n; ++i) {
+      dest[n - i] = src[n - i];
+    }
+  }
+  return dest;
+}
+
+void *intercepted_memcpy(volatile char *dest, volatile char *src, size_t n) {
+  for (size_t i = 0; i < n; ++i) {
+    dest[i] = src[i];
+  }
+  return dest;
+}
 
 char *intercepted_strcpy(volatile char *dest, volatile const char *src) {
-  // return if no memory is allocated to the destination
-    if (dest == NULL)
-      return NULL;
-    volatile char *ptr = dest;
-
-    while (*src != '\0')
-    {
-      *dest = *src;
-      dest++;
-      src++;
+  for (size_t i = 0; ; ++i) {
+    char ch = src[i];
+    dest[i] = ch;
+    if (!ch) {
+      break;
     }
-    *dest = '\0';
-    return ptr;
-}
-
-char *intercepted_strncpy(volatile char *dest,
-    volatile const char *src, size_t n) {
-  // return if no memory is allocated to the destination
-    size_t i = 0;
-    if (dest == NULL)
-      return NULL;
-    volatile char *ptr = dest;
-
-    while (*src != '\0') {
-      if (i == n) {
-        break;
-      }
-      *dest = *src;
-      dest++;
-      src++;
-      ++i;
-    }
-    *dest = '\0';
-    return ptr;
-}
-
-char *intercepted_strlen(volatile const char *str) {
-  volatile const char *s = str;
-  while (*s) {
-    ++s;
   }
-  return (size_t) (s - str);
+  return dest;
+}
+
+char *intercepted_strncpy(volatile char *dest, volatile const char *src,
+                          size_t n) {
+  for (size_t i = 0; i < n; ++i) {
+    char ch = src[i];
+    dest[i] = ch;
+    if (!ch) {
+      break;
+    }
+  }
+  return dest;
+}
+
+size_t intercepted_strlen(volatile const char *str) {
+  if (!str) {
+    return 0;
+  } else {
+    size_t i = 0;
+    for (; str[i]; ++i) { }
+    return i;
+  }
 }
 

@@ -206,7 +206,6 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
-    add("symbolic_stdin", handle__symbolic_stdin, true),
 
     /* libc intercepts*/
     add("symbolic_stdin", handle__symbolic_stdin, true),
@@ -235,64 +234,77 @@ void SpecialFunctionHandler::handle_memset_intercept(
     std::vector<ref<Expr>> &arguments) {
 
   auto mem_ptr = executor.toUnique(state, arguments[0]);
-  auto s = executor.toUnique(state, arguments[1]); 
+  auto dest = executor.toUnique(state, arguments[1]);
   auto constant = executor.toUnique(state, arguments[2]);
   auto n = executor.toUnique(state, arguments[3]);
 
-  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-  auto s_uint = dyn_cast<ConstantExpr>(s) -> getZExtValue();
-  auto c_uint = dyn_cast<ConstantExpr>(constant) -> getZExtValue();
-  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest)->getZExtValue();
+  auto c_uint = dyn_cast<ConstantExpr>(constant)->getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n)->getZExtValue();
  
   auto mem = executor.Memory(state, mem_uint);
-  if (mem -> CanWrite(s_uint)) {
-    for (size_t i=0; i < n_uint; ++i) {
-      if (mem->TryWrite(s_uint + i, static_cast<uint8_t>(c_uint))) {
-      } else {
-        LOG(ERROR) << "illegal write during memset to address " << 
-            std::hex << s_uint + i << std::dec;
-      }
+
+  executor.bindLocal(target, state, dest);
+
+  for (size_t i=0; i < n_uint; ++i) {
+    if (!mem->TryWrite(dest_uint + i, static_cast<uint8_t>(c_uint))) {
+      LOG(ERROR)
+          << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
+          << " during memset";
+      executor.terminateStateOnError(
+          state, "Failed write in memset" , Executor::Assert);
+      return;
     }
-    executor.bindLocal(target, state, s);
-  } else {
-    executor.bindLocal(target, state, ConstantExpr::create(~0ULL, 64));
   }
 }
 
 void SpecialFunctionHandler::handle_memcpy_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-  
+
   auto mem_ptr = executor.toUnique(state, arguments[0]);
-  auto dest = executor.toUnique(state, arguments[1]); 
+  auto dest = executor.toUnique(state, arguments[1]);
   auto src = executor.toUnique(state, arguments[2]);
   auto n = executor.toUnique(state, arguments[3]);
 
-  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
-  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
-  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n)->getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
-  for (size_t i=0; i<n_uint; ++i) {
-    uint8_t val;
-    if (!mem->TryRead(src_uint + i, &val)) {
-      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + i << std::dec << " During memcpy";
-    } else if (!mem->TryWrite(dest_uint+i, val)) {
-      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
-          src_uint + i << std::dec << " During memcpy";
 
-    } else if (val == klee::native::kSymbolicByte ) {
+  executor.bindLocal(target, state, dest);
+
+  for (size_t i = 0; i < n_uint; ++i) {
+    uint8_t val = 0;
+
+    if (!mem->TryRead(src_uint + i, &val)) {
+      LOG(ERROR)
+          << "Cannot read from " << std::hex << (src_uint + i) << std::dec
+          << " during memcpy";
+      executor.terminateStateOnError(
+          state, "Failed read in memcpy" , Executor::Assert);
+      return;
+
+    } else if (!mem->TryWrite(dest_uint+i, val)) {
+      LOG(ERROR)
+          << "Cannot write to " << std::hex << (dest_uint + i)
+          << std::dec << " during memcpy";
+      executor.terminateStateOnError(
+          state, "Failed write in memcpy" , Executor::Assert);
+      return;
+
     // copy symbol from src_uint + i to dest_uint + i
+    } else if (val == klee::native::kSymbolicByte) {
       mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
+
+    // erase symbolic val at dest_uint+i, if it exists.
     } else {
       mem->symbolic_memory.erase(dest_uint + i);
-    // erase symbolic val at dest_uint+i
     }
   }
-
-  executor.bindLocal(target, state, ConstantExpr::create(dest_uint, 64));
 }
 
 void SpecialFunctionHandler::handle_memmove_intercept(
@@ -303,29 +315,78 @@ void SpecialFunctionHandler::handle_memmove_intercept(
   auto src = executor.toUnique(state, arguments[2]);
   auto n = executor.toUnique(state, arguments[3]);
 
-  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
-  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
-  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n)->getZExtValue();
+
+  uint64_t error_addr = 0;
+
+  executor.bindLocal(target, state, dest);
 
   auto mem = executor.Memory(state, mem_uint);
-  for (size_t i=1; i<=n_uint; ++i) {
-    uint8_t val;
-    if (!mem->TryRead(src_uint + n_uint - i, &val)) {
-      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + n_uint - i << std::dec << " During memmove";
-    } else if (!mem->TryWrite(dest_uint + n_uint - i, val)) {
-      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
-          src_uint + n_uint - i << std::dec << " During memmove";
+  if (dest_uint < src_uint) {
+    for (size_t i = 0; i < n_uint; ++i) {
+      uint8_t val = 0;
 
-    } else if (val == klee::native::kSymbolicByte ) {
-    // copy symbol from src_uint + i to dest_uint + i
-      mem->symbolic_memory[dest_uint + n_uint - i] =
-          mem->symbolic_memory[src_uint + n_uint - i];
-    } else {
-      mem->symbolic_memory.erase(dest_uint + n_uint -i);
+      if (!mem->TryRead(src_uint + i, &val)) {
+        error_addr = src_uint + i;
+        goto report_read_error;
+
+      } else if (!mem->TryWrite(dest_uint + i, val)) {
+        error_addr = dest_uint + i;
+        goto report_write_error;
+
+      // copy symbol from src_uint + i to dest_uint + i
+      } else if (val == klee::native::kSymbolicByte) {
+        mem->symbolic_memory[dest_uint + i] = mem->symbolic_memory[src_uint + i];
+
+      // erase symbolic val at dest_uint+i, if it exists.
+      } else {
+        mem->symbolic_memory.erase(dest_uint + i);
+      }
+    }
+  } else {
+    auto src_end = src_uint + n_uint;
+    auto dest_end = dest_uint + n_uint;
+    for (size_t i = 1; i <= n_uint; ++i) {
+      uint8_t val;
+      if (!mem->TryRead(src_end - i, &val)) {
+        error_addr = src_end - i;
+        goto report_read_error;
+
+      } else if (!mem->TryWrite(dest_end - i, val)) {
+        error_addr = dest_end - i;
+        goto report_write_error;
+
+      // copy symbol from src_uint + i to dest_uint + i
+      } else if (val == klee::native::kSymbolicByte ) {
+        mem->symbolic_memory[dest_end - i] = mem->symbolic_memory[src_end - i];
+
+      // erase symbolic val at dest_uint+i, if it exists.
+      } else {
+        mem->symbolic_memory.erase(dest_end - i);
+      }
     }
   }
+
+  return;
+
+report_read_error:
+  LOG(ERROR)
+      << "Cannot read from " << std::hex << error_addr << std::dec
+      << " during memmove";
+  executor.terminateStateOnError(
+      state, "Failed read in memmove" , Executor::Assert);
+  return;
+
+report_write_error:
+  LOG(ERROR)
+      << "Cannot write to " << std::hex << error_addr << std::dec
+      << " during memmove";
+  executor.terminateStateOnError(
+      state, "Failed write in memmove" , Executor::Assert);
+  return;
 }
 
 void SpecialFunctionHandler::handle_strncpy_intercept(
@@ -336,59 +397,62 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   auto src = executor.toUnique(state, arguments[2]);
   auto n = executor.toUnique(state, arguments[3]);
 
-  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
-  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
-  auto n_uint = dyn_cast<ConstantExpr>(n) -> getZExtValue();
-
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n)->getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
   executor.bindLocal(target, state, dest);
-  uint8_t val;
+
+  uint8_t val = 0;
   uint64_t i = 0;
+  auto zero = ConstantExpr::create(0,8);
 
-  LOG(INFO) << "src: " << std::hex << src_uint << std::dec;
-  LOG(INFO) << "dest: " << std::hex << dest_uint << std::dec;
-  for (size_t i=0; i < n_uint; ++i){
+  for (size_t i = 0; i < n_uint; ++i) {
     if (!mem->TryRead(src_uint + i, &val)) {
-      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + i << std::dec << " During strcnpy";
+      LOG(ERROR)
+          << "Cannot read from " << std::hex << (src_uint + i) << std::dec
+          << " during strncpy";
       executor.terminateStateOnError(
-          state, "Failed Read on strncpy from src" , Executor::Assert);
-      break;
-    } else if (!mem->TryWrite(dest_uint+i, val)) {
-      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
-          src_uint + i << std::dec << " During strncpy";
+          state, "Failed read in strncpy" , Executor::Assert);
+      return;
+
+    } else if (!mem->TryWrite(dest_uint + i, val)) {
+      LOG(ERROR)
+          << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
+          << " during strncpy";
       executor.terminateStateOnError(
-          state, "Failed Write on strncpy To Dest" , Executor::Assert);
-      break;
+          state, "Failed write in strncpy" , Executor::Assert);
+      return;
 
-    } else if (val == klee::native::kSymbolicByte ) {
-    // copy symbol from src_uint + i to dest_uint + i
-
+    } else if (val == klee::native::kSymbolicByte) {
       auto sym_pair = mem->symbolic_memory.find(src_uint + i);
       if (sym_pair != mem->symbolic_memory.end()) {
-        bool res;
-        (void) executor.solver->mayBeTrue(state,
-          EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
-          res);
-        if (res) {
-          const uint8_t zero = 0;
-          executor.addConstraint(state,
-              EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
-              ));
-          if(!mem->TryWrite(dest_uint + i, zero)){
-          }
-          else {
-            mem->symbolic_memory.erase(dest_uint + i);
-          }
+        auto sym_val = sym_pair->second;
+        auto sym_val_eq_zero = EqExpr::create(sym_val, zero);
+        bool res = false;
+        if (executor.solver->mayBeTrue(state, sym_val_eq_zero, res) && res) {
+          executor.addConstraint(state, sym_val_eq_zero);
           val = 0;
 
+          // Opportunistically zero out that byte.
+          if (mem->TryWrite(src_uint + i, val)) {
+            mem->symbolic_memory.erase(src_uint + i);
+
+          // Unable to opportunistically write out zero; then force the symbolic
+          // memory to hold a concrete zero.
+          } else {
+            mem->symbolic_memory[src_uint + i] = zero;
+          }
+
+          mem->symbolic_memory.erase(dest_uint + i);
+          mem->TryWrite(dest_uint + i, val);
         }
       }
 
     } else {
-        mem->symbolic_memory.erase(dest_uint + i);
+      mem->symbolic_memory.erase(dest_uint + i);
     }
 
     if (!val) {
@@ -397,57 +461,62 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   }
 }
 
-
 void SpecialFunctionHandler::handle_strlen_intercept(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-    auto mem_ptr = executor.toUnique(state, arguments[0]);
-    auto s = executor.toUnique(state, arguments[1]);
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto src = executor.toUnique(state, arguments[1]);
 
-    auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-    auto s_uint = dyn_cast<ConstantExpr>(s) -> getZExtValue();
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
 
-    auto mem = executor.Memory(state, mem_uint);
-    uint8_t val;
-    size_t i;
-    for (i=0;; ++i){
-      // LOG(INFO) << "In strcpy loop val is " << (char)val;
-      if (!mem->TryRead(s_uint + i, &val)) {
-        LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-            s_uint + i << std::dec << " During strlen";
-            executor.terminateStateOnError(
-            state, "Failed Read on strcpy from src" , Executor::Assert);
-            break;
-      }
+  auto mem = executor.Memory(state, mem_uint);
 
-      if (val == klee::native::kSymbolicByte ) {
-      // copy symbol from src_uint + i to dest_uint + i
-        auto sym_pair = mem->symbolic_memory.find(s_uint + i);
-        if (sym_pair != mem->symbolic_memory.end()) {
-          bool res;
-          (void) executor.solver->mayBeTrue(state,
-              EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
-              res);
-          if (res) {
-            const uint8_t zero = 0;
-            executor.addConstraint(state,
-                EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
-                ));
-            if(!mem->TryWrite(s_uint + i, zero)){
-            } else {
-              mem->symbolic_memory.erase(sym_pair);
-            }
-            break;
+  uint8_t val = 0;
+  size_t i = 0;
+  auto zero = ConstantExpr::create(0,8);
+
+  for (; ; ++i) {
+    if (!mem->TryRead(src_uint + i, &val)) {
+      LOG(ERROR)
+          << "Cannot read from " << std::hex << (src_uint + i) << std::dec
+          << " during strlen";
+      executor.terminateStateOnError(
+          state, "Failed read in strlen" , Executor::Assert);
+      return;
+    }
+
+    if (val == klee::native::kSymbolicByte) {
+      auto sym_pair = mem->symbolic_memory.find(src_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()) {
+        auto sym_val = sym_pair->second;
+        auto sym_val_eq_zero = EqExpr::create(sym_val, zero);
+        bool res = false;
+        if (executor.solver->mayBeTrue(state, sym_val_eq_zero, res) && res) {
+          executor.addConstraint(state, sym_val_eq_zero);
+
+          val = 0;
+
+          // Opportunistically zero out that byte.
+          if (mem->TryWrite(src_uint + i, val)) {
+            mem->symbolic_memory.erase(src_uint + i);
+
+          // Unable to opportunistically write out zero; then force the symbolic
+          // memory to hold a concrete zero.
+          } else {
+            mem->symbolic_memory[src_uint + i] = zero;
           }
         }
       }
-      if (val == 0) {
-        break;
-      }
     }
-    //  TODO(sai) add some sort of continuation that makes symbolic strlen better
 
-    executor.bindLocal(target, state, ConstantExpr::create(i, 64));
+    if (val == 0) {
+      break;
+    }
+  }
+  //  TODO(sai) add some sort of continuation that makes symbolic strlen better
+
+  executor.bindLocal(target, state, ConstantExpr::create(i, 64));
 }
 
 void SpecialFunctionHandler::handle_strcpy_intercept(
@@ -457,59 +526,61 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
   auto dest = executor.toUnique(state, arguments[1]);
   auto src = executor.toUnique(state, arguments[2]);
 
-  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr) -> getZExtValue();
-  auto dest_uint = dyn_cast<ConstantExpr>(dest) -> getZExtValue();
-  auto src_uint = dyn_cast<ConstantExpr>(src) -> getZExtValue();
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto dest_uint = dyn_cast<ConstantExpr>(dest)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
 
   auto mem = executor.Memory(state, mem_uint);
   executor.bindLocal(target, state, dest);
-  uint8_t val;
-  uint64_t i = 0;
 
-  LOG(INFO) << "src: " << std::hex << src_uint << std::dec;
-  LOG(INFO) << "dest: " << std::hex << dest_uint << std::dec;
-  for (size_t i=0;; ++i){
-    // LOG(INFO) << "In strcpy loop val is " << (char)val;
+  uint8_t val = 0;
+  uint64_t i = 0;
+  auto zero = ConstantExpr::create(0,8);
+
+  for (size_t i = 0; ; ++i) {
     if (!mem->TryRead(src_uint + i, &val)) {
-      LOG(ERROR) << "Cannot Read from Src " << std::hex <<
-          src_uint + i << std::dec << " During strcpy";
+      LOG(ERROR)
+          << "Cannot read from " << std::hex << (src_uint + i) << std::dec
+          << " during strncpy";
       executor.terminateStateOnError(
-          state, "Failed Read on strcpy from src" , Executor::Assert);
-      break;
-    } else if (!mem->TryWrite(dest_uint+i, val)) {
-      LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
-          src_uint + i << std::dec << " During strcpy";
+          state, "Failed read in strcpy" , Executor::Assert);
+      return;
+
+    } else if (!mem->TryWrite(dest_uint + i, val)) {
+      LOG(ERROR)
+          << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
+          << " during strcpy";
       executor.terminateStateOnError(
-          state, "Failed Write on strcpy To Dest" , Executor::Assert);
-      break;
+          state, "Failed write in strcpy" , Executor::Assert);
+      return;
 
     } else if (val == klee::native::kSymbolicByte ) {
-    // copy symbol from src_uint + i to dest_uint + i
-
       auto sym_pair = mem->symbolic_memory.find(src_uint + i);
       if (sym_pair != mem->symbolic_memory.end()) {
-        bool res;
-        (void) executor.solver->mayBeTrue(state,
-          EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)),
-          res);
-        if (res) {
-          const uint8_t zero = 0;
-          executor.addConstraint(state,
-              EqExpr::create(sym_pair->second, ConstantExpr::create(0,8)
-              ));
-          if(!mem->TryWrite(dest_uint + i, zero)){
-          }
-          else {
-            mem->symbolic_memory.erase(dest_uint + i);
-          }
+        auto sym_val = sym_pair->second;
+        auto sym_val_eq_zero = EqExpr::create(sym_val, zero);
+        bool res = false;
+        if (executor.solver->mayBeTrue(state, sym_val_eq_zero, res) && res) {
+          executor.addConstraint(state, sym_val_eq_zero);
           val = 0;
 
+          // Opportunistically zero out that byte.
+          if (mem->TryWrite(src_uint + i, val)) {
+            mem->symbolic_memory.erase(src_uint + i);
+
+          // Unable to opportunistically write out zero; then force the symbolic
+          // memory to hold a concrete zero.
+          } else {
+            mem->symbolic_memory[src_uint + i] = zero;
+          }
+
+          mem->symbolic_memory.erase(dest_uint + i);
+          mem->TryWrite(dest_uint + i, val);
         }
       }
 
     } else {
-    // erase symbolic val at dest_uint+i
-       mem->symbolic_memory.erase(dest_uint + i);
+      mem->symbolic_memory.erase(dest_uint + i);
     }
 
     if (!val) {
@@ -517,70 +588,6 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
     }
   }
 }
-
-//
-//void SpecialFunctionHandler::handle_independent_calloc(
-//    ExecutionState &state, KInstruction *target,
-//    std::vector<ref<Expr>> &arguments) {
-//  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
-//  auto mem_uint = mem_val->getZExtValue();
-//  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
-//  auto size_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
-//
-//  auto mem = executor.Memory(state, mem_uint);
-//  addr_t addr;
-//  uint8_t byte = 0;
-//  for (size_t i = n_elements_uint; i > 0; --i){
-//    cauto addr = mem->TryMalloc(size_uint);
-//
-//    if (0 < reinterpret_cast<int64_t>(addr)) {
-//      for (size_t i = 0; i < size_uint; ++i){
-//        (void) mem->TryWrite(addr+i, byte);
-//       }
-//    }
-//  }
-//
-//  addr_t saved_addr = mem->TryMalloc(8);
-//  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(addr,64), mem, mem_val);
-//
-//  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
-//}
-//
-//void SpecialFunctionHandler::handle_independent_comalloc(
-//    ExecutionState &state, KInstruction *target,
-//    std::vector<ref<Expr>> &arguments) {
-//
-//  auto mem_val = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]));
-//  auto mem_uint = mem_val->getZExtValue();
-//  auto n_elements_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
-//  auto sizes_addr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
-//
-//  auto mem = executor.Memory(state, mem_uint);
-//  addr_t addr;
-//  size_t size_uint;
-//  addr_t first_address;
-//  for (size_t i = 0; i < n_elements_uint; ++i) {
-//   MemoryReadResult val;
-//   auto size_val = runtime_read_memory(mem, sizes_addr + i,8,val);
-//   if (auto const_size = dyn_cast<ConstantExpr>(size_val)) {
-//     size_uint = const_size->getZExtValue();
-//   } else {
-//     ref<ConstantExpr> const_val;
-//     executor.solver->getValue(state, size_val, const_val );
-//     executor.addConstraint(state,EqExpr::create(const_val, size_val));
-//     size_uint = const_val->getZExtValue();
-//   }
-//   (void) mem->TryMalloc(size_uint);
-//    if (!i){
-//     first_address = addr;
-//    }
-//  }
-//
-//  addr_t saved_addr = mem->TryMalloc(8);
-//  (void) runtime_write_64(state, saved_addr, ConstantExpr::create(first_address,64), mem, mem_val);
-//
-//  executor.bindLocal(target, state, ConstantExpr::create(saved_addr, 64));
-//}
 
 void SpecialFunctionHandler::handle_malloc_size(
     ExecutionState &state, KInstruction *target,
@@ -623,10 +630,10 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  if (0 < reinterpret_cast<uint64_t>(addr)) {
-    uint8_t byte=0;
+  if (0 < reinterpret_cast<int64_t>(addr)) {
+    uint8_t zero = 0;
     for (size_t i = 0; i < size; ++i){
-      (void) mem->TryWrite(addr+i, byte);
+      (void) mem->TryWrite(addr+i, zero);
     }
   }
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
