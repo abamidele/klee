@@ -242,11 +242,11 @@ static Memory *Intercept_memset(Memory *memory, State *state,
 
   addr_t ptr = memset_intercept(memory, s, (char) c, n);
   if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR, dest, (int)(char)c, n);
+    STRACE_ERROR(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR, ptr, (int)(char)c, n);
     return memory;
   }
 
-  STRACE_SUCCESS(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR ", ret=%" PRIxADDR, dest, (int)(char)c, n, ptr);
+  STRACE_SUCCESS(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR ", ret=%" PRIxADDR, ptr, (int)(char)c, n, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
 
