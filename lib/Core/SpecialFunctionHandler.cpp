@@ -724,7 +724,6 @@ ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
        << " to address 0x" << addr_uint << " in address space "
        << addr_space_id;
     executor.terminateStateOnError(state, ss.str(), Executor::ReportError);
-    mem->Kill();
     return Expr::createPointer(0);
   }
 
@@ -1299,7 +1298,6 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
               target, state, runtime_read_memory(memory, addr_uint, \
                                                  num_bytes, result)); \
         } else { \
-          memory->Kill(); \
           std::stringstream ss; \
           ss << "Can't read " << num_bytes << " from " \
              << std::hex << addr_uint; \

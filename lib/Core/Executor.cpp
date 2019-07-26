@@ -3260,6 +3260,13 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
+
+  for (auto &memory : state.memories) {
+    if (memory) {
+      memory->Kill();
+    }
+  }
+
   std::string message = messaget.str();
   static std::set<std::pair<Instruction*, std::string> > emittedErrors;
   Instruction * lastInst;

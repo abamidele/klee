@@ -251,16 +251,17 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   new_address.flat = new_addr;
 
   // Migrate the old data.
-  auto old_bytes = old_alloc_list.allocations[old_alloc_index].get();
-  auto new_bytes = new_alloc_list.allocations[new_address.alloc_index].get();
+  auto &old_bytes = old_alloc_list.allocations[old_alloc_index];
+  auto &new_bytes = new_alloc_list.allocations[new_address.alloc_index];
   const auto it_end = symbolic_memory.end();
   for (size_t i = 0, max_i = std::min(old_size, alloc_size); i < max_i; ++i) {
     uint8_t byte = old_bytes[i];
     if (byte == kSymbolicByte) {
       auto it = symbolic_memory.find(addr + i);
       if (it != it_end) {
-        symbolic_memory[new_addr + i] = it->second;
-        symbolic_memory.erase(it->first);
+        auto sym_val = it->second;
+        symbolic_memory.erase(it);
+        symbolic_memory[new_addr + i] = sym_val;
       }
     }
     new_bytes[i] = byte;
@@ -424,7 +425,6 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
 // Read a byte from memory.
 bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   const auto addr = addr_ & addr_mask;
-  auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = { };
   address.flat = addr;
   if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
