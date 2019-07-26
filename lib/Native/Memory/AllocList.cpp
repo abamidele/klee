@@ -41,7 +41,8 @@ uint64_t AllocList::Allocate(Address addr) {
     }
   }
 
-  auto mem = std::make_shared<std::vector<uint8_t>>(addr.size);
+  auto mem = std::make_shared<std::vector<uint8_t>>();
+  mem->resize(addr.size);
 
   if (!found_free) {
     addr.alloc_index = allocations.size();
@@ -180,7 +181,8 @@ bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
 
   if (alloc_buffer.use_count() > 1) {
     auto old_array = alloc_buffer.get();
-    auto new_array = std::make_shared<std::vector<uint8_t>>(address.size);
+    auto new_array = std::make_shared<std::vector<uint8_t>>();
+    new_array->resize(address.size);
     memcpy(new_array->data(), old_array->data(), address.size);
     alloc_buffer = std::move(new_array);
   }
