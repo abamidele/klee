@@ -226,6 +226,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 	  add("strcpy_intercept", handle_strcpy_intercept, true),
 	  add("strncpy_intercept", handle_strncpy_intercept, true),
 	  add("strlen_intercept", handle_strlen_intercept, true),
+    add("strnlen_intercept", handle_strnlen_intercept, true),
 
 #undef addDNR
 #undef add
@@ -460,6 +461,18 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
       break;
     }
   }
+
+  for (size_t i = 0; i < n_uint; ++i) {
+    if (!mem->TryWrite(dest_uint + i, val)) {
+      LOG(ERROR)
+          << "Cannot write trailing zero byte to "
+          << std::hex << (dest_uint + i) << std::dec
+          << " during strncpy";
+      executor.terminateStateOnError(
+          state, "Failed write trailing zero in strncpy" , Executor::Assert);
+      return;
+    }
+  }
 }
 
 void SpecialFunctionHandler::handle_strlen_intercept(
@@ -482,6 +495,67 @@ void SpecialFunctionHandler::handle_strlen_intercept(
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during strlen";
+      executor.terminateStateOnError(
+          state, "Failed read in strlen" , Executor::Assert);
+      return;
+    }
+
+    if (val == klee::native::kSymbolicByte) {
+      auto sym_pair = mem->symbolic_memory.find(src_uint + i);
+      if (sym_pair != mem->symbolic_memory.end()) {
+        auto sym_val = sym_pair->second;
+        auto sym_val_eq_zero = EqExpr::create(sym_val, zero);
+        bool res = false;
+        if (executor.solver->mayBeTrue(state, sym_val_eq_zero, res) && res) {
+          executor.addConstraint(state, sym_val_eq_zero);
+
+          val = 0;
+
+          // Opportunistically zero out that byte.
+          if (mem->TryWrite(src_uint + i, val)) {
+            mem->symbolic_memory.erase(src_uint + i);
+
+          // Unable to opportunistically write out zero; then force the symbolic
+          // memory to hold a concrete zero.
+          } else {
+            mem->symbolic_memory[src_uint + i] = zero;
+          }
+        }
+      }
+    }
+
+    if (val == 0) {
+      break;
+    }
+  }
+  //  TODO(sai) add some sort of continuation that makes symbolic strlen better
+
+  executor.bindLocal(target, state, ConstantExpr::create(i, 64));
+}
+
+
+void SpecialFunctionHandler::handle_strnlen_intercept(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+  auto mem_ptr = executor.toUnique(state, arguments[0]);
+  auto src = executor.toUnique(state, arguments[1]);
+  auto n = executor.toUnique(state, arguments[2]);
+
+  auto mem_uint = dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
+  auto src_uint = dyn_cast<ConstantExpr>(src)->getZExtValue();
+  auto n_uint = dyn_cast<ConstantExpr>(n)->getZExtValue();
+
+  auto mem = executor.Memory(state, mem_uint);
+
+  uint8_t val = 0;
+  size_t i = 0;
+  auto zero = ConstantExpr::create(0,8);
+
+  for (; i < n; ++i) {
+    if (!mem->TryRead(src_uint + i, &val)) {
+      LOG(ERROR)
+          << "Cannot read from " << std::hex << (src_uint + i) << std::dec
+          << " during strnlen";
       executor.terminateStateOnError(
           state, "Failed read in strlen" , Executor::Assert);
       return;

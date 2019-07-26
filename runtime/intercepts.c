@@ -71,6 +71,7 @@ void *(*real_memcpy)(void *, void *, size_t) = NULL;
 char *(*real_strcpy)(char *, const char *) = NULL;
 char *(*real_strncpy)(char *, const char *, size_t) = NULL;
 char *(*real_strlen)(char *) = NULL;
+char *(*real_strnlen)(char *) = NULL;
 //int (*real_strcmp)(const char *, const char *) = NULL;
 //int (*real_strncmp)(const char *, const char *, size_t) = NULL;
 
@@ -139,6 +140,8 @@ void init(void) {
   real_strncpy = (char * (*)(char *, const char *, size_t)) dlsym(RTLD_NEXT, "strncpy");
   bump = bump_start;
   real_strlen = (size_t (*)(char *)) dlsym(RTLD_NEXT, "strlen");
+  bump = bump_start;
+  real_strnlen = (size_t (*)(char *)) dlsym(RTLD_NEXT, "strnlen");
   bump = bump_start;
 
   real_malloc = og_malloc;
@@ -256,13 +259,19 @@ char *intercepted_strcpy(volatile char *dest, volatile const char *src) {
 
 char *intercepted_strncpy(volatile char *dest, volatile const char *src,
                           size_t n) {
-  for (size_t i = 0; i < n; ++i) {
+  size_t i = 0;
+  for (; i < n; ++i) {
     char ch = src[i];
     dest[i] = ch;
     if (!ch) {
       break;
     }
   }
+
+  for (; i < n; ++i) {
+    dest[i] = 0;
+  }
+
   return dest;
 }
 
@@ -272,6 +281,16 @@ size_t intercepted_strlen(volatile const char *str) {
   } else {
     size_t i = 0;
     for (; str[i]; ++i) { }
+    return i;
+  }
+}
+
+size_t intercepted_strnlen(volatile const char *str, size_t n) {
+  if (!str) {
+    return 0;
+  } else {
+    size_t i = 0;
+    for (; i < n && str[i]; ++i) { }
     return i;
   }
 }

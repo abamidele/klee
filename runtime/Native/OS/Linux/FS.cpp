@@ -763,12 +763,11 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
     if (written) {
       pos = telldir(dir);
     }
-    auto our_entry_bool = __kleemill_readdir(dir);
-    struct dirent our_entry = {};
-    if (!our_entry_bool) {
+    if (!__kleemill_readdir(dir)) {
       break;
     }
 
+    struct dirent our_entry = {};
     our_entry.d_ino = static_cast<decltype(our_entry.d_ino)>(__kleemill_readdir_val(0));
 #ifdef __APPLE__
     our_entry.d_seekoff = static_cast<decltype(our_entry.d_seekoff)>(__kleemill_readdir_val(1));

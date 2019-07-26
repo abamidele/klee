@@ -30,6 +30,7 @@ addr_t memmove_intercept(Memory * memory, addr_t dest, addr_t src, size_t n);
 addr_t strcpy_intercept(Memory *memory, addr_t dest, addr_t src);
 addr_t strncpy_intercept(Memory *memory, addr_t dest, addr_t src, size_t n);
 size_t strlen_intercept(Memory *memory, addr_t s);
+size_t strnlen_intercept(Memory *memory, addr_t s, size_t n);
 }  // extern C
 
 template <typename ABI>
@@ -252,11 +253,6 @@ static Memory *Intercept_memset(Memory *memory, State *state,
   }
 
   addr_t ptr = memset_intercept(memory, s, (char) c, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR, ptr, (int)(char)c, n);
-    return memory;
-  }
-
   STRACE_SUCCESS(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR ", ret=%" PRIxADDR, ptr, (int)(char)c, n, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
@@ -273,10 +269,6 @@ static Memory *Intercept_memcpy(Memory *memory, State *state,
   }
 
   addr_t ptr = memcpy_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
-    return memory;
-  }
   STRACE_SUCCESS(libc_memcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
@@ -293,10 +285,6 @@ static Memory *Intercept_memmove(Memory *memory, State *state,
   }
 
   addr_t ptr = memmove_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memmove, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
-    return memory;
-  }
   STRACE_SUCCESS(libc_memmove, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
@@ -314,11 +302,6 @@ static Memory *Intercept_strcpy(Memory *memory, State *state,
   }
 
   addr_t ptr = strcpy_intercept(memory, dest, src);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_strcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR, dest, src);
-    return memory;
-  }
-
   STRACE_SUCCESS(libc_strcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", ret=%" PRIxADDR, dest, src, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
@@ -337,11 +320,6 @@ static Memory *Intercept_strncpy(Memory *memory, State *state,
   }
 
   addr_t ptr = strncpy_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_strncpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
-    return memory;
-  }
-
   STRACE_SUCCESS(libc_strncpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
   return intercept.SetReturn(memory, state, ptr);
 }
@@ -357,17 +335,26 @@ static Memory *Intercept_strlen(Memory *memory, State *state,
   }
 
   size_t size = strlen_intercept(memory, s);
-
-  if (size == kBadAddr) {
-    STRACE_ERROR(libc_strlen, "ptr=%" PRIxADDR, s);
-    return memory;
-  }
-
-  STRACE_SUCCESS(libc_strlen, "ptr=%" PRIxADDR ", len=%" PRIxADDR, s, size);
-
+  STRACE_SUCCESS(libc_strlen, "ptr=%" PRIxADDR ", len=%" PRIdADDR, s, size);
   return intercept.SetReturn(memory, state, size);
 }
 
+
+template <typename ABI>
+static Memory *Intercept_strnlen(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s;
+  size_t n;
+
+  if (!intercept.TryGetArgs(memory, state, &s, &n)) {
+    STRACE_ERROR(libc_strnlen, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  size_t size = strnlen_intercept(memory, s, n);
+  STRACE_SUCCESS(libc_strnlen, "ptr=%" PRIxADDR ", max_len=%" PRIdADDR ", len=%" PRIdADDR, s, n, size);
+  return intercept.SetReturn(memory, state, size);
+}
 
 template <typename ABI>
 static Memory *Intercept_strncmp(Memory *memory, State *state,

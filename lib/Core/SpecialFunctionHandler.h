@@ -251,6 +251,7 @@ class SpecialFunctionHandler {
   HANDLER(handle_strcpy_intercept);
   HANDLER(handle_strncpy_intercept);
   HANDLER(handle_strlen_intercept);
+  HANDLER(handle_strnlen_intercept);
 
 #undef HANDLER
 };
