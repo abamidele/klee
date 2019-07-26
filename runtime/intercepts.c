@@ -65,6 +65,54 @@ void *(*real_calloc)(unsigned long long, unsigned long long) = NULL;
 void *(*real_realloc)(void *, unsigned long long) = NULL;
 void (*real_free)(void *) = NULL;
 
+void *(*real_memset)(void *, int, size_t) = NULL;
+void *(*real_memmove)(void *, void *, size_t) = NULL;
+void *(*real_memcpy)(void *, void *, size_t) = NULL;
+char *(*real_strcpy)(char *, const char *) = NULL;
+char *(*real_strncpy)(char *, const char *, size_t) = NULL;
+char *(*real_strlen)(char *) = NULL;
+//int (*real_strcmp)(const char *, const char *) = NULL;
+//int (*real_strncmp)(const char *, const char *, size_t) = NULL;
+
+
+int strcmp(volatile const char *a, volatile const char *b) {
+  write(2, "HIT STRCMP!\n", 12);
+  while (*a && *a == *b) {
+    ++a, ++b;
+  }
+  return *a - *b;
+}
+
+/****EXPERIMENTAL*****/
+char *setlocale(int category, const char *locale){
+  return "en_US.UTF-8";
+}
+
+int strncmp(volatile const char *s1,
+    volatile const char *s2, size_t n) {
+  write(2, "HIT STRNCMP!\n", 13);
+  if (n == 0) {
+    return (0);
+  }
+  do {
+    if (*s1 != *s2++) {
+      return (*(unsigned char *)s1 -
+        *(unsigned char *)(s2 - 1));
+    }
+    if (*s1++ == 0) {
+      break;
+    }
+  } while (--n != 0);
+  return (0);
+}
+
+/*
+int strcmp(volatile const char *a, volatile const char *b) {
+  //write(0, "HIT STRCMP!\n", 12);
+  return intercepted_strcmp(a,b);
+}
+*/
+
 __attribute__((initializer))
 void init(void) {
   real_malloc = reentrant_malloc;
@@ -80,11 +128,59 @@ void init(void) {
   bump = bump_start;
   void (*og_free)(void *) = (void (*)(void *)) dlsym(RTLD_NEXT, "free");
   bump = bump_start;
+  real_memset = (void * (*)(void *, int, size_t)) dlsym(RTLD_NEXT, "memset");
+  bump = bump_start;
+  real_memmove = (void * (*)(void *, void *, size_t)) dlsym(RTLD_NEXT, "memmove");
+  bump = bump_start;
+  real_memcpy = (void * (*)(void *, void *, size_t)) dlsym(RTLD_NEXT, "memcpy");
+  bump = bump_start;
+  real_strcpy = (char * (*)(char *, const char *)) dlsym(RTLD_NEXT, "strcpy");
+  bump = bump_start;
+  real_strncpy = (char * (*)(char *, const char *, size_t)) dlsym(RTLD_NEXT, "strncpy");
+  bump = bump_start;
+  real_strlen = (size_t (*)(char *)) dlsym(RTLD_NEXT, "strlen");
+  bump = bump_start;
+
   real_malloc = og_malloc;
   real_calloc = og_calloc;
   real_realloc = og_realloc;
   real_free = og_free;
+
+  //real_strcmp = &intercepted_strcmp;
+  //real_strncmp = &intercepted_strncmp;
 }
+
+char * __findenv(const char *name, int *offset)
+{
+  extern char **environ;
+  int len, i;
+  const char *np;
+  char **p, *cp;
+  if (name == NULL || environ == NULL)
+    return (NULL);
+  for (np = name; *np && *np != '='; ++np)
+    ;
+  len = np - name;
+  for (p = environ; (cp = *p) != NULL; ++p) {
+    for (np = name, i = len; i && *cp; i--)
+      if (*cp++ != *np++)
+        break;
+    if (i == 0 && *cp++ == '=') {
+      *offset = p - environ;
+      return (cp);
+    }
+  }
+  return (NULL);
+}
+/*
+ * getenv --
+ *  Returns ptr to value associated with name, if any, else NULL.
+ */
+char * getenv(const char *name) {
+  int offset;
+  return (__findenv(name, &offset));
+}
+
 
 void *intercepted_malloc(unsigned long long a) {
   if (!real_malloc) {
@@ -118,3 +214,79 @@ void intercepted_free(void *ptr) {
   }
   real_free(ptr);
 }
+
+void *intercepted_memset(volatile void * a, volatile int c, size_t n) {
+  volatile char *s = (volatile char*) a;
+  for(size_t i=0; i<n; i++) {
+    s[i]=c;
+  }
+}
+
+void * intercepted_memmove(volatile void * a, volatile void * s, size_t n) {
+  volatile char *src = (volatile char *)s;
+  volatile char *dest = (volatile char *)a;
+
+  for (size_t i = 1; i <= n; ++i) {
+    dest[n - i] = src[n - i];
+  }
+}
+
+void *intercepted_memcpy(volatile void *dest_addr,
+    volatile void *src_addr, size_t n) {
+
+  volatile char *dest = (volatile char *)dest_addr;
+  volatile char *src = (volatile char *)src_addr;
+
+  for (size_t i=0; i < n; ++i){
+    dest[i] = src[i];
+  }
+
+  return dest;
+}
+
+
+char *intercepted_strcpy(volatile char *dest, volatile const char *src) {
+  // return if no memory is allocated to the destination
+    if (dest == NULL)
+      return NULL;
+    volatile char *ptr = dest;
+
+    while (*src != '\0')
+    {
+      *dest = *src;
+      dest++;
+      src++;
+    }
+    *dest = '\0';
+    return ptr;
+}
+
+char *intercepted_strncpy(volatile char *dest,
+    volatile const char *src, size_t n) {
+  // return if no memory is allocated to the destination
+    size_t i = 0;
+    if (dest == NULL)
+      return NULL;
+    volatile char *ptr = dest;
+
+    while (*src != '\0') {
+      if (i == n) {
+        break;
+      }
+      *dest = *src;
+      dest++;
+      src++;
+      ++i;
+    }
+    *dest = '\0';
+    return ptr;
+}
+
+char *intercepted_strlen(volatile const char *str) {
+  volatile const char *s = str;
+  while (*s) {
+    ++s;
+  }
+  return (size_t) (s - str);
+}
+

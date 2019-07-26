@@ -412,6 +412,8 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       interpreterHandler(ih),
       searcher(0),
       externalDispatcher(new ExternalDispatcher(ctx)),
+      solver(nullptr),
+      memory(nullptr),
       statsTracker(0),
       pathWriter(0),
       symPathWriter(0),
@@ -4203,9 +4205,10 @@ int *Executor::getErrnoLocation(const ExecutionState &state) const {
 }
 
 ///
+#include <new>
 
 Interpreter *Interpreter::create(LLVMContext &ctx,
                                  const InterpreterOptions &opts,
                                  InterpreterHandler *ih) {
-  return new Executor(ctx, opts, ih);
+  return new (calloc(1, sizeof(Executor)))Executor(ctx, opts, ih);
 }

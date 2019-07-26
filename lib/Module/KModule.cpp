@@ -254,6 +254,7 @@ void KModule::instrument(llvm::Module *mod,
   pm.add(createScalarizerPass());
 
   // This pass will replace atomic instructions with non-atomic operations
+  /*
   pm.add(createLowerAtomicPass());
   if (opts.CheckDivZero) {
     pm.add(new DivCheckPass());
@@ -262,6 +263,7 @@ void KModule::instrument(llvm::Module *mod,
     pm.add(new OvershiftCheckPass());
   }
   pm.add(new IntrinsicCleanerPass(*targetData));
+  */
   pm.run(*mod);
 }
 
