@@ -231,6 +231,37 @@ void CopyStat(const struct stat &info, T *info32) {
 #endif
 }
 
+enum StatValId {
+  kStatDev,
+  kStatInode,
+  kStatMode,
+  kStatLink,
+  kStatUserId,
+  kStatGroupId,
+  kStatRDev,
+  kStatSize,
+  kStatBlockSize,
+  kStatBlocks
+};
+
+extern "C" int __kleemill_fstat(int fd);
+extern "C" int __kleemill_lstat(const char *path);
+extern "C" int __kleemill_stat(const char *path);
+extern "C" addr_t __kleemill_stat_val(StatValId);
+
+static void FillStat(struct stat &info) {
+  info.st_dev = static_cast<decltype(info.st_dev)>(__kleemill_stat_val(kStatDev));
+  info.st_ino = static_cast<decltype(info.st_ino)>(__kleemill_stat_val(kStatInode));
+  info.st_mode = static_cast<decltype(info.st_mode)>(__kleemill_stat_val(kStatMode));
+  info.st_nlink = static_cast<decltype(info.st_nlink)>(__kleemill_stat_val(kStatLink));
+  info.st_uid = static_cast<decltype(info.st_uid)>(__kleemill_stat_val(kStatUserId));
+  info.st_gid = static_cast<decltype(info.st_gid)>(__kleemill_stat_val(kStatGroupId));
+  info.st_rdev = static_cast<decltype(info.st_rdev)>(__kleemill_stat_val(kStatRDev));
+  info.st_size = static_cast<decltype(info.st_size)>(__kleemill_stat_val(kStatSize));
+  info.st_blksize = static_cast<decltype(info.st_blksize)>(__kleemill_stat_val(kStatBlockSize));
+  info.st_blocks = static_cast<decltype(info.st_blocks)>(__kleemill_stat_val(kStatBlocks));
+}
+
 // Emulate a `stat` system call.
 template<typename T, typename ABI>
 static Memory *SysStat(Memory *memory, State *state, const ABI &syscall) {
@@ -260,12 +291,14 @@ static Memory *SysStat(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  struct stat info = { };
-  if (::stat(gPath, &info)) {
+  if (__kleemill_stat(gPath)) {
     auto err = errno;
     STRACE_ERROR(stat, "Can't stat path %s: %s", gPath, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
+
+  struct stat info = { };
+  FillStat(info);
 
   T info32 = { };
   CopyStat(info, &info32);
@@ -398,13 +431,15 @@ static Memory *SysFStatAt(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -EBADFD);
   }
 
-  struct stat info = { };
-  if (::stat(final_path, &info)) {
+  if (__kleemill_stat(final_path)) {
     auto err = errno;
     STRACE_ERROR(fstatat, "Can't stat path %s (final=%s): %s", gPath,
                  final_path, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
+
+  struct stat info = {};
+  FillStat(info);
 
   T info_compat = { };
   CopyStat(info, &info_compat);
@@ -447,12 +482,15 @@ static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -EFAULT);
   }
 
-  struct stat info = { };
-  if (lstat(gPath, &info)) {
+  if (__kleemill_lstat(gPath)) {
     auto err = errno;
     STRACE_ERROR(lstat, "Can't lstat path %s: %s", gPath, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
+
+
+  struct stat info = {};
+  FillStat(info);
 
   T info32 = { };
   CopyStat(info, &info32);
@@ -469,7 +507,6 @@ static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
 // Emulate a an `fstat` system call.
 //
 //
-extern "C" int my_fstat(int fd, struct stat *info);
 extern "C" uint64_t get_fstat_index(int index);
 
 template<typename T, typename ABI>
@@ -487,38 +524,14 @@ static Memory *SysFstat(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -EINVAL);
   }
 
-  struct stat info =  {};
-  if (my_fstat(fd, &info)) {
+  if (__kleemill_fstat(fd)) {
     auto err = errno;
     STRACE_ERROR(fstat, "Can't fstat fd %d: %s", fd, strerror(err));
     return syscall.SetReturn(memory, state, -err);
   }
 
-  info.st_dev = get_fstat_index(0);
-  info.st_ino = get_fstat_index(1);
-  info.st_mode = get_fstat_index(2);
-  info.st_nlink = get_fstat_index(3);
-  info.st_uid = get_fstat_index(4);
-  info.st_gid = get_fstat_index(5);
-  info.st_rdev = get_fstat_index(6);
-  info.st_size = get_fstat_index(7);
-  info.st_blksize =get_fstat_index(8);
-  info.st_blocks = get_fstat_index(9);
- 
-  /*
-  puts("---------FSTAT STRUCT FIELDS------------");
-  printf("st_dv: %ld\n", info.st_dev);
-  printf("st_ino: %ld\n", info.st_ino);
-  printf("st_mode: %ld\n", info.st_mode);
-  printf("st_nlink: %ld\n", info.st_nlink);
-  printf("st_uid: %ld\n", info.st_uid);
-  printf("st_gid: %ld\n", info.st_gid);
-  printf("st_rdev: %ld\n", info.st_rdev);
-  printf("st_size: %ld\n", info.st_size);
-  printf("st_blksize: %ld\n", info.st_blksize);
-  printf("st_blocks: %ld\n", info.st_blocks);
-  puts("---------FSTAT STRUCT FIELDS------------");
-  */
+  struct stat info = {};
+  FillStat(info);
 
   T info32 = {};
   CopyStat(info, &info32);

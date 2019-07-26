@@ -198,10 +198,12 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     
     add("llvm.ctpop.i32", handle__llvm_ctpop, true),
     add("klee_overshift_check", handle__klee_overshift_check, false),
-    add("my_fstat", handle__fstat64, true),
+    add("__kleemill_fstat", handle__fstat64, true),
+    add("__kleemill_lstat", handle__lstat64, true),
+    add("__kleemill_stat", handle__stat64, true),
+    add("__kleemill_stat_val", handle_get_fstat_index, true),
     add("stat64", handle__stat64, true),
     add("my_openat", handle_openat64, true),
-    add("get_fstat_index", handle_get_fstat_index, true),
     add("get_dirent_index", handle_get_dirent_index, true),
     add("get_dirent_name", handle_get_dirent_name, true),
     add("my_readdir", handle__my_readdir, true),
@@ -957,18 +959,31 @@ void SpecialFunctionHandler::handle_openat64(
   }
 }
 
+enum {
+  kStatDev,
+  kStatInode,
+  kStatMode,
+  kStatLink,
+  kStatUserId,
+  kStatGroupId,
+  kStatRDev,
+  kStatSize,
+  kStatBlockSize,
+  kStatBlocks
+};
+
 void SpecialFunctionHandler::set_up_fstat_struct(struct stat *info) {
-  fstat_vector.clear();
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_dev));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_ino));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_mode));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_nlink));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_uid));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_gid));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_rdev));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_size));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_blksize));
-  fstat_vector.push_back(static_cast<uint64_t>(info->st_blocks));
+  fstat_vector.resize(10);
+  fstat_vector[kStatDev] = static_cast<uint64_t>(info->st_dev);
+  fstat_vector[kStatInode] = static_cast<uint64_t>(info->st_ino);
+  fstat_vector[kStatMode] = static_cast<uint64_t>(info->st_mode);
+  fstat_vector[kStatLink] = static_cast<uint64_t>(info->st_nlink);
+  fstat_vector[kStatUserId] = static_cast<uint64_t>(info->st_uid);
+  fstat_vector[kStatGroupId] = static_cast<uint64_t>(info->st_gid);
+  fstat_vector[kStatRDev] = static_cast<uint64_t>(info->st_rdev);
+  fstat_vector[kStatSize] = static_cast<uint64_t>(info->st_size);
+  fstat_vector[kStatBlockSize] = static_cast<uint64_t>(info->st_blksize);
+  fstat_vector[kStatBlocks] = static_cast<uint64_t>(info->st_blocks);
 }
 
 void SpecialFunctionHandler::handle_get_fstat_index(
@@ -1054,23 +1069,40 @@ void SpecialFunctionHandler::handle__fstat64(
   auto fd_val = executor.toUnique(state, arguments[0]);
   auto fd_uint = llvm::dyn_cast<ConstantExpr>(fd_val)->getZExtValue();
 
-  auto stat_val = executor.toUnique(state, arguments[1]);
-  auto stat_uint = llvm::dyn_cast<ConstantExpr>(stat_val)->getZExtValue();
+  struct stat stat_data = {};
+  auto stat_ret = fstat(fd_uint, &stat_data);
+  auto err = errno;
 
-  auto stat = reinterpret_cast<struct stat *>(stat_uint);
-  auto stat_ret = fstat(fd_uint, stat);
+  executor.bindLocal(target, state,
+                     ConstantExpr::create(stat_ret, Expr::Int32));
 
-  // must set errno
-  if (stat_ret == -1) {
+  if (stat_ret != -1) {
+    set_up_fstat_struct(&stat_data);
+  }
+
+  errno = err;
+}
+
+
+void SpecialFunctionHandler::handle__lstat64(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr>> &arguments) {
+  auto path_val = executor.toUnique(state, arguments[0]);
+    auto path_uint = llvm::dyn_cast<ConstantExpr>(path_val)->getZExtValue();
+    const char *pathname = reinterpret_cast<char *>(path_uint);
+
+    struct stat stat_data = {};
+    auto stat_ret = lstat(pathname, &stat_data);
+    auto err = errno;
+
     executor.bindLocal(target, state,
                        ConstantExpr::create(stat_ret, Expr::Int32));
-    errno = EFAULT;
-  } else {
-    set_up_fstat_struct(stat);
-    executor.bindLocal(target, state,
-                       ConstantExpr::create(stat_ret, Expr::Int64));
-    errno = 0;
-  }
+
+    if (stat_ret != -1) {
+      set_up_fstat_struct(&stat_data);
+    }
+
+    errno = err;
 }
 
 void SpecialFunctionHandler::handle__stat64(ExecutionState &state,
@@ -1080,22 +1112,18 @@ void SpecialFunctionHandler::handle__stat64(ExecutionState &state,
   auto path_uint = llvm::dyn_cast<ConstantExpr>(path_val)->getZExtValue();
   const char *pathname = reinterpret_cast<char *>(path_uint);
 
-  auto stat_val = executor.toUnique(state, arguments[1]);
-  auto stat_uint = llvm::dyn_cast<ConstantExpr>(stat_val)->getZExtValue();
+  struct stat stat_data = {};
+  auto stat_ret = stat(pathname, &stat_data);
+  auto err = errno;
 
-  auto stat_struct = reinterpret_cast<struct stat *>(stat_uint);
-  auto stat_ret = stat(pathname, stat_struct);
+  executor.bindLocal(target, state,
+                     ConstantExpr::create(stat_ret, Expr::Int32));
 
-  // msust set errno
-  if (stat_ret == -1) {
-    executor.bindLocal(target, state,
-                       ConstantExpr::create(stat_ret, Expr::Int32));
-    errno = EFAULT;
-  } else {
-    executor.bindLocal(target, state,
-                       ConstantExpr::create(stat_ret, Expr::Int64));
-    errno = 0;
+  if (stat_ret != -1) {
+    set_up_fstat_struct(&stat_data);
   }
+
+  errno = err;
 }
 
 void SpecialFunctionHandler::handle__klee_overshift_check(

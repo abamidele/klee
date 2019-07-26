@@ -101,160 +101,13 @@ static Memory *Intercept_free(Memory *memory, State *state,
   }
 
   if (!free_intercept(memory, address)) {
-    STRACE_ERROR(libc_free, "Falling back to real free for addr=%" PRIxADDR,
+    STRACE_ERROR(libc_free, "Falling back to real free for ptr=%" PRIxADDR,
                  address);
     return memory;
   }
 
-  STRACE_SUCCESS(libc_free, "free of ptr=%" PRIxADDR, address);
+  STRACE_SUCCESS(libc_free, "ptr=%" PRIxADDR, address);
   return intercept.SetReturn(memory, state, 0);
-}
-
-template <typename ABI>
-static Memory *Intercept_memset(Memory *memory, State *state,
-                              const ABI &intercept) {
-  addr_t s;
-  int c;
-  size_t n;
-  if (!intercept.TryGetArgs(memory, state, &s, &c, &n)) {
-    STRACE_ERROR(libc_memset, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  addr_t ptr = memset_intercept(memory, s, c, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memset, "Falling back to real memset for s=% c=% n=%" PRIxADDR,
-                 s, c, n);
-    return memory;
-  }
-  STRACE_SUCCESS(libc_memset, "successful memset for of ptr=%" PRIxADDR, ptr);
-  return intercept.SetReturn(memory, state, ptr);
-
-}
-
-template <typename ABI>
-static Memory *Intercept_memcpy(Memory *memory, State *state,
-                              const ABI &intercept) {
-  addr_t dest;
-  addr_t src;
-  size_t n;
-  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
-    STRACE_ERROR(libc_memcpy, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  addr_t ptr = memcpy_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memcpy, "Falling back to real memset for dest=% src=% n=%" PRIxADDR,
-                 dest, src, n);
-    return memory;
-  }
-  STRACE_SUCCESS(libc_memcpy, "Successful memcpy for ptr=%" PRIxADDR, ptr);
-  return intercept.SetReturn(memory, state, ptr);
-}
-
-template <typename ABI>
-static Memory *Intercept_memmove(Memory *memory, State *state,
-                              const ABI &intercept) {
-  addr_t dest;
-  addr_t src;
-  size_t n;
-  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
-    STRACE_ERROR(libc_memset, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  addr_t ptr = memmove_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_memmove, "Falling back to real memmove for dest=% src=% n=%" PRIxADDR,
-                 dest, src, n);
-    return memory;
-  }
-  STRACE_SUCCESS(libc_memmove, "successful memmove for ptr=%" PRIxADDR, ptr);
-  return intercept.SetReturn(memory, state, ptr);
-}
-
-template <typename ABI>
-static Memory *Intercept_strcpy(Memory *memory, State *state,
-                              const ABI &intercept) {
-
-  addr_t dest;
-  addr_t src;
-
-  if (!intercept.TryGetArgs(memory, state, &dest, &src)) {
-    STRACE_ERROR(libc_memset, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  addr_t ptr = strcpy_intercept(memory, dest, src);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_strcpy, "Falling back to real strcpy for dest=% src=%" PRIxADDR,
-                 dest, src);
-    return memory;
-  }
-
-  STRACE_SUCCESS(libc_strcpy, "successful strcpy for ptr=%" PRIxADDR, ptr);
-  return intercept.SetReturn(memory, state, ptr);
-}
-
-template <typename ABI>
-static Memory *Intercept_strncpy(Memory *memory, State *state,
-                              const ABI &intercept) {
-
-  addr_t dest;
-  addr_t src;
-  size_t n;
-
-  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
-    STRACE_ERROR(libc_strncpy, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  addr_t ptr = strncpy_intercept(memory, dest, src, n);
-  if (ptr == kBadAddr){
-    STRACE_ERROR(libc_strncpy, "Falling back to real strncpy for dest=% src=%" PRIxADDR,
-                 dest, src);
-    return memory;
-  }
-
-  STRACE_SUCCESS(libc_strncpy, "successful strncpy for ptr=%" PRIxADDR, ptr);
-  return intercept.SetReturn(memory, state, ptr);
-}
-
-template <typename ABI>
-static Memory *Intercept_strlen(Memory *memory, State *state,
-                              const ABI &intercept) {
-  addr_t s;
-
-  if (!intercept.TryGetArgs(memory, state,&s)) {
-    STRACE_ERROR(libc_strlen, "Couldn't get args");
-    return intercept.SetReturn(memory, state, 0);
-  }
-
-  size_t size = strlen_intercept(memory, s);
-
-  if (size == kBadAddr) {
-    STRACE_ERROR(libc_strlen, "Falling back to real strlen for %" PRIxADDR, s);
-    return memory;
-  }
-
-  STRACE_SUCCESS(libc_strlen, "successful strlen for ptr=% of size %" PRIxADDR,
-      s, size);
-
-  return intercept.SetReturn(memory, state, size);
-}
-
-
-template <typename ABI>
-static Memory *Intercept_strncmp(Memory *memory, State *state,
-                              const ABI &intercept) {
-  return memory;
-}
-
-template <typename ABI>
-static Memory *Intercept_strcmp(Memory *memory, State *state,
-                              const ABI &intercept) {
-  return memory;
 }
 
 
@@ -375,5 +228,146 @@ static Memory *Intercept_malloc_usable_size(Memory *memory, State *state,
   return intercept.SetReturn(memory, state, size);
 }
 
+
+template <typename ABI>
+static Memory *Intercept_memset(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s;
+  int c;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &s, &c, &n)) {
+    STRACE_ERROR(libc_memset, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memset_intercept(memory, s, (char) c, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR, dest, (int)(char)c, n);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_memset, "dest=%" PRIxADDR ", val=%x, len=%" PRIdADDR ", ret=%" PRIxADDR, dest, (int)(char)c, n, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_memcpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t dest;
+  addr_t src;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_memcpy, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memcpy_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_memcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_memmove(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t dest;
+  addr_t src;
+  size_t n;
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_memmove, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = memmove_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_memmove, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
+    return memory;
+  }
+  STRACE_SUCCESS(libc_memmove, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strcpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+
+  addr_t dest;
+  addr_t src;
+
+  if (!intercept.TryGetArgs(memory, state, &dest, &src)) {
+    STRACE_ERROR(libc_strcpy, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = strcpy_intercept(memory, dest, src);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_strcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR, dest, src);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_strcpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", ret=%" PRIxADDR, dest, src, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strncpy(Memory *memory, State *state,
+                              const ABI &intercept) {
+
+  addr_t dest;
+  addr_t src;
+  size_t n;
+
+  if (!intercept.TryGetArgs(memory, state, &dest, &src, &n)) {
+    STRACE_ERROR(libc_strncpy, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  addr_t ptr = strncpy_intercept(memory, dest, src, n);
+  if (ptr == kBadAddr){
+    STRACE_ERROR(libc_strncpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR, dest, src, n);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_strncpy, "dest=%" PRIxADDR ", src=%" PRIxADDR ", len=%" PRIdADDR ", ret=%" PRIxADDR, dest, src, n, ptr);
+  return intercept.SetReturn(memory, state, ptr);
+}
+
+template <typename ABI>
+static Memory *Intercept_strlen(Memory *memory, State *state,
+                              const ABI &intercept) {
+  addr_t s;
+
+  if (!intercept.TryGetArgs(memory, state,&s)) {
+    STRACE_ERROR(libc_strlen, "Couldn't get args");
+    return intercept.SetReturn(memory, state, 0);
+  }
+
+  size_t size = strlen_intercept(memory, s);
+
+  if (size == kBadAddr) {
+    STRACE_ERROR(libc_strlen, "ptr=%" PRIxADDR, s);
+    return memory;
+  }
+
+  STRACE_SUCCESS(libc_strlen, "ptr=%, len=%" PRIxADDR, s, size);
+
+  return intercept.SetReturn(memory, state, size);
+}
+
+
+template <typename ABI>
+static Memory *Intercept_strncmp(Memory *memory, State *state,
+                              const ABI &intercept) {
+  return memory;
+}
+
+template <typename ABI>
+static Memory *Intercept_strcmp(Memory *memory, State *state,
+                              const ABI &intercept) {
+  return memory;
+}
 
 }  // namespace
