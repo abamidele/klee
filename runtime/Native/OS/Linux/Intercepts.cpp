@@ -160,12 +160,18 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
-  addr_t new_ptr = 0;
-  if (!ptr) {
-    new_ptr = malloc_intercept(memory, alloc_size);
-  } else {
-    new_ptr = realloc_intercept(memory, ptr, alloc_size);
+  if (!alloc_size) {
+    if (ptr && !free_intercept(memory, ptr)) {
+
+      STRACE_ERROR(libc_realloc, "Error freeing old_ptr=%" PRIxADDR, ptr);
+    }
+
+    STRACE_SUCCESS(libc_realloc, "old_ptr=%" PRIxADDR ", new_size=%" PRIdADDR ", new_ptr=%" PRIxADDR,
+                   ptr, alloc_size, 0);
+    return intercept.SetReturn(memory, state, 0);
   }
+
+  addr_t new_ptr = realloc_intercept(memory, ptr, alloc_size);
 
   if (new_ptr == kBadAddr) {
     STRACE_ERROR(libc_realloc, "Falling back to real realloc for ptr=%" PRIxADDR
@@ -189,8 +195,8 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     klee_abort();
 
   } else {
-    STRACE_SUCCESS(libc_realloc, "Realloc of ptr=%" PRIxADDR " to %" PRIxADDR,
-                   ptr, new_ptr);
+    STRACE_SUCCESS(libc_realloc, "old_ptr=%" PRIxADDR ", new_size=%" PRIdADDR ", new_ptr=%" PRIxADDR,
+                   ptr, alloc_size, new_ptr);
     return intercept.SetReturn(memory, state, new_ptr);
   }
 }

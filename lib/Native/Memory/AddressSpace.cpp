@@ -202,8 +202,8 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     return kBadAddr;
   }
 
-  if (address.must_be_0x1 != 0x1 ||
-      address.must_be_0xa != 0xa) {
+  if (addr && (address.must_be_0x1 != 0x1 ||
+               address.must_be_0xa != 0xa)) {
     return kBadAddr;
   }
 
@@ -241,13 +241,13 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   const size_t old_size = address.size;
   const auto old_alloc_index = address.alloc_index;
 
-  if (old_alloc_index >= old_alloc_list.allocations.size()) {
+  if (addr && old_alloc_index >= old_alloc_list.allocations.size()) {
     LOG(ERROR)
         << "Bad old realloc address";
     return kReallocInvalidPtr;
   }
 
-  if (old_alloc_list.free_list[old_alloc_index]) {
+  if (addr && old_alloc_list.free_list[old_alloc_index]) {
     LOG(ERROR)
         << "Cannot realloc on a freed memory region";
     return kReallocFreedPtr;
@@ -257,23 +257,26 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   new_address.flat = new_addr;
 
   // Migrate the old data.
-  auto &old_bytes = old_alloc_list.allocations[old_alloc_index];
-  auto &new_bytes = new_alloc_list.allocations[new_address.alloc_index];
-  const auto it_end = symbolic_memory.end();
-  for (size_t i = 0, max_i = std::min(old_size, alloc_size); i < max_i; ++i) {
-    uint8_t byte = old_bytes->at(i);
-    if (byte == kSymbolicByte) {
-      auto it = symbolic_memory.find(addr + i);
-      if (it != it_end) {
-        auto sym_val = it->second;
-        symbolic_memory.erase(it);
-        symbolic_memory[new_addr + i] = sym_val;
+  if (addr) {
+    auto &old_bytes = old_alloc_list.allocations[old_alloc_index];
+    auto &new_bytes = new_alloc_list.allocations[new_address.alloc_index];
+    const auto it_end = symbolic_memory.end();
+    for (size_t i = 0, max_i = std::min(old_size, alloc_size); i < max_i; ++i) {
+      uint8_t byte = old_bytes->at(i);
+      if (byte == kSymbolicByte) {
+        auto it = symbolic_memory.find(addr + i);
+        if (it != it_end) {
+          auto sym_val = it->second;
+          symbolic_memory.erase(it);
+          symbolic_memory[new_addr + i] = sym_val;
+        }
       }
+      new_bytes->at(i) = byte;
     }
-    new_bytes->at(i) = byte;
+
+    CHECK(TryFree(addr));
   }
 
-  CHECK(TryFree(addr));
   return new_addr;
 }
 
