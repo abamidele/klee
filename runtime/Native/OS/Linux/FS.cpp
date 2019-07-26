@@ -488,7 +488,6 @@ static Memory *SysLstat(Memory *memory, State *state, const ABI &syscall) {
     return syscall.SetReturn(memory, state, -err);
   }
 
-
   struct stat info = {};
   FillStat(info);
 

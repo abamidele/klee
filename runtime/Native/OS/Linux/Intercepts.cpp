@@ -100,6 +100,11 @@ static Memory *Intercept_free(Memory *memory, State *state,
     return intercept.SetReturn(memory, state, 0);
   }
 
+  if (!address) {
+    STRACE_SUCCESS(libc_free, "ptr=%" PRIxADDR, address);
+    return intercept.SetReturn(memory, state, 0);
+  }
+
   if (!free_intercept(memory, address)) {
     STRACE_ERROR(libc_free, "Falling back to real free for ptr=%" PRIxADDR,
                  address);
