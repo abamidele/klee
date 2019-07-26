@@ -355,11 +355,13 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
           src_uint + i << std::dec << " During strcnpy";
       executor.terminateStateOnError(
           state, "Failed Read on strncpy from src" , Executor::Assert);
+      break;
     } else if (!mem->TryWrite(dest_uint+i, val)) {
       LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
           src_uint + i << std::dec << " During strncpy";
       executor.terminateStateOnError(
           state, "Failed Write on strncpy To Dest" , Executor::Assert);
+      break;
 
     } else if (val == klee::native::kSymbolicByte ) {
     // copy symbol from src_uint + i to dest_uint + i
@@ -473,11 +475,13 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
           src_uint + i << std::dec << " During strcpy";
       executor.terminateStateOnError(
           state, "Failed Read on strcpy from src" , Executor::Assert);
+      break;
     } else if (!mem->TryWrite(dest_uint+i, val)) {
       LOG(ERROR) << "Cannot Write To Dest " << std::hex <<
           src_uint + i << std::dec << " During strcpy";
       executor.terminateStateOnError(
           state, "Failed Write on strcpy To Dest" , Executor::Assert);
+      break;
 
     } else if (val == klee::native::kSymbolicByte ) {
     // copy symbol from src_uint + i to dest_uint + i
