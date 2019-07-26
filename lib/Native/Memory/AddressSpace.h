@@ -71,26 +71,6 @@ class AddressSpace : public Memory {
   __attribute__((hot)) bool TryRead(uint64_t addr, uint8_t *val);
   __attribute__((hot)) bool TryWrite(uint64_t addr, uint8_t val);
 
-  // Read/write a word to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, uint16_t *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, uint16_t val);
-
-  // Read/write a dword to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, uint32_t *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, uint32_t val);
-
-  // Read/write a qword to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, uint64_t *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, uint64_t val);
-
-  // Read/write a float to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, float *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, float val);
-
-  // Read/write a double to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, double *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, double val);
-
   // Return the virtual address of the memory backing `addr`.
   __attribute__((hot)) void *ToReadWriteVirtualAddress(uint64_t addr);
 

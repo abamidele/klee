@@ -238,12 +238,14 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
   const auto old_alloc_index = address.alloc_index;
 
   if (old_alloc_index >= old_alloc_list.allocations.size()) {
-    LOG(ERROR) << "Bad old realloc address";
+    LOG(ERROR)
+        << "Bad old realloc address";
     return kReallocInvalidPtr;
   }
 
   if (old_alloc_list.free_list[old_alloc_index]) {
-    LOG(ERROR) << "Cannot realloc on a freed memory region";
+    LOG(ERROR)
+        << "Cannot realloc on a freed memory region";
     return kReallocFreedPtr;
   }
 
@@ -494,9 +496,10 @@ static std::vector<MemoryMapPtr> RemoveRange(
   std::vector<MemoryMapPtr> new_ranges;
   new_ranges.reserve(ranges.size() + 1);
 
-  DLOG_IF(INFO, FLAGS_verbose)<< "  RemoveRange: [" << std::hex << base << ", "
-  << std::hex << limit << ") from list of "
-  << ranges.size() << " ranges";
+  DLOG_IF(INFO, FLAGS_verbose)
+      << "  RemoveRange: [" << std::hex << base << ", "
+      << std::hex << limit << ") from list of "
+      << ranges.size() << " ranges";
 
   for (auto &map : ranges) {
     auto map_base_address = map->BaseAddress();
@@ -504,28 +507,29 @@ static std::vector<MemoryMapPtr> RemoveRange(
 
     // No overlap between `map` and the range to remove.
     if (map_limit_address <= base || map_base_address >= limit) {
-      DLOG_IF(INFO, FLAGS_verbose)<< "    Keeping with no overlap ["
-      << std::hex << map_base_address << ", "
-      << std::hex << map_limit_address << ")";
+      DLOG_IF(INFO, FLAGS_verbose)
+          << "    Keeping with no overlap ["
+          << std::hex << map_base_address << ", "
+          << std::hex << map_limit_address << ")";
       new_ranges.push_back(map);
 
       // `map` is fully contained in the range to remove.
     } else if (map_base_address >= base && map_limit_address <= limit) {
       DLOG_IF(INFO, FLAGS_verbose)
-      << "    Removing with full containment ["
-      << std::hex << map_base_address << ", "
-      << std::hex << map_limit_address << ")";
+          << "    Removing with full containment ["
+          << std::hex << map_base_address << ", "
+          << std::hex << map_limit_address << ")";
       continue;
 
       // The range to remove is fully contained in `map`.
     } else if (map_base_address < base && map_limit_address > limit) {
       DLOG_IF(INFO, FLAGS_verbose)
-      << "    Splitting with overlap ["
-      << std::hex << map_base_address << ", "
-      << std::hex << map_limit_address << ") into "
-      << "[" << std::hex << map_base_address << ", "
-      << std::hex << base << ") and ["
-      << std::hex << limit << ", " << std::hex << map_limit_address << ")";
+          << "    Splitting with overlap ["
+          << std::hex << map_base_address << ", "
+          << std::hex << map_limit_address << ") into "
+          << "[" << std::hex << map_base_address << ", "
+          << std::hex << base << ") and ["
+          << std::hex << limit << ", " << std::hex << map_limit_address << ")";
 
       new_ranges.push_back(map->Copy(map_base_address, base));
       new_ranges.push_back(map->Copy(limit, map_limit_address));
@@ -533,16 +537,16 @@ static std::vector<MemoryMapPtr> RemoveRange(
       // The range to remove is a prefix of `map`.
     } else if (map_base_address == base) {
       DLOG_IF(INFO, FLAGS_verbose)
-      << "    Keeping prefix [" << std::hex << limit << ", "
-      << std::hex << map_limit_address << ")";
+          << "    Keeping prefix [" << std::hex << limit << ", "
+          << std::hex << map_limit_address << ")";
       new_ranges.push_back(map->Copy(limit, map_limit_address));
 
       // The range to remove is a suffix of `map`.
     } else {
       DLOG_IF(INFO, FLAGS_verbose)
-      << "    Keeping suffix ["
-      << std::hex << map_base_address << ", "
-      << std::hex << base << ")";
+          << "    Keeping suffix ["
+          << std::hex << map_base_address << ", "
+          << std::hex << base << ")";
       new_ranges.push_back(map->Copy(map_base_address, base));
     }
   }
@@ -585,16 +589,19 @@ void AddressSpace::AddMap(uint64_t base_, size_t size, const char *name,
   auto limit = std::min(base + RoundUpToPage(size), addr_mask);
 
   if (unlikely(is_dead)) {
-    LOG(ERROR) << "Trying to map range [" << std::hex << base << ", " << limit
+    LOG(ERROR)
+        << "Trying to map range [" << std::hex << base << ", " << limit
         << ") in destroyed address space." << std::dec;
     return;
   }
 
-  CHECK((base & addr_mask) == base)<< "Base address " << std::hex << base << " cannot fit into mask "
-  << addr_mask << std::dec << "; are you trying to map a 64-bit address "
-  << "into a 32-bit address space?";
+  CHECK((base & addr_mask) == base)
+      << "Base address " << std::hex << base << " cannot fit into mask "
+      << addr_mask << std::dec << "; are you trying to map a 64-bit address "
+      << "into a 32-bit address space?";
 
-  LOG(INFO) << "Mapping range [" << std::hex << base << ", " << limit << ")"
+  LOG(INFO)
+      << "Mapping range [" << std::hex << base << ", " << limit << ")"
       << std::dec;
 
   auto new_map = MappedRange::Create(base, limit, name, offset);
@@ -603,7 +610,8 @@ void AddressSpace::AddMap(uint64_t base_, size_t size, const char *name,
 
   auto old_ranges = RemoveRange(maps, base, limit);
   if (old_ranges.size() < maps.size()) {
-    LOG(INFO) << "New map [" << std::hex << base << ", " << limit << ")"
+    LOG(INFO)
+        << "New map [" << std::hex << base << ", " << limit << ")"
         << " overlapped with " << std::dec << (maps.size() - old_ranges.size())
         << " existing maps";
   }
@@ -617,14 +625,16 @@ void AddressSpace::RemoveMap(uint64_t base_, size_t size) {
   auto limit = std::min(base + RoundUpToPage(size), addr_mask);
 
   if (unlikely(is_dead)) {
-    LOG(ERROR) << "Trying to map range [" << std::hex << base << ", " << limit
+    LOG(ERROR)
+        << "Trying to map range [" << std::hex << base << ", " << limit
         << ") in destroyed address space." << std::dec;
     return;
   }
 
-  CHECK((base & addr_mask) == base)<< "Base address " << std::hex << base << " cannot fit into mask "
-  << addr_mask << std::dec << "; are you trying to remove a 64-bit address "
-  << "from a 32-bit address space?";
+  CHECK((base & addr_mask) == base)
+      << "Base address " << std::hex << base << " cannot fit into mask "
+      << addr_mask << std::dec << "; are you trying to remove a 64-bit address "
+      << "from a 32-bit address space?";
 
   LOG(INFO) << "Unmapping range [" << std::hex << base << ", " << limit << ")"
       << std::dec;
@@ -633,7 +643,8 @@ void AddressSpace::RemoveMap(uint64_t base_, size_t size) {
   CHECK(!maps.empty());
   auto old_ranges = RemoveRange(maps, base, limit);
   if (old_ranges.size() < maps.size()) {
-    LOG(INFO) << "New invalid map [" << std::hex << base << ", " << limit << ")"
+    LOG(INFO)
+        << "New invalid map [" << std::hex << base << ", " << limit << ")"
         << " overlapped with " << std::dec << (maps.size() - old_ranges.size())
         << " existing maps";
   }
@@ -862,9 +873,9 @@ void AddressSpace::LogMaps(std::ostream &os) const {
     std::stringstream ss;
     auto flags = ss.flags();
     ss << "  [" << std::hex << std::setw((int32_t) (arch->address_size / 4))
-        << std::setfill('0') << range->BaseAddress() << ", " << std::hex
-        << std::setw((int32_t) (arch->address_size) / 4) << std::setfill('0')
-        << range->LimitAddress() << ")";
+       << std::setfill('0') << range->BaseAddress() << ", " << std::hex
+       << std::setw((int32_t) (arch->address_size) / 4) << std::setfill('0')
+       << range->LimitAddress() << ")";
     ss.setf(flags);
 
     auto virt = range->ToReadOnlyVirtualAddress(range->BaseAddress());
