@@ -406,7 +406,6 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   executor.bindLocal(target, state, dest);
 
   uint8_t val = 0;
-  uint64_t i = 0;
   auto zero = ConstantExpr::create(0,8);
 
   for (size_t i = 0; i < n_uint; ++i) {
@@ -534,7 +533,6 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
   executor.bindLocal(target, state, dest);
 
   uint8_t val = 0;
-  uint64_t i = 0;
   auto zero = ConstantExpr::create(0,8);
 
   for (size_t i = 0; ; ++i) {
@@ -615,10 +613,6 @@ void SpecialFunctionHandler::handle__intercept_realloc(
   auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  //LOG(INFO) << "ptr is : " << std::hex << ptr_uint;
-  //LOG(INFO) << "mem is : " << mem_uint;
-  //LOG(INFO) << "size is : " << size;
-
   uint64_t addr = mem->TryRealloc(ptr_uint, size);
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
@@ -642,14 +636,14 @@ void SpecialFunctionHandler::handle__intercept_calloc(
 void SpecialFunctionHandler::handle__intercept_strtol(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr>> &arguments) {
-
-  auto nptr_val = executor.toUnique(state, arguments[0]);
-  auto end_ptr_val = executor.toUnique(state, arguments[1]);
-  auto base_val = executor.toUnique(state, arguments[2]);
-
-  auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
-  ref<Expr> read_byte;
-  int size = 0;
+//
+//  auto nptr_val = executor.toUnique(state, arguments[0]);
+//  auto end_ptr_val = executor.toUnique(state, arguments[1]);
+//  auto base_val = executor.toUnique(state, arguments[2]);
+//
+//  auto nptr = dyn_cast<ConstantExpr>(nptr_val)->getZExtValue();
+//  ref<Expr> read_byte;
+//  int size = 0;
 
   exit(0);
 }
