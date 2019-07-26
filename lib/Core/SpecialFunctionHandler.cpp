@@ -1026,7 +1026,7 @@ void SpecialFunctionHandler::set_up_dirent_struct(struct dirent *info,
   dirent_entry[3] = info->d_type;
   auto len = strnlen(info->d_name, sizeof(info->d_name));
   dirent_entry_name.resize(len);
-  mempcy(&(dirent_entry_name[0]), info->d_name, len);
+  memcpy(&(dirent_entry_name[0]), info->d_name, len);
   if (dirent_entry_name.empty() || !dirent_entry_name.back()) {
     dirent_entry_name.push_back('\0');
   }
