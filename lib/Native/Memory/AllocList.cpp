@@ -117,20 +117,11 @@ bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
   }
 
   if (address.offset >= address.size) {
-    if (address.size < 16 && address.offset < 16) {
-      LOG(WARNING)
-          << "Permitted heap address overflow on memory read address "
-          << std::hex << addr << std::dec << " for object whose size is "
-          << " less than 16 bytes";
-      *byte_out = 0;
-      return true;
-
-    } else {
-      LOG(ERROR)
-          << "Heap address overflow on memory read address "
-          << std::hex << addr << std::dec;
-      return false;
-    }
+    LOG(ERROR)
+        << "Heap address overflow on memory read address "
+        << std::hex << addr << std::dec;
+    *byte_out = 0;
+    return true;
   }
 
   *byte_out = allocations[address.alloc_index]->at(address.offset);
