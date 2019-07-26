@@ -1587,7 +1587,6 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
 
   auto new_errno = errno;
   if (new_errno != old_errno){
-    LOG(INFO) << "ERRNO IS DIFFERENT on " << f->getName().str();
     int *errno_addr = getErrnoLocation(state);
     ObjectPair result;
     bool resolved = state.addressSpace.resolveOne(

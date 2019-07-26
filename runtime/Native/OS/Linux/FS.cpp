@@ -715,9 +715,9 @@ static Memory *SysReadLinkAt(Memory *memory, State *state, const ABI &syscall) {
   return syscall.SetReturn(memory, state, ret);
 }
 
-extern "C" bool my_readdir(DIR *dirp);
-extern "C" unsigned get_dirent_index(int index);
-extern "C" char* get_dirent_name();
+extern "C" bool __kleemill_readdir(DIR *dirp);
+extern "C" uint64_t __kleemill_readdir_val(int index);
+extern "C" const char *__kleemill_readdir_name(void);
 
 template<typename ABI>
 static Memory *SysGetDirEntries64(Memory *memory, State *state,
@@ -764,22 +764,23 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
     if (written) {
       pos = telldir(dir);
     }
-    auto our_entry_bool = my_readdir(dir);
-    struct dirent our_entry;
+    auto our_entry_bool = __kleemill_readdir(dir);
+    struct dirent our_entry = {};
     if (!our_entry_bool) {
       break;
     }
 
-    our_entry.d_ino = get_dirent_index(0);
-    our_entry.d_off = get_dirent_index(1);
-    
-    our_entry.d_reclen = get_dirent_index(2);
-
-    our_entry.d_type = get_dirent_index(3);
-
-    puts(get_dirent_name());
+    our_entry.d_ino = static_cast<decltype(our_entry.d_ino)>(__kleemill_readdir_val(0));
+#ifdef __APPLE__
+    our_entry.d_seekoff = static_cast<decltype(our_entry.d_seekoff)>(__kleemill_readdir_val(1));
+#else
+    our_entry.d_off = static_cast<decltype(our_entry.d_off)>(__kleemill_readdir_val(1));
+#endif
+    our_entry.d_reclen = static_cast<decltype(our_entry.d_reclen)>(__kleemill_readdir_val(2));
+    our_entry.d_type = static_cast<decltype(our_entry.d_type)>(__kleemill_readdir_val(3));
     our_entry.d_name[0] = 0;
-    //strcpy(our_entry.d_name,get_dirent_name()); 
+
+    strcpy(our_entry.d_name, __kleemill_readdir_name());
     struct linux_dirent64 entry = { };
     auto name_len = strlen(our_entry.d_name);
     auto entry_addr = dirent + written;
@@ -798,7 +799,7 @@ static Memory *SysGetDirEntries64(Memory *memory, State *state,
 
     entry.d_ino = static_cast<decltype(entry.d_ino)>(our_entry.d_ino);
 #ifdef __APPLE__
-    entry.d_off = static_cast<decltype(entry.d_off)>(our_entry.d_seekoff);
+    entry.d_off = static_cast<decltype(entry.d_off)>(pos);
 #else
     entry.d_off = static_cast<decltype(entry.d_off)>(our_entry.d_off);
 #endif

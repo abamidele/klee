@@ -168,7 +168,7 @@ static Memory *Intercept_realloc(Memory *memory, State *state,
     return memory;
 
   } else if (kReallocInternalPtr == new_ptr) {
-    STRACE_ERROR(libc_realloc, "Can't realloc displaced malloc addr=" PRIxADDR, ptr);
+    STRACE_ERROR(libc_realloc, "Can't realloc displaced malloc addr=%" PRIxADDR, ptr);
     klee_abort();
 
   } else if (kReallocTooBig == new_ptr) {
@@ -352,7 +352,7 @@ static Memory *Intercept_strlen(Memory *memory, State *state,
     return memory;
   }
 
-  STRACE_SUCCESS(libc_strlen, "ptr=%, len=%" PRIxADDR, s, size);
+  STRACE_SUCCESS(libc_strlen, "ptr=%" PRIxADDR ", len=%" PRIxADDR, s, size);
 
   return intercept.SetReturn(memory, state, size);
 }

@@ -51,9 +51,8 @@ class SpecialFunctionHandler {
   std::vector<uint64_t> fstat_vector;
   std::vector<uint64_t> sym_addrs;
  
-
-  struct dirent dirent_entry;
-  std::string entry_name;
+  std::vector<uint64_t> dirent_entry;
+  std::string dirent_entry_name;
 
   handlers_ty handlers;
   class Executor &executor;
@@ -129,7 +128,7 @@ class SpecialFunctionHandler {
   std::string readStringAtAddress(ExecutionState &state, ref<Expr> address);
 
   void set_up_fstat_struct(struct stat *info);
-  void set_up_dirent_struct(struct dirent *info);
+  void set_up_dirent_struct(struct dirent *info, long offset);
 
 
   ref<Expr> runtime_read_memory(native::AddressSpace * mem,

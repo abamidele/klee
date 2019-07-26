@@ -204,9 +204,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("__kleemill_stat_val", handle_get_fstat_index, true),
     add("stat64", handle__stat64, true),
     add("my_openat", handle_openat64, true),
-    add("get_dirent_index", handle_get_dirent_index, true),
-    add("get_dirent_name", handle_get_dirent_name, true),
-    add("my_readdir", handle__my_readdir, true),
+    add("__kleemill_readdir_val", handle_get_dirent_index, true),
+    add("__kleemill_readdir_name", handle_get_dirent_name, true),
+    add("__kleemill_readdir", handle__my_readdir, true),
     add("klee_init_remill_memory", handle_klee_init_remill_mem, false),
 
     /* libc intercepts*/
@@ -1004,7 +1004,7 @@ void SpecialFunctionHandler::handle_get_dirent_name(
     std::vector<ref<Expr>> &arguments) {
   executor.bindLocal(
       target, state,
-      Expr::createPointer(reinterpret_cast<uintptr_t>(dirent_entry.d_name)));
+      Expr::createPointer(reinterpret_cast<uintptr_t>(dirent_entry_name.data())));
 }
 
 void SpecialFunctionHandler::handle_get_dirent_index(
@@ -1014,34 +1014,22 @@ void SpecialFunctionHandler::handle_get_dirent_index(
   auto dirent_index_val = executor.toUnique(state, arguments[0]);
   auto index_uint =
       llvm::dyn_cast<ConstantExpr>(dirent_index_val)->getZExtValue();
-  unsigned field;
-  switch (index_uint) {
-    case 0: {
-      field = dirent_entry.d_ino;
-      break;
-    }
-    case 1: {
-      field = dirent_entry.d_off;
-      break;
-    }
-    case 2: {
-      field = dirent_entry.d_reclen;
-      break;
-    }
-    case 3: {
-      field = dirent_entry.d_type;
-      break;
-    }
-  }
-  executor.bindLocal(target, state, ConstantExpr::create(field, Expr::Int64));
+  executor.bindLocal(target, state, ConstantExpr::create(dirent_entry[index_uint], Expr::Int64));
 }
 
-void SpecialFunctionHandler::set_up_dirent_struct(struct dirent *info) {
-  dirent_entry.d_ino = info->d_ino;
-  dirent_entry.d_off = info->d_off;
-  dirent_entry.d_reclen = info->d_reclen;
-  dirent_entry.d_type = info->d_type;
-  strcpy(dirent_entry.d_name, info->d_name);
+void SpecialFunctionHandler::set_up_dirent_struct(struct dirent *info,
+                                                  long offset) {
+  dirent_entry.resize(4);
+  dirent_entry[0] = info->d_ino;
+  dirent_entry[1] = static_cast<uint64_t>(offset);
+  dirent_entry[2] = info->d_reclen;
+  dirent_entry[3] = info->d_type;
+  auto len = strnlen(info->d_name, sizeof(info->d_name));
+  dirent_entry_name.resize(len);
+  mempcy(&(dirent_entry_name[0]), info->d_name, len);
+  if (dirent_entry_name.empty() || !dirent_entry_name.back()) {
+    dirent_entry_name.push_back('\0');
+  }
 }
 
 void SpecialFunctionHandler::handle__my_readdir(
@@ -1052,13 +1040,14 @@ void SpecialFunctionHandler::handle__my_readdir(
   auto dir_uint = llvm::dyn_cast<ConstantExpr>(dir_val)->getZExtValue();
 
   auto dir = reinterpret_cast<DIR *>(dir_uint);
+  auto offset = telldir(dir);
   auto dirent = readdir(dir);
 
   // must set errno
   if (!dirent) {
     executor.bindLocal(target, state, ConstantExpr::create(false, Expr::Bool));
   } else {
-    set_up_dirent_struct(dirent);
+    set_up_dirent_struct(dirent, offset);
     executor.bindLocal(target, state, ConstantExpr::create(true, Expr::Bool));
   }
 }
