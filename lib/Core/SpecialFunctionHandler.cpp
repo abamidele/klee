@@ -630,7 +630,7 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
   auto addr = mem->TryMalloc(size);
-  if (0 < reinterpret_cast<int64_t>(addr)) {
+  if (0 < static_cast<int64_t>(addr)) {
     uint8_t zero = 0;
     for (size_t i = 0; i < size; ++i){
       (void) mem->TryWrite(addr+i, zero);
