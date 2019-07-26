@@ -551,7 +551,7 @@ void SpecialFunctionHandler::handle_strnlen_intercept(
   size_t i = 0;
   auto zero = ConstantExpr::create(0,8);
 
-  for (; i < n; ++i) {
+  for (; i < n_uint; ++i) {
     if (!mem->TryRead(src_uint + i, &val)) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
