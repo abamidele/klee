@@ -197,7 +197,8 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
 
   Address address = {};
   address.flat = addr;
-  if (alloc_size >= (1U << 15U)) {
+  address.size = alloc_size;
+  if (address.size != alloc_size) {
     return kBadAddr;
   }
 
