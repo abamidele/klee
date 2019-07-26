@@ -70,10 +70,13 @@ static uint64_t GetAddressMask(void) {
 }  // namespace
 
 AddressSpace::AddressSpace(void) :
-    page_to_map(256), wnx_page_to_map(256), min_addr(
-        std::numeric_limits<uint64_t>::max()), addr_mask(GetAddressMask()), invalid(
-        MappedRange::CreateInvalid(0, addr_mask)), symbolic_memory(), is_dead(
-        false) {
+    page_to_map(256),
+    wnx_page_to_map(256),
+    min_addr(std::numeric_limits<uint64_t>::max()),
+    addr_mask(GetAddressMask()),
+    invalid(MappedRange::CreateInvalid(0, addr_mask)),
+    symbolic_memory(),
+    is_dead(false) {
   maps.push_back(invalid);
   CreatePageToRangeMap();
 }
