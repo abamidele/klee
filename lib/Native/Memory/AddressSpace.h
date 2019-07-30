@@ -37,6 +37,16 @@ using CodeVersion = uint64_t;
 using PC = uint64_t;
 static const uint8_t kSymbolicByte = 0xff;
 
+static constexpr uint64_t kBadAddr = ~0ULL;
+static constexpr uint64_t kReallocInternalPtr = ~0ULL - 1ULL;
+static constexpr uint64_t kReallocTooBig = ~0ULL - 2ULL;
+static constexpr uint64_t kReallocInvalidPtr = ~0ULL - 3ULL;
+static constexpr uint64_t kReallocFreedPtr = ~0ULL - 4ULL;
+
+
+static constexpr uint64_t kMallocTooBig = ~0ULL - 1ULL;
+
+
 // Basic memory implementation.
 class AddressSpace : public Memory {
  public:

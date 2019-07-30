@@ -46,7 +46,7 @@ C_INTERCEPT(memmove, 0x89)
 C_INTERCEPT(strcpy, 0x8a)
 C_INTERCEPT(strncpy, 0x8b)
 C_INTERCEPT(strlen, 0x8c)
-C_INTERCEPT(strnlen, 0x8d)
+// C_INTERCEPT(strnlen, 0x8d)
 
 //  C_INTERCEPT(strncmp, 0x91) implemented as just LD_PRELOAD
 //  C_INTERCEPT(strcmp, 0x92) implemented as just LD_PRELOAD
