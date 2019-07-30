@@ -59,9 +59,9 @@ namespace native {
 
   bool PolicyHandler::HandleDoubleFree(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
-        << "Use-after-free on memory write addresss "
-        << std::hex << address.flat << std::dec;
-    return false;
+        << "Double free on " << std::hex << address.flat << std::dec
+        << " (size=" << address.size << ", entry=" << address.alloc_index << ")";
+    return true;  // To let it continue.
   }
 
   void PolicyHandler::HandleFreeOffset(AddressSpace *mem, const Address& address) {

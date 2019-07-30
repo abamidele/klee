@@ -16,6 +16,7 @@
 
 #include <glog/logging.h>
 #include "Native/Memory/AllocList.h"
+#include "Native/Memory/PolicyHandler.h"
 
 namespace klee {
 namespace native {
@@ -62,10 +63,7 @@ uint64_t AllocList::Allocate(Address addr) {
 bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler &policy_handler) {
   auto alloc_index = address.alloc_index;
   if (alloc_index >= free_list.size()) {
-    LOG(ERROR)
-        << "Free of unallocated memory (size=" << address.size << ", entry="
-        << alloc_index << ")";
-    return false;
+    return policy_handler.HandleFreeUnallocatedMem(mem, address);
   }
 
   auto is_free = free_list[alloc_index];
