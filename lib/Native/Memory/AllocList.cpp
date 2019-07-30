@@ -59,7 +59,7 @@ uint64_t AllocList::Allocate(Address addr) {
   return addr.flat;
 }
 
-bool AllocList::TryFree(Address address) {
+bool AllocList::TryFree(Address address, PolicyHandler &policy_handler) {
   auto alloc_index = address.alloc_index;
   if (alloc_index >= free_list.size()) {
     LOG(ERROR)
@@ -91,7 +91,7 @@ bool AllocList::TryFree(Address address) {
   return true;
 }
 
-bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
+bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out, PolicyHandler &policy_handler) {
   Address address = {};
   address.flat = addr;
 
@@ -128,7 +128,7 @@ bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out) {
   return true;
 }
 
-bool AllocList::TryWrite(uint64_t addr, uint8_t byte) {
+bool AllocList::TryWrite(uint64_t addr, uint8_t byte, PolicyHandler &policy_handler) {
   Address address = {};
   address.flat = addr;
 

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
 
 namespace klee {
 namespace native {
@@ -22,18 +23,19 @@ namespace native {
 
 class PolicyHandler {
   public:
+    PolicyHandler() = default;
     virtual bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address);
     virtual bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address);
     virtual bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address);
     virtual bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address);
-    virtual bool HandleUseAfterFree(AddressSpace *mem, const Address& address);
-    virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address);
-    virtual void HandleFreeOffset(AddressSpace *mem, const Address& address);
+    virtual bool HandleUseAfterFree(AddressSpace *mem, const Address& address) ;
+    virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address) ;
+    virtual void HandleFreeOffset(AddressSpace *mem, const Address& address) ;
     virtual bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address);
     virtual bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address);
     virtual uint64_t HandleBadRealloc(AddressSpace *mem,
         const Address& address, size_t alloc_size, uint64_t err_type);
-} ;
+};
 
 }//  namespace native
 }//  namespace klee

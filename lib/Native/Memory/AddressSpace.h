@@ -25,6 +25,7 @@
 
 #include "Native/Memory/MappedRange.h"
 #include "Native/Memory/AllocList.h"
+#include "Native/Memory/PolicyHandler.h"
 #include "Core/AddressSpace.h"
 #include "klee/Expr.h"
 
@@ -42,9 +43,9 @@ static constexpr uint64_t kReallocInternalPtr = ~0ULL - 1ULL;
 static constexpr uint64_t kReallocTooBig = ~0ULL - 2ULL;
 static constexpr uint64_t kReallocInvalidPtr = ~0ULL - 3ULL;
 static constexpr uint64_t kReallocFreedPtr = ~0ULL - 4ULL;
-
-
 static constexpr uint64_t kMallocTooBig = ~0ULL - 1ULL;
+
+class PolicyHandler;
 
 
 // Basic memory implementation.
@@ -196,6 +197,8 @@ class AddressSpace : public Memory {
   // Is the address space dead? This means that all operations on it
   // will be muted.
   bool is_dead;
+
+  PolicyHandler policy_handler;
 };
 
 }  // namespace native

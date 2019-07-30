@@ -22,78 +22,70 @@
 namespace klee {
 namespace native {
 
-  bool PolicyHandler::HandleHeapWriteOverflow(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Heap address overflow on memory write address "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  bool PolicyHandler::HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Heap address underflow on memory write address "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  bool PolicyHandler::HandleHeapReadOverflow(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleHeapReadOverflow(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Heap address overflow on memory read address "
         << std::hex << address.flat << std::dec;
     return true;
   }
 
-  bool PolicyHandler::HandleHeapReadUnderflow(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Heap address underflow on memory read address "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  bool PolicyHandler::HandleUseAfterFree(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleUseAfterFree(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Use-after-free on memory read addresss "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  bool PolicyHandler::HandleDoubleFree(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleDoubleFree(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Use-after-free on memory write addresss "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  void PolicyHandler::HandleFreeOffset(AddressSpace *mem, const Address& address){
+  void PolicyHandler::HandleFreeOffset(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Freeing internal pointer " << std::hex << address.flat << std::dec;
     // TODO(sai): Eventually do something more interesting here.
   }
 
-  bool PolicyHandler::HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Free of unallocated memory (size=" << address.size << ", entry="
         << address.alloc_index << ")";
     return false;
   }
 
-  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address){
+  bool PolicyHandler::HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address) {
     LOG(ERROR)
         << "Trying to execute heap-allocated memory at "
         << std::hex << address.flat << std::dec;
     return false;
   }
 
-  const uint64_t HandleBadInternalRealloc(AddressSpace *mem, const Address& address){
-    LOG(ERROR)
-        << "Realloc of internal pointer with size " << address.size
-        << ", index " << address.alloc_index << ", and offset "
-        << std::hex << address.offset << std::dec;
 
-    return kReallocInternalPtr;
-  }
-
-  const uint64_t HandleBadRealloc(AddressSpace *mem,
+  uint64_t PolicyHandler::HandleBadRealloc(AddressSpace *mem,
       const Address& address, size_t alloc_size, uint64_t err_type) {
     switch (err_type) {
       case (kReallocInternalPtr): {
