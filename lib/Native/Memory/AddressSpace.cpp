@@ -148,7 +148,7 @@ bool AddressSpace::TryFree(uint64_t addr) {
   }
 
   auto &alloc_list = alloc_lists[address.size];
-  if (!alloc_list.TryFree(address, policy_handler)) {
+  if (!alloc_list.TryFree(address,this, policy_handler)) {
     return true;
   }
 
@@ -354,7 +354,7 @@ bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
   if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
     auto &alloc_list = alloc_lists[address.size];
     for (size_t offset = 0; offset < size; ++offset) {
-      if (!alloc_list.TryRead(addr + offset, out_stream++, policy_handler)) {
+      if (!alloc_list.TryRead(addr + offset, out_stream++,this, policy_handler)) {
         return false;
       }
     }
@@ -386,7 +386,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
   if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
     auto &alloc_list = alloc_lists[address.size];
     for (size_t offset = 0; offset < size; ++offset) {
-      if (!alloc_list.TryWrite(addr + offset, *in_stream++, policy_handler)) {
+      if (!alloc_list.TryWrite(addr + offset, *in_stream++, this, policy_handler)) {
         return false;
       }
     }
@@ -432,7 +432,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
   //            in `AllocList::TryRead` to report a possible underflow.
   if (address.must_be_0xa == 0xa) {
     auto &alloc_list = alloc_lists[address.size];
-    return alloc_list.TryRead(addr, val_out, policy_handler);
+    return alloc_list.TryRead(addr, val_out,this, policy_handler);
   } else {
     return FindRange(addr).Read(addr, val_out);
   }
@@ -447,7 +447,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
   //            in `AllocList::TryRead` to report a possible underflow.
   if (address.must_be_0xa == 0xa) {
     auto &alloc_list = alloc_lists[address.size];
-    return alloc_list.TryWrite(addr, val, policy_handler);
+    return alloc_list.TryWrite(addr, val,this, policy_handler);
   } else {
     if (likely(FindWNXRange(addr).Write(addr, val))) {
       return true;

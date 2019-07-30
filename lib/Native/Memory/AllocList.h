@@ -34,6 +34,7 @@ union Address {
   } __attribute__((packed));
 };
 
+class AddressSpace;
 class PolicyHandler;
 
 static uint8_t under_flow_check = 0x0a;
@@ -42,9 +43,9 @@ static uint8_t special_malloc_byte = 0xa;
 class AllocList {
  public:
   uint64_t Allocate(Address addr);
-  bool TryFree(Address addr, PolicyHandler &policy_handler);
-  bool TryRead(uint64_t addr, uint8_t *byte_out, PolicyHandler &policy_handler);
-  bool TryWrite(uint64_t addr, uint8_t byte, PolicyHandler &policy_handler);
+  bool TryFree(Address addr, AddressSpace *mem, PolicyHandler &policy_handler);
+  bool TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, PolicyHandler &policy_handler);
+  bool TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyHandler &policy_handler);
 
   std::vector<bool> free_list;
   std::vector<std::shared_ptr<std::vector<uint8_t>>> allocations;
