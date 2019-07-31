@@ -22,6 +22,7 @@
 #include "Native/Workspace/Workspace.h"
 #include "Native/Memory/Snapshot.h"
 #include "Native/Memory/AddressSpace.h"
+#include "Native/Memory/PolicyHandler.h"
 
 #include "klee/klee.h"
 #include "klee/Interpreter.h"
@@ -202,7 +203,9 @@ int main(int argc, char **argv, char **envp) {
       klee::Interpreter::create(context, interp_options, handler.get());
 
   handler->setInterpreter(executor);
-  executor->setModule(loaded_modules, module_options);
+
+  auto policy_handler = new klee::native::ProxyPolicyHandler();
+  executor->setModule(loaded_modules, module_options, policy_handler);
 
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
   executor->setSymbolicStdin(FLAGS_symbolic_stdin);

@@ -27,10 +27,12 @@ class raw_fd_ostream;
 namespace klee {
 namespace native {
 class AddressSpace;
+class PolicyHandler;
 }  // namespace native
 class ExecutionState;
 class Interpreter;
 class TreeStreamWriter;
+
 
 class InterpreterHandler {
  public:
@@ -117,7 +119,7 @@ class Interpreter {
   /// inserted, and modified for interpretation.
   virtual llvm::Module *
   setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
-            const ModuleOptions &opts) = 0;
+            const ModuleOptions &opts, klee::native::PolicyHandler *ph ) = 0;
 
   // supply a tree stream writer which the interpreter will use
   // to record the concrete path (as a stream of '0' and '1' bytes).

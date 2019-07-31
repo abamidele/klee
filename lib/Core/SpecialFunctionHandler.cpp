@@ -251,7 +251,7 @@ void SpecialFunctionHandler::handle_memset_intercept(
   executor.bindLocal(target, state, dest);
 
   for (size_t i=0; i < n_uint; ++i) {
-    if (!mem->TryWrite(dest_uint + i, static_cast<uint8_t>(c_uint))) {
+    if (!mem->TryWrite(dest_uint + i, static_cast<uint8_t>(c_uint), executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
           << " during memset";
@@ -283,7 +283,7 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
   for (size_t i = 0; i < n_uint; ++i) {
     uint8_t val = 0;
 
-    if (!mem->TryRead(src_uint + i, &val)) {
+    if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during memcpy";
@@ -291,7 +291,7 @@ void SpecialFunctionHandler::handle_memcpy_intercept(
           state, "Failed read in memcpy" , Executor::Assert);
       return;
 
-    } else if (!mem->TryWrite(dest_uint+i, val)) {
+    } else if (!mem->TryWrite(dest_uint+i, val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot write to " << std::hex << (dest_uint + i)
           << std::dec << " during memcpy";
@@ -332,11 +332,11 @@ void SpecialFunctionHandler::handle_memmove_intercept(
     for (size_t i = 0; i < n_uint; ++i) {
       uint8_t val = 0;
 
-      if (!mem->TryRead(src_uint + i, &val)) {
+      if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
         error_addr = src_uint + i;
         goto report_read_error;
 
-      } else if (!mem->TryWrite(dest_uint + i, val)) {
+      } else if (!mem->TryWrite(dest_uint + i, val, executor.policy_handler.get())) {
         error_addr = dest_uint + i;
         goto report_write_error;
 
@@ -354,11 +354,11 @@ void SpecialFunctionHandler::handle_memmove_intercept(
     auto dest_end = dest_uint + n_uint;
     for (size_t i = 1; i <= n_uint; ++i) {
       uint8_t val;
-      if (!mem->TryRead(src_end - i, &val)) {
+      if (!mem->TryRead(src_end - i, &val, executor.policy_handler.get())) {
         error_addr = src_end - i;
         goto report_read_error;
 
-      } else if (!mem->TryWrite(dest_end - i, val)) {
+      } else if (!mem->TryWrite(dest_end - i, val, executor.policy_handler.get())) {
         error_addr = dest_end - i;
         goto report_write_error;
 
@@ -412,7 +412,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   auto zero = ConstantExpr::create(0,8);
 
   for (size_t i = 0; i < n_uint; ++i) {
-    if (!mem->TryRead(src_uint + i, &val)) {
+    if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during strncpy";
@@ -420,7 +420,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
           state, "Failed read in strncpy" , Executor::Assert);
       return;
 
-    } else if (!mem->TryWrite(dest_uint + i, val)) {
+    } else if (!mem->TryWrite(dest_uint + i, val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
           << " during strncpy";
@@ -439,7 +439,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
           val = 0;
 
           // Opportunistically zero out that byte.
-          if (mem->TryWrite(src_uint + i, val)) {
+          if (mem->TryWrite(src_uint + i, val, executor.policy_handler.get())) {
             mem->symbolic_memory.erase(src_uint + i);
 
           // Unable to opportunistically write out zero; then force the symbolic
@@ -449,7 +449,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
           }
 
           mem->symbolic_memory.erase(dest_uint + i);
-          mem->TryWrite(dest_uint + i, val);
+          mem->TryWrite(dest_uint + i, val, executor.policy_handler.get());
         }
       }
 
@@ -463,7 +463,7 @@ void SpecialFunctionHandler::handle_strncpy_intercept(
   }
 
   for (size_t i = 0; i < n_uint; ++i) {
-    if (!mem->TryWrite(dest_uint + i, val)) {
+    if (!mem->TryWrite(dest_uint + i, val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot write trailing zero byte to "
           << std::hex << (dest_uint + i) << std::dec
@@ -491,7 +491,7 @@ void SpecialFunctionHandler::handle_strlen_intercept(
   auto zero = ConstantExpr::create(0,8);
 
   for (; ; ++i) {
-    if (!mem->TryRead(src_uint + i, &val)) {
+    if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during strlen";
@@ -512,7 +512,7 @@ void SpecialFunctionHandler::handle_strlen_intercept(
           val = 0;
 
           // Opportunistically zero out that byte.
-          if (mem->TryWrite(src_uint + i, val)) {
+          if (mem->TryWrite(src_uint + i, val, executor.policy_handler.get())) {
             mem->symbolic_memory.erase(src_uint + i);
 
           // Unable to opportunistically write out zero; then force the symbolic
@@ -552,7 +552,7 @@ void SpecialFunctionHandler::handle_strnlen_intercept(
   auto zero = ConstantExpr::create(0,8);
 
   for (; i < n_uint; ++i) {
-    if (!mem->TryRead(src_uint + i, &val)) {
+    if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during strnlen";
@@ -573,7 +573,7 @@ void SpecialFunctionHandler::handle_strnlen_intercept(
           val = 0;
 
           // Opportunistically zero out that byte.
-          if (mem->TryWrite(src_uint + i, val)) {
+          if (mem->TryWrite(src_uint + i, val, executor.policy_handler.get())) {
             mem->symbolic_memory.erase(src_uint + i);
 
           // Unable to opportunistically write out zero; then force the symbolic
@@ -612,7 +612,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
   auto zero = ConstantExpr::create(0,8);
 
   for (size_t i = 0; ; ++i) {
-    if (!mem->TryRead(src_uint + i, &val)) {
+    if (!mem->TryRead(src_uint + i, &val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot read from " << std::hex << (src_uint + i) << std::dec
           << " during strncpy";
@@ -620,7 +620,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
           state, "Failed read in strcpy" , Executor::Assert);
       return;
 
-    } else if (!mem->TryWrite(dest_uint + i, val)) {
+    } else if (!mem->TryWrite(dest_uint + i, val, executor.policy_handler.get())) {
       LOG(ERROR)
           << "Cannot write to " << std::hex << (dest_uint + i) << std::dec
           << " during strcpy";
@@ -639,7 +639,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
           val = 0;
 
           // Opportunistically zero out that byte.
-          if (mem->TryWrite(src_uint + i, val)) {
+          if (mem->TryWrite(src_uint + i, val, executor.policy_handler.get())) {
             mem->symbolic_memory.erase(src_uint + i);
 
           // Unable to opportunistically write out zero; then force the symbolic
@@ -649,7 +649,7 @@ void SpecialFunctionHandler::handle_strcpy_intercept(
           }
 
           mem->symbolic_memory.erase(dest_uint + i);
-          mem->TryWrite(dest_uint + i, val);
+          mem->TryWrite(dest_uint + i, val, executor.policy_handler.get());
         }
       }
 
@@ -689,7 +689,7 @@ void SpecialFunctionHandler::handle__intercept_realloc(
   auto ptr_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[2]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  uint64_t addr = mem->TryRealloc(ptr_uint, size);
+  uint64_t addr = mem->TryRealloc(ptr_uint, size, executor.policy_handler.get());
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
@@ -699,11 +699,11 @@ void SpecialFunctionHandler::handle__intercept_calloc(
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  auto addr = mem->TryMalloc(size);
+  auto addr = mem->TryMalloc(size, executor.policy_handler.get());
   if (0 < static_cast<int64_t>(addr)) {
     uint8_t zero = 0;
     for (size_t i = 0; i < size; ++i){
-      (void) mem->TryWrite(addr+i, zero);
+      (void) mem->TryWrite(addr+i, zero, executor.policy_handler.get());
     }
   }
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
@@ -731,7 +731,7 @@ void SpecialFunctionHandler::handle__intercept_malloc(
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto size = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  auto addr = mem->TryMalloc(size);
+  auto addr = mem->TryMalloc(size, executor.policy_handler.get());
   executor.bindLocal(target, state, ConstantExpr::create(addr, 64));
 }
 
@@ -742,7 +742,7 @@ void SpecialFunctionHandler::handle__intercept_free(
   auto mem_uint = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[0]))->getZExtValue();
   auto ptr = dyn_cast<ConstantExpr>(executor.toUnique(state, arguments[1]))->getZExtValue();
   auto mem = executor.Memory(state, mem_uint);
-  executor.bindLocal(target, state, ConstantExpr::create(mem->TryFree(ptr), Expr::Bool));
+  executor.bindLocal(target, state, ConstantExpr::create(mem->TryFree(ptr, executor.policy_handler.get()), Expr::Bool));
 }
 
 
@@ -765,7 +765,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
                            mem, mem_ptr);
   }
 
-  if (!mem->TryWrite(addr_uint, klee::native::kSymbolicByte)) {
+  if (!mem->TryWrite(addr_uint, klee::native::kSymbolicByte, executor.policy_handler.get())) {
     auto addr_space_id = llvm::dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
     std::stringstream ss;
     ss << "Failed 1-byte write of symbol to address 0x"
@@ -787,7 +787,7 @@ ref<Expr> SpecialFunctionHandler::runtime_write_8(ExecutionState &state,
     mem->symbolic_memory.erase(addr_uint);
   }
 
-  if (!mem->TryWrite(addr_uint, val)) {
+  if (!mem->TryWrite(addr_uint, val, executor.policy_handler.get())) {
     auto addr_space_id = llvm::dyn_cast<ConstantExpr>(mem_ptr)->getZExtValue();
     std::stringstream ss;
     ss << "Failed 1-byte write of " << std::hex << unsigned(val)
@@ -1378,7 +1378,7 @@ void SpecialFunctionHandler::handle__kleemill_find_unmapped_address(
       if (auto const_addr = llvm::dyn_cast<klee::ConstantExpr>(addr_val)) { \
         auto addr_uint = const_addr->getZExtValue(); \
         MemoryReadResult result = {}; \
-        if (memory->TryRead(addr_uint, result.as_bytes, num_bytes)) { \
+        if (memory->TryRead(addr_uint, result.as_bytes, num_bytes, executor.policy_handler.get())) { \
           executor.bindLocal( \
               target, state, runtime_read_memory(memory, addr_uint, \
                                                  num_bytes, result)); \

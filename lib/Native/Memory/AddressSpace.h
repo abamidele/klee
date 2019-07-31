@@ -73,14 +73,14 @@ class AddressSpace : public Memory {
   CodeVersion ComputeCodeVersion(PC pc);
 
   __attribute__((hot))
-  bool TryRead(uint64_t addr, void *val, size_t size);
+  bool TryRead(uint64_t addr, void *val, size_t size, PolicyHandler *policy_handler);
 
   __attribute__((hot))
-  bool TryWrite(uint64_t addr, const void *val, size_t size);
+  bool TryWrite(uint64_t addr, const void *val, size_t size, PolicyHandler *policy_handler);
 
   // Read/write a byte to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, uint8_t *val);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, uint8_t val);
+  __attribute__((hot)) bool TryRead(uint64_t addr, uint8_t *val, PolicyHandler *policy_handler);
+  __attribute__((hot)) bool TryWrite(uint64_t addr, uint8_t val, PolicyHandler *policy_handler);
 
   // Return the virtual address of the memory backing `addr`.
   __attribute__((hot)) void *ToReadWriteVirtualAddress(uint64_t addr);
@@ -123,9 +123,9 @@ class AddressSpace : public Memory {
   // Check to see if a given program counter is a trace head.
   bool IsMarkedTraceHead(PC pc) const;
   
-  bool TryFree(uint64_t addr);
-  uint64_t TryMalloc(size_t alloc_size);
-  uint64_t TryRealloc(uint64_t addr, size_t alloc_size);
+  bool TryFree(uint64_t addr, PolicyHandler *policy_handler);
+  uint64_t TryMalloc(size_t alloc_size, PolicyHandler *policy_handler);
+  uint64_t TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandler *policy_handler);
 
 
  private:
@@ -198,7 +198,6 @@ class AddressSpace : public Memory {
   // will be muted.
   bool is_dead;
 
-  PolicyHandler policy_handler;
 };
 
 }  // namespace native

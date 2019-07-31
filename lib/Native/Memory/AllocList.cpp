@@ -30,12 +30,12 @@ uint64_t AllocList::Allocate(Address addr) {
   bool found_free = false;
 
   if (num_free >= kMinNumFree) {
-    if (auto max_j = free_list.size()) {
+    if (auto max_j = zeros.size()) {
       uint64_t i = static_cast<size_t>(rand()) % max_j;
       for (size_t j = 0; j < max_j; ++j) {
         free_slot = (i + j) % max_j;
-        if (free_list[free_slot]) {
-          found_free = true;
+        if (zeros[free_slot]) {
+          found_free = kFreeValue;
           break;
         }
       }
@@ -48,31 +48,28 @@ uint64_t AllocList::Allocate(Address addr) {
   if (!found_free) {
     addr.alloc_index = allocations.size();
     allocations.emplace_back(std::move(mem));
-    free_list.push_back(false);
+    zeros.push_back(0);
 
   } else {
     num_free--;
     addr.alloc_index = free_slot;
     allocations[free_slot] = std::move(mem);
-    free_list[free_slot] = false;
+    zeros[free_slot] = 0;
   }
 
   return addr.flat;
 }
 
-bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler &policy_handler) {
+bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler *policy_handler) {
   auto alloc_index = address.alloc_index;
-  if (alloc_index >= free_list.size()) {
-    return policy_handler.HandleFreeUnallocatedMem(mem, address);
+  if (alloc_index >= zeros.size()) {
+    return policy_handler -> HandleFreeUnallocatedMem(mem, address);
   }
 
-  auto is_free = free_list[alloc_index];
+  auto base = zeros[alloc_index];
 
-  if (is_free) {
-    LOG(ERROR)
-        << "Double free on " << std::hex << address.flat << std::dec
-        << " (size=" << address.size << ", entry=" << alloc_index << ")";
-    return true;  // To let it continue.
+  if (base == kFreeValue) {
+    return policy_handler -> HandleDoubleFree(mem, address);
   }
 
   auto &alloc = allocations[alloc_index];
@@ -85,87 +82,62 @@ bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler &poli
 
   alloc.reset();  // Free the std::vector.
   num_free++;
-  free_list[alloc_index] = true;
+  zeros[alloc_index] = kFreeValue;
   return true;
 }
 
-bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, PolicyHandler &policy_handler) {
+bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, PolicyHandler *policy_handler) {
   Address address = {};
   address.flat = addr;
+  auto base = zeros.at(address.alloc_index);
 
   if (address.alloc_index >= allocations.size()) {
-    LOG(ERROR)
-        << "Invalid memory read address " << std::hex << addr << std::dec
-        << "; out-of-bounds allocation index";
-    return false;
+    return policy_handler -> HandleInvalidOutOfBoundsHeapRead(mem, address);
   }
 
-  if (free_list.at(address.alloc_index)) {
-    LOG(ERROR)
-        << "Use-after-free on memory read addresss "
-        << std::hex << addr << std::dec;
-    return false;
+  if (base == kFreeValue) {
+    policy_handler -> HandleReadUseAfterFree(mem, address);
+
   }
 
   if (address.must_be_0x1 != 0x1) {
-    LOG(ERROR)
-        << "Heap address underflow on memory read address "
-        << std::hex << addr << std::dec;
-    return false;
+    return policy_handler -> HandleHeapReadUnderflow(mem, address);
   }
 
   if (address.offset >= address.size) {
-    LOG(ERROR)
-        << "Heap address overflow on memory read address "
-        << std::hex << addr << std::dec;
-    *byte_out = 0;
-    return true;
+    return policy_handler -> HandleHeapReadOverflow(mem, address, byte_out);
   }
 
-  *byte_out = allocations[address.alloc_index]->at(address.offset);
+
+  *byte_out = allocations[address.alloc_index]->at(base + address.offset);
   return true;
 }
 
-bool AllocList::TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyHandler &policy_handler) {
+bool AllocList::TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyHandler *policy_handler) {
   Address address = {};
   address.flat = addr;
+  auto base = zeros.at(address.alloc_index);
 
   if (address.alloc_index >= allocations.size()) {
-    LOG(ERROR)
-        << "Invalid memory write address " << std::hex << addr << std::dec
-        << "; out-of-bounds allocation index";
-    return false;
+    return policy_handler->HandleInvalidOutOfBoundsHeapWrite(mem, address);
   }
 
-  if (free_list.at(address.alloc_index)) {
-    LOG(ERROR)
-        << "Use-after-free on memory write addresss "
-        << std::hex << addr << std::dec;
-    return false;
+  if (base == kFreeValue) {
+    return policy_handler->HandleWriteUseAfterFree(mem, address);
   }
 
   if (address.must_be_0x1 != 0x1) {
-    LOG(ERROR)
-        << "Heap address underflow on memory write address "
-        << std::hex << addr << std::dec;
-    return false;
+    return policy_handler->HandleHeapWriteUnderflow(mem, address);
   }
 
   if (address.offset >= address.size) {
-    LOG(ERROR)
-        << "Heap address overflow on memory write address "
-        << std::hex << addr << std::dec;
-    return false;
+    return policy_handler->HandleHeapWriteOverflow(mem, address);
   }
 
   auto &alloc_buffer = allocations[address.alloc_index];
+
   if (!alloc_buffer) {
-    LOG(ERROR)
-        << "Error in memory implementation; pseudo-use-after-free on "
-        << std::hex << address.flat << std::dec
-        << " (size=" << address.size << ", entry=" << address.alloc_index
-        << ")";
-    return false;
+    return policy_handler->HandlePseudoUseAfterFree(mem, address);
   }
 
   if (alloc_buffer.use_count() > 1) {
@@ -176,7 +148,7 @@ bool AllocList::TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyH
     alloc_buffer = std::move(new_array);
   }
 
-  allocations[address.alloc_index]->at(address.offset) = byte;
+  allocations[address.alloc_index]->at(base + address.offset) = byte;
   return true;
 }
 

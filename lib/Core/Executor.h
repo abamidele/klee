@@ -81,6 +81,7 @@ class TreeStreamWriter;
 class MergeHandler;
 class StateContinuation;
 class MemoryAccessContinuation;
+class PolicyHandler;
 
 namespace native {
 class TraceManager;
@@ -275,6 +276,8 @@ class Executor : public Interpreter {
   ExprOptimizer optimizer;
 
   bool symbolicStdin;
+
+  std::unique_ptr<klee::native::PolicyHandler> policy_handler;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
@@ -529,7 +532,7 @@ class Executor : public Interpreter {
   }
 
   llvm::Module *setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
-                          const ModuleOptions &opts) override;
+                          const ModuleOptions &opts, klee::native::PolicyHandler *ph) override;
 
   native::AddressSpace *Memory(klee::ExecutionState &state,
                                uintptr_t index);

@@ -22,6 +22,7 @@
 #include "TimingSolver.h"
 
 #include "klee/Solver.h"
+#include "Native/Memory/PolicyHandler.h"
 
 
 namespace klee {
@@ -57,19 +58,19 @@ ExecutionState *MemoryAccessContinuation::YieldNextState(Executor &exe) {
     switch (kind) {
       case MemoryContinuationKind::kContinueRead8:
       case MemoryContinuationKind::kContinueWrite8:
-        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 1);
+        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 1, exe.policy_handler.get());
         break;
       case MemoryContinuationKind::kContinueRead16:
       case MemoryContinuationKind::kContinueWrite16:
-        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 2);
+        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 2, exe.policy_handler.get());
         break;
       case MemoryContinuationKind::kContinueRead32:
       case MemoryContinuationKind::kContinueWrite32:
-        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 4);
+        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 4,exe.policy_handler.get() );
         break;
       case MemoryContinuationKind::kContinueRead64:
       case MemoryContinuationKind::kContinueWrite64:
-        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 8);
+        can_read = curr_mem->TryRead(next_addr, &(val.as_bytes[0]), 8, exe.policy_handler.get());
         break;
     }
 

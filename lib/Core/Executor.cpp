@@ -29,6 +29,7 @@
 #include "Native/Arch/TraceManager.h"
 #include "Native/Memory/AddressSpace.h"
 #include "Native/Util/AreaAllocator.h"
+#include "Native/Memory/PolicyHandler.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -429,7 +430,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
       haltExecution(false),
       ivcEnabled(false),
       debugLogBuffer(debugBufferString),
-      symbolicStdin(false){
+      symbolicStdin(false) {
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -491,11 +492,13 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
 
 llvm::Module *
 Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
-                    const ModuleOptions &opts_) {
+                    const ModuleOptions &opts_, klee::native::PolicyHandler *ph) {
   assert(!kmodule && !modules.empty() && "can only register one module");  // XXX gross
 
   opts = opts_;
   kmodule = std::unique_ptr<KModule>(new KModule());
+
+  policy_handler = std::unique_ptr<klee::native::PolicyHandler>(ph);
 
 
   // 1.) Link the modules together

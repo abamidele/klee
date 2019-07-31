@@ -17,26 +17,106 @@
 
 namespace klee {
 namespace native {
-  class AddressSpace;
-  class AllocList;
-  union Address;
+class AddressSpace;
+class AllocList;
+union Address;
 
 class PolicyHandler {
-  public:
-    PolicyHandler() = default;
-    virtual bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address);
-    virtual bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address);
-    virtual bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address);
-    virtual bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address);
-    virtual bool HandleUseAfterFree(AddressSpace *mem, const Address& address) ;
-    virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address) ;
-    virtual void HandleFreeOffset(AddressSpace *mem, const Address& address) ;
-    virtual bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address);
-    virtual bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address);
-    virtual uint64_t HandleBadRealloc(AddressSpace *mem,
-        const Address& address, size_t alloc_size, uint64_t err_type);
+public:
+  PolicyHandler() = default;
+  virtual ~PolicyHandler() = default;
+  virtual bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleHeapWriteOverflow(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleHeapWriteUnderflow(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
+      uint8_t *byte_out) = 0;
+  virtual bool HandleHeapReadUnderflow(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleReadUseAfterFree(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleWriteUseAfterFree(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandlePseudoUseAfterFree(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address) = 0;
+  virtual void HandleFreeOffset(AddressSpace *mem, const Address& address) = 0;
+  virtual bool HandleFreeUnallocatedMem(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual bool HandleTryExecuteHeapMem(AddressSpace *mem,
+      const Address& address) = 0;
+  virtual uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type) = 0;
+
 };
 
-}//  namespace native
-}//  namespace klee
+class ReportErrorPolicyHandler: public PolicyHandler {
+public:
+  ReportErrorPolicyHandler() = default;
+  bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
+      uint8_t *byte_out) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
+  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandleDoubleFree(AddressSpace *mem, const Address& address) override;
+  void HandleFreeOffset(AddressSpace *mem, const Address& address) override;
+  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address) override;
+  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address) override;
+  uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type) override;
+
+};
+
+class ProxyPolicyHandler: public PolicyHandler {
+public:
+  ProxyPolicyHandler();
+  bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
+      uint8_t *byte_out) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
+  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address) override;
+  bool HandleDoubleFree(AddressSpace *mem, const Address& address) override;
+  void HandleFreeOffset(AddressSpace *mem, const Address& address) override;
+  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address) override;
+  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address) override;
+  uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type) override;
+
+  std::unique_ptr<PolicyHandler> proxy;
+};
+
+class SymbolicBufferPolicy: public ProxyPolicyHandler {
+  SymbolicBufferPolicy() = default;
+  bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
+      const Address& address) override;
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+  bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
+      uint8_t *byte_out) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
+};
+
+
+} //  namespace native
+} //  namespace klee
 

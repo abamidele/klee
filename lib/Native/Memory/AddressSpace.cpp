@@ -97,7 +97,7 @@ AddressSpace::AddressSpace(const AddressSpace &parent) :
 
   // Only copy the lists with non-full free lists.
   for (const auto &size_list : parent.alloc_lists) {
-    if (size_list.second.num_free == size_list.second.free_list.size()) {
+    if (size_list.second.num_free == size_list.second.zeros.size()) {
       continue;
     } else {
       alloc_lists.emplace(size_list.first, size_list.second);
@@ -126,7 +126,7 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
 }
 
 
-bool AddressSpace::TryFree(uint64_t addr) {
+bool AddressSpace::TryFree(uint64_t addr, PolicyHandler *policy_handler) {
   if (is_dead) {
     return kBadAddr;
   }
@@ -159,7 +159,7 @@ bool AddressSpace::TryFree(uint64_t addr) {
   return true;
 }
 
-uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
+uint64_t AddressSpace::TryMalloc(size_t alloc_size, PolicyHandler *policy_handler) {
   if (is_dead) {
     return kBadAddr;
   }
@@ -182,7 +182,7 @@ uint64_t AddressSpace::TryMalloc(size_t alloc_size) {
   return alloc_lists[alloc_size].Allocate(address);
 }
 
-uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
+uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandler *policy_handler) {
   if (is_dead) {
     return kBadAddr;
   }
@@ -239,7 +239,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
     return kReallocInvalidPtr;
   }
 
-  if (addr && old_alloc_list.free_list[old_alloc_index]) {
+  if (addr && (old_alloc_list.zeros[old_alloc_index] == kFreeValue) ) {
     LOG(ERROR)
         << "Cannot realloc on a freed memory region";
     return kReallocFreedPtr;
@@ -266,7 +266,7 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size) {
       new_bytes->at(i) = byte;
     }
 
-    CHECK(TryFree(addr));
+    CHECK(TryFree(addr, policy_handler));
   }
 
   return new_addr;
@@ -346,7 +346,7 @@ bool AddressSpace::CanExecuteAligned(uint64_t addr) const {
   return page_is_executable.count(addr);
 }
 
-bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
+bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size, PolicyHandler *policy_handler) {
   auto addr = addr_ & addr_mask;
   auto out_stream = reinterpret_cast<uint8_t *>(val_out);
   Address address = { };
@@ -377,7 +377,7 @@ bool AddressSpace::TryRead(uint64_t addr_, void *val_out, size_t size) {
   }
 }
 
-bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
+bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size, PolicyHandler *policy_handler) {
   auto addr = addr_ & addr_mask;
   auto in_stream = reinterpret_cast<const uint8_t *>(val);
   Address address = { };
@@ -424,7 +424,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, const void *val, size_t size) {
 }
 
 // Read a byte from memory.
-bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
+bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out, PolicyHandler* policy_handler) {
   const auto addr = addr_ & addr_mask;
   Address address = { };
   address.flat = addr;
@@ -439,7 +439,7 @@ bool AddressSpace::TryRead(uint64_t addr_, uint8_t *val_out) {
 }
 
 // Write a byte to memory.
-bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
+bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val, PolicyHandler *policy_handler) {
   const auto addr = addr_ & addr_mask;
   Address address = { };
   address.flat = addr;
@@ -452,7 +452,7 @@ bool AddressSpace::TryWrite(uint64_t addr_, uint8_t val) {
     if (likely(FindWNXRange(addr).Write(addr, val))) {
       return true;
     } else {
-      return TryWrite(addr, &val, sizeof(val));
+      return TryWrite(addr, &val, sizeof(val), policy_handler);
     }
   }
 }
