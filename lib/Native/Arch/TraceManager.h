@@ -17,6 +17,7 @@
 #pragma once
 
 #include "remill/BC/Lifter.h"
+#include <memory>
 
 namespace klee {
 
@@ -25,10 +26,12 @@ class Executor;
 namespace native {
 
 class AddressSpace;
+class PolicyHandler;
 
 class TraceManager : public ::remill::TraceManager {
  public:
-  explicit TraceManager(llvm::Module &lifted_code_);
+  explicit TraceManager(llvm::Module &lifted_code_,
+      std::shared_ptr<PolicyHandler> ph);
 
   void ForEachDevirtualizedTarget(
       const remill::Instruction &inst,
@@ -52,6 +55,7 @@ class TraceManager : public ::remill::TraceManager {
   llvm::Module &lifted_code;
   AddressSpace *memory;
   std::unordered_map<uint64_t, llvm::Function *> traces;
+  std::shared_ptr<PolicyHandler> policy_handler;
 };
 }  // namespace native
 }  // namespace klee

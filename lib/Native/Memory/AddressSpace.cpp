@@ -127,6 +127,7 @@ bool AddressSpace::IsMarkedTraceHead(PC pc) const {
 
 
 bool AddressSpace::TryFree(uint64_t addr, PolicyHandler *policy_handler) {
+  bool res;
   if (is_dead) {
     return kBadAddr;
   }
@@ -139,13 +140,7 @@ bool AddressSpace::TryFree(uint64_t addr, PolicyHandler *policy_handler) {
     return false;
   }
 
-  // Realloc of a contained address.
-  if (address.offset != 0) {
-    LOG(ERROR)
-        << "Freeing internal pointer " << std::hex << addr << std::dec;
-    // TODO(sai): Eventually do something more interesting here.
-    address.offset = 0;
-  }
+  policy_handler->HandleFreeOffset(this, address, &res);
 
   auto &alloc_list = alloc_lists[address.size];
   if (!alloc_list.TryFree(address,this, policy_handler)) {
@@ -187,9 +182,11 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
     return kBadAddr;
   }
 
+  bool res;
   Address address = {};
   address.flat = addr;
   address.size = alloc_size;
+  auto &old_alloc_list = alloc_lists[address.size];
   if (address.size != alloc_size) {
     return kBadAddr;
   }
@@ -200,13 +197,9 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
   }
 
   // Realloc of a contained address.
-  if (address.offset != 0) {
+  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+      kReallocInternalPtr, &old_alloc_list)) {
     // TODO(sai): Report?
-    LOG(ERROR)
-        << "Realloc of internal pointer with size " << address.size
-        << ", index " << address.alloc_index << ", and offset "
-        << std::hex << address.offset << std::dec;
-
     return kReallocInternalPtr;
   }
 
@@ -216,10 +209,8 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
   new_address.size = alloc_size;
   new_address.offset = 0;
 
-  if (new_address.size != alloc_size) {
-    LOG(ERROR)
-        << "Realloc of size " << address.size << " to " << alloc_size
-        << " has to be handled by native.";
+  if (policy_handler->HandleBadRealloc(this, new_address, alloc_size,
+      kReallocTooBig, &old_alloc_list)) {
     return kReallocTooBig;
   }
 
@@ -227,21 +218,18 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
     return addr;
   }
 
-  auto &old_alloc_list = alloc_lists[address.size];
   auto &new_alloc_list = alloc_lists[alloc_size];
 
   const size_t old_size = address.size;
   const auto old_alloc_index = address.alloc_index;
 
-  if (addr && old_alloc_index >= old_alloc_list.allocations.size()) {
-    LOG(ERROR)
-        << "Bad old realloc address";
+  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+      kReallocInvalidPtr, &old_alloc_list)) {
     return kReallocInvalidPtr;
   }
 
-  if (addr && (old_alloc_list.zeros[old_alloc_index] == kFreeValue) ) {
-    LOG(ERROR)
-        << "Cannot realloc on a freed memory region";
+  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+      kReallocFreedPtr, &old_alloc_list) ) {
     return kReallocFreedPtr;
   }
 
@@ -470,18 +458,16 @@ const void *AddressSpace::ToReadOnlyVirtualAddress(uint64_t addr_) {
 }
 
 // Read a byte as an executable byte. This is used for instruction decoding.
-bool AddressSpace::TryReadExecutable(PC pc, uint8_t *val) {
+bool AddressSpace::TryReadExecutable(PC pc, uint8_t *val, PolicyHandler *policy_handler) {
   // if (!read_addrs) {
   //   read_addrs = OpenReadAddrs();
   // }
   auto addr = static_cast<uint64_t>(pc) & addr_mask;
   Address address = { };
   address.flat = addr;
-  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
-    LOG(ERROR)
-        << "Trying to execute heap-allocated memory at "
-        << std::hex << addr << std::dec;
-    return false;
+  bool res;
+  if (policy_handler->HandleTryExecuteHeapMem(this, address, &res)) {
+    return res;
   }
 
   auto page_addr = AlignDownToPage(addr);

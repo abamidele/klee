@@ -62,23 +62,19 @@ uint64_t AllocList::Allocate(Address addr) {
 
 bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler *policy_handler) {
   auto alloc_index = address.alloc_index;
-  if (alloc_index >= zeros.size()) {
-    return policy_handler -> HandleFreeUnallocatedMem(mem, address);
+  bool res;
+  if (policy_handler -> HandleFreeUnallocatedMem(mem, address, &res, this)) {
+    return res;
   }
 
   auto base = zeros[alloc_index];
 
-  if (base == kFreeValue) {
-    return policy_handler -> HandleDoubleFree(mem, address);
+  if (policy_handler -> HandleDoubleFree(mem, address, &res, this)) {
+    return res;
   }
 
   auto &alloc = allocations[alloc_index];
-  if (!alloc) {
-    LOG(ERROR)
-        << "Error in memory implementation; pseudo-double free on "
-        << std::hex << address.flat << std::dec
-        << " (size=" << address.size << ", entry=" << alloc_index << ")";
-  }
+  (void) policy_handler->HandlePseudoUseAfterFree(mem, address, &res, this);
 
   alloc.reset();  // Free the std::vector.
   num_free++;
@@ -89,23 +85,23 @@ bool AllocList::TryFree(Address address, AddressSpace *mem,  PolicyHandler *poli
 bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, PolicyHandler *policy_handler) {
   Address address = {};
   address.flat = addr;
+  bool res;
   auto base = zeros.at(address.alloc_index);
 
-  if (address.alloc_index >= allocations.size()) {
-    return policy_handler -> HandleInvalidOutOfBoundsHeapRead(mem, address);
+  if (policy_handler -> HandleInvalidOutOfBoundsHeapRead(mem, address, &res, this)){
+    return res;
   }
 
-  if (base == kFreeValue) {
-    policy_handler -> HandleReadUseAfterFree(mem, address);
-
+  if (policy_handler -> HandleReadUseAfterFree(mem, address, &res, this)) {
+    return res;
   }
 
-  if (address.must_be_0x1 != 0x1) {
-    return policy_handler -> HandleHeapReadUnderflow(mem, address);
+  if (policy_handler -> HandleHeapReadUnderflow(mem, address, &res, this)) {
+    return res;
   }
 
-  if (address.offset >= address.size) {
-    return policy_handler -> HandleHeapReadOverflow(mem, address, byte_out);
+  if (policy_handler -> HandleHeapReadOverflow(mem, address, byte_out, &res, this)) {
+    return res;
   }
 
 
@@ -116,28 +112,29 @@ bool AllocList::TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, Pol
 bool AllocList::TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyHandler *policy_handler) {
   Address address = {};
   address.flat = addr;
+  bool res;
   auto base = zeros.at(address.alloc_index);
 
-  if (address.alloc_index >= allocations.size()) {
-    return policy_handler->HandleInvalidOutOfBoundsHeapWrite(mem, address);
+  if (policy_handler->HandleInvalidOutOfBoundsHeapWrite(mem, address, &res, this)) {
+    return res;
   }
 
-  if (base == kFreeValue) {
-    return policy_handler->HandleWriteUseAfterFree(mem, address);
+  if (policy_handler->HandleWriteUseAfterFree(mem, address, &res, this)) {
+    return res;
   }
 
-  if (address.must_be_0x1 != 0x1) {
-    return policy_handler->HandleHeapWriteUnderflow(mem, address);
+  if (policy_handler->HandleHeapWriteUnderflow(mem, address, &res, this)) {
+    return res;
   }
 
-  if (address.offset >= address.size) {
-    return policy_handler->HandleHeapWriteOverflow(mem, address);
+  if (policy_handler->HandleHeapWriteOverflow(mem, address, &res, this)) {
+    return res;
   }
 
   auto &alloc_buffer = allocations[address.alloc_index];
 
-  if (!alloc_buffer) {
-    return policy_handler->HandlePseudoUseAfterFree(mem, address);
+  if (policy_handler->HandlePseudoUseAfterFree(mem, address, &res, this)) {
+    return false;
   }
 
   if (alloc_buffer.use_count() > 1) {

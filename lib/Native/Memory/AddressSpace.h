@@ -91,7 +91,8 @@ class AddressSpace : public Memory {
   // Read a byte as an executable byte. This is used for instruction decoding.
   // Returns `false` if the read failed. This function operates on the state
   // of a page, and may result in broad-reaching cache invalidations.
-  __attribute__((hot)) bool TryReadExecutable(uint64_t addr, uint8_t *val);
+  __attribute__((hot)) bool TryReadExecutable(uint64_t addr, uint8_t *val,
+      PolicyHandler *policy_handler);
 
   // Change the permissions of some range of memory. This can split memory
   // maps.

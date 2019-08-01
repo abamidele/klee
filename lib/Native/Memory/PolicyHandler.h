@@ -26,31 +26,31 @@ public:
   PolicyHandler() = default;
   virtual ~PolicyHandler() = default;
   virtual bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleHeapWriteOverflow(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleHeapWriteUnderflow(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
-      uint8_t *byte_out) = 0;
+      uint8_t *byte_out, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleHeapReadUnderflow(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleReadUseAfterFree(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleWriteUseAfterFree(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandlePseudoUseAfterFree(AddressSpace *mem,
-      const Address& address) = 0;
-  virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address) = 0;
-  virtual void HandleFreeOffset(AddressSpace *mem, const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
+  virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) = 0;
+  virtual void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res) = 0;
   virtual bool HandleFreeUnallocatedMem(AddressSpace *mem,
-      const Address& address) = 0;
+      const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleTryExecuteHeapMem(AddressSpace *mem,
-      const Address& address) = 0;
-  virtual uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
-      size_t alloc_size, uint64_t err_type) = 0;
+      const Address& address, bool *res ) = 0;
+  virtual bool HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type, AllocList *alloc_list) = 0;
 
 };
 
@@ -58,23 +58,23 @@ class ReportErrorPolicyHandler: public PolicyHandler {
 public:
   ReportErrorPolicyHandler() = default;
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-      const Address& address) override;
+      const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-      const Address& address) override;
-  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
-  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+      const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
-      uint8_t *byte_out) override;
-  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
-  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandleDoubleFree(AddressSpace *mem, const Address& address) override;
-  void HandleFreeOffset(AddressSpace *mem, const Address& address) override;
-  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address) override;
-  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address) override;
-  uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
-      size_t alloc_size, uint64_t err_type) override;
+      uint8_t *byte_out, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
+  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address, bool *res) override;
+  bool HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type, AllocList *alloc_list ) override;
 
 };
 
@@ -82,23 +82,23 @@ class ProxyPolicyHandler: public PolicyHandler {
 public:
   ProxyPolicyHandler();
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-      const Address& address) override;
+      const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-      const Address& address) override;
-  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
-  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+      const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
-      uint8_t *byte_out) override;
-  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
-  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address) override;
-  bool HandleDoubleFree(AddressSpace *mem, const Address& address) override;
-  void HandleFreeOffset(AddressSpace *mem, const Address& address) override;
-  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address) override;
-  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address) override;
-  uint64_t HandleBadRealloc(AddressSpace *mem, const Address& address,
-      size_t alloc_size, uint64_t err_type) override;
+      uint8_t *byte_out, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleReadUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
+  bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address, bool *res) override;
+  bool HandleBadRealloc(AddressSpace *mem, const Address& address,
+      size_t alloc_size, uint64_t err_type, AllocList *alloc_list) override;
 
   std::unique_ptr<PolicyHandler> proxy;
 };
@@ -106,14 +106,14 @@ public:
 class SymbolicBufferPolicy: public ProxyPolicyHandler {
   SymbolicBufferPolicy() = default;
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-      const Address& address) override;
+      const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list);
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-      const Address& address) override;
-  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address) override;
-  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address) override;
+      const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list);
+  bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
-      uint8_t *byte_out) override;
-  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address) override;
+      uint8_t *byte_out, bool *res, AllocList *alloc_list) override;
+  bool HandleHeapReadUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
 };
 
 

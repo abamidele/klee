@@ -498,7 +498,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   opts = opts_;
   kmodule = std::unique_ptr<KModule>(new KModule());
 
-  policy_handler = std::unique_ptr<klee::native::PolicyHandler>(ph);
+  policy_handler = std::shared_ptr<klee::native::PolicyHandler>(ph);
 
 
   // 1.) Link the modules together
@@ -549,7 +549,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   holding_module.reset(new llvm::Module("", context));
   semantics_module.reset(remill::LoadTargetSemantics(&context));
   intrinsics.reset(new remill::IntrinsicTable(semantics_module));
-  trace_manager.reset(new native::TraceManager(*traces_module));
+  trace_manager.reset(new native::TraceManager(*traces_module, policy_handler));
   inst_lifter.reset(new remill::InstructionLifter(
       remill::GetTargetArch(), *intrinsics));
   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));

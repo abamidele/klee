@@ -23,9 +23,11 @@
 namespace klee {
 namespace native {
 
-TraceManager::TraceManager(llvm::Module &lifted_code_)
+TraceManager::TraceManager(llvm::Module &lifted_code_,
+    std::shared_ptr<PolicyHandler> ph)
     : lifted_code(lifted_code_),
-      memory(nullptr) {}
+      memory(nullptr),
+      policy_handler(ph) {}
 
 void TraceManager::ForEachDevirtualizedTarget(
     const remill::Instruction &inst,
@@ -33,7 +35,7 @@ void TraceManager::ForEachDevirtualizedTarget(
 
 bool TraceManager::TryReadExecutableByte(uint64_t addr, uint8_t *byte) {
   DLOG_IF(FATAL, !memory) << "Memory pointer not initialized in TraceManager.";
-  return memory->TryReadExecutable(addr, byte);
+  return memory->TryReadExecutable(addr, byte, policy_handler.get());
 }
 
 void TraceManager::SetLiftedTraceDefinition(uint64_t addr,
