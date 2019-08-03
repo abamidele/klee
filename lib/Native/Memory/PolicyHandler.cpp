@@ -18,9 +18,38 @@
 #include <Native/Memory/AddressSpace.h>
 #include <Native/Memory/AllocList.h>
 #include <Native/Memory/PolicyHandler.h>
+#include <Core/Memory.h>
+#include <Core/AddressSpace.h>
+#include <Core/Executor.h>
+#include <klee/ExecutionState.h>
+#include "klee/Internal/Module/KInstruction.h"
+#include "klee/Internal/Module/KModule.h"
+#include <llvm/Support/raw_ostream.h>
 
 namespace klee {
 namespace native {
+
+ReportErrorPolicyHandler::ReportErrorPolicyHandler()
+    : PolicyHandler(),
+      exe(nullptr),
+      st(nullptr) {
+}
+
+void ReportErrorPolicyHandler::Init(klee::Executor *exe_) {
+  exe = exe_;
+}
+
+void ReportErrorPolicyHandler::setState(klee::ExecutionState *state) {
+  st = state;
+}
+
+klee::ExecutionState *ReportErrorPolicyHandler::getState() {
+  return st;
+}
+
+klee::Executor *ReportErrorPolicyHandler::getExecutor() {
+  return exe;
+}
 
 bool ReportErrorPolicyHandler::HandleHeapWriteOverflow(AddressSpace *mem,
     const Address& address, bool *res, AllocList *alloc_list) {
@@ -213,7 +242,23 @@ bool ReportErrorPolicyHandler::HandleBadRealloc(AddressSpace *mem,
 }
 
 ProxyPolicyHandler::ProxyPolicyHandler() :
-    proxy(new ReportErrorPolicyHandler()) {
+  proxy(new ReportErrorPolicyHandler()){
+}
+
+void ProxyPolicyHandler::Init(klee::Executor *exe_) {
+  proxy->Init(exe_);
+}
+
+void ProxyPolicyHandler::setState(klee::ExecutionState *state) {
+  proxy->setState(state);
+}
+
+klee::Executor *ProxyPolicyHandler::getExecutor() {
+  return proxy->getExecutor();
+}
+
+klee::ExecutionState *ProxyPolicyHandler::getState() {
+  return proxy->getState();
 }
 
 bool ProxyPolicyHandler::HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
@@ -228,6 +273,7 @@ bool ProxyPolicyHandler::HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
 
 bool ProxyPolicyHandler::HandleHeapWriteOverflow(AddressSpace *mem,
     const Address& address, bool *res, AllocList *alloc_list) {
+  KInstruction *ins = getState()->prevPC;
   return proxy->HandleHeapWriteOverflow(mem, address, res, alloc_list);
 }
 
@@ -287,25 +333,39 @@ bool ProxyPolicyHandler::HandleBadRealloc(AddressSpace *mem,
 }
 
 bool SymbolicBufferPolicy::HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-    const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list) {
+    const Address& address, bool *res, AllocList *alloc_list) {
   return false;
 }
 bool SymbolicBufferPolicy::HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-    const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list) {
+    const Address& address, bool *res, AllocList *alloc_list) {
   *res = false;
-  auto &allocation = alloc_list->allocations[address.alloc_index];
-  if (allocation->size() > address.offset) {
-    allocation->at(address.offset) = byte;
-  }
-  allocation->push_back(byte);
-  LOG(WARNING)
-    << "Writing Byte " << byte <<
-    " Into Heap Address " << std::hex << address.flat
-    << std::dec << " As Per Symbolic Buffer Policy";
   return false;
 }
+
 bool SymbolicBufferPolicy::HandleHeapWriteOverflow(AddressSpace *mem,
     const Address& address, bool *res, AllocList *alloc_list) {
+  static uint64_t buff_index;
+  if (proxy->HandleHeapWriteOverflow(mem, address, res, alloc_list)){
+    LOG(INFO) << "HIT SYMBOLIC HEAP OVERFLOW";
+    auto *exe = getExecutor();
+    *res = true;
+    auto state = getState();
+    for (auto &sym_pairs: state->symbolics) {
+      if (sym_pairs.first->address == exe->sym_buff_addr){
+        auto mo = sym_pairs.first;
+        auto os = state->addressSpace.findObject(mo);
+        auto byte = ReadExpr::create(UpdateList(sym_pairs.second, 0),
+            ConstantExpr::alloc(buff_index, sym_pairs.second->getDomain()));
+        byte->dump();
+        mem->symbolic_memory[address.flat] = byte;
+        //exit(0);
+      }
+    }
+
+    buff_index = (buff_index + 1) % exe->policy_array_size;
+    //  TODO(sai, handle the wrap around)
+    return true;
+  }
   *res = true;
   return false;
 }

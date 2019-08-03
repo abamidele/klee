@@ -148,7 +148,7 @@ class MemoryObject {
 };
 
 class ObjectState {
- private:
+ public:
   friend class AddressSpace;
   friend class SpecialFunctionHandler;
   unsigned copyOnWriteOwner;  // exclusively for AddressSpace

@@ -204,7 +204,7 @@ int main(int argc, char **argv, char **envp) {
 
   handler->setInterpreter(executor);
 
-  auto policy_handler = new klee::native::ProxyPolicyHandler();
+  auto policy_handler = new klee::native::SymbolicBufferPolicy();
   executor->setModule(loaded_modules, module_options, policy_handler);
 
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);

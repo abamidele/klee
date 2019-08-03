@@ -499,6 +499,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   kmodule = std::unique_ptr<KModule>(new KModule());
 
   policy_handler = std::shared_ptr<klee::native::PolicyHandler>(ph);
+  policy_handler->Init(this);
 
 
   // 1.) Link the modules together
@@ -3046,7 +3047,13 @@ void Executor::bindModuleConstants(llvm::Module *mod) {
 //}
 
 void Executor::run(ExecutionState &initialState) {
+  // Binds Symbolic Array for later use by the policy handler
   bindModuleConstants(kmodule->module.get());
+  policy_array_size = 100;
+  auto mo = memory->allocate(policy_array_size, false, true, initialState.pc->inst, 8);
+  sym_buff_addr = mo -> address;
+  executeMakeSymbolic(initialState, mo, "symbolic_policy_buffer");
+
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.
@@ -3064,6 +3071,8 @@ void Executor::run(ExecutionState &initialState) {
       //     << "Popping ineffectual continuation off stack.";
       continue;
     }
+
+    policy_handler->setState(state.get());
 
     auto is_done = false;
     auto should_remove = removedStates.count(state.get());
@@ -3964,6 +3973,10 @@ void Executor::runFunctionAsMain(Function *f,
 
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
+  /***
+   * create symbolic array for policy handler here
+   *
+   */
   run(*state);
   
   delete processTree;

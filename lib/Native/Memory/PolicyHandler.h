@@ -16,6 +16,9 @@
 #pragma once
 
 namespace klee {
+class Executor;
+class ExecutionState;
+
 namespace native {
 class AddressSpace;
 class AllocList;
@@ -25,6 +28,10 @@ class PolicyHandler {
 public:
   PolicyHandler() = default;
   virtual ~PolicyHandler() = default;
+  virtual void Init(klee::Executor *exe_) = 0;
+  virtual void setState(klee::ExecutionState *state) = 0;
+  virtual klee::Executor *getExecutor() = 0;
+  virtual klee::ExecutionState *getState() = 0;
   virtual bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
       const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
@@ -56,7 +63,11 @@ public:
 
 class ReportErrorPolicyHandler: public PolicyHandler {
 public:
-  ReportErrorPolicyHandler() = default;
+  ReportErrorPolicyHandler();
+  void Init(klee::Executor *exe_) override;
+  void setState(klee::ExecutionState *state) override;
+  klee::Executor *getExecutor() override;
+  klee::ExecutionState *getState() override;
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
       const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
@@ -76,11 +87,18 @@ public:
   bool HandleBadRealloc(AddressSpace *mem, const Address& address,
       size_t alloc_size, uint64_t err_type, AllocList *alloc_list ) override;
 
+  klee::Executor *exe;
+  klee::ExecutionState *st;
+
 };
 
 class ProxyPolicyHandler: public PolicyHandler {
 public:
   ProxyPolicyHandler();
+  void Init(klee::Executor *exe_) override;
+  void setState(klee::ExecutionState *state) override;
+  klee::ExecutionState *getState() override;
+  klee::Executor *getExecutor() override;
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
       const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
@@ -104,11 +122,12 @@ public:
 };
 
 class SymbolicBufferPolicy: public ProxyPolicyHandler {
+public:
   SymbolicBufferPolicy() = default;
   bool HandleInvalidOutOfBoundsHeapRead(AddressSpace *mem,
-      const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list);
+      const Address& address, bool *res, AllocList *alloc_list);
   bool HandleInvalidOutOfBoundsHeapWrite(AddressSpace *mem,
-      const Address& address, const uint8_t byte, bool *res, AllocList *alloc_list);
+      const Address& address, bool *res, AllocList *alloc_list);
   bool HandleHeapWriteOverflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleHeapWriteUnderflow(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleHeapReadOverflow(AddressSpace *mem, const Address& address,
