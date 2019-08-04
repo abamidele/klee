@@ -159,6 +159,9 @@ public:
   std::vector<uint64_t> sym_addrs;
   
   std::uint64_t sym_addr_index;
+  std::uint64_t policy_buff_index;
+  const Array *policy_buff_array;
+
 
 private:
   ExecutionState() : ptreeNode(0) {}

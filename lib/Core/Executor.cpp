@@ -3049,11 +3049,6 @@ void Executor::bindModuleConstants(llvm::Module *mod) {
 void Executor::run(ExecutionState &initialState) {
   // Binds Symbolic Array for later use by the policy handler
   bindModuleConstants(kmodule->module.get());
-  policy_array_size = 100;
-  auto mo = memory->allocate(policy_array_size, false, true, initialState.pc->inst, 8);
-  sym_buff_addr = mo -> address;
-  executeMakeSymbolic(initialState, mo, "symbolic_policy_buffer");
-
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.

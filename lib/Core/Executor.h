@@ -279,8 +279,6 @@ class Executor : public Interpreter {
   bool symbolicStdin;
 
   std::shared_ptr<klee::native::PolicyHandler> policy_handler;
-  uint64_t sym_buff_addr;
-  size_t policy_array_size;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);

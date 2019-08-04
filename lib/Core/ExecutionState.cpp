@@ -77,12 +77,15 @@ ExecutionState::ExecutionState(KFunction *kf) :
     forkDisabled(false),
     ptreeNode(0),
     steppedInstructions(0), 
-    sym_addr_index(0) {
+    sym_addr_index(0),
+    policy_buff_index(0),
+    policy_buff_array(nullptr){
     pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), ptreeNode(0), sym_addr_index(0) {}
+    : constraints(assumptions), ptreeNode(0),
+      sym_addr_index(0), policy_buff_index(0), policy_buff_array(nullptr) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -127,7 +130,9 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     openMergeStack(state.openMergeStack),
     steppedInstructions(state.steppedInstructions),
     sym_addrs(state.sym_addrs),
-    sym_addr_index(state.sym_addr_index) {
+    sym_addr_index(state.sym_addr_index),
+    policy_buff_index(state.policy_buff_index),
+    policy_buff_array(nullptr) {
 
   memories.reserve(state.memories.size());
   for (const auto &other_memory : state.memories) {
