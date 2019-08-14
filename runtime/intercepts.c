@@ -77,7 +77,7 @@ char *(*real_strnlen)(char *) = NULL;
 
 
 int strcmp(volatile const char *a, volatile const char *b) {
-  write(2, "HIT STRCMP!\n", 12);
+  //write(2, "HIT STRCMP!\n", 12);
   while (*a && *a == *b) {
     ++a, ++b;
   }
@@ -91,7 +91,7 @@ char *setlocale(int category, const char *locale){
 
 int strncmp(volatile const char *s1,
     volatile const char *s2, size_t n) {
-  write(2, "HIT STRNCMP!\n", 13);
+  //write(2, "HIT STRNCMP!\n", 13);
   if (n == 0) {
     return (0);
   }
