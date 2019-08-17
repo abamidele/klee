@@ -281,7 +281,7 @@ void KModule::optimiseAndPrepare(
   // optimized.
   if (mod == module.get()) {
     if (opts.Optimize) {
-      Optimize(mod, preservedFunctions);
+      //Optimize(mod, preservedFunctions);
     }
   }
 

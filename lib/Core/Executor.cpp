@@ -527,7 +527,6 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   specialFunctionHandler->prepare(traces_module, preservedFunctions);
 
   kmodule->optimiseAndPrepare(traces_module, opts, preservedFunctions);
-
   // 4.) Manifest the module
   kmodule->manifest(traces_module, interpreterHandler,
                     StatsTracker::useStatistics());
@@ -696,7 +695,7 @@ void Executor::AddTask(vTask *task) {
 }
 
 Executor::~Executor() {
-
+  /*
   for (unsigned i = 0;; i++) {
     const std::string task_var_name = "__vmill_task_" + std::to_string(i);
     const auto task_var = kmodule->module->getGlobalVariable(task_var_name);
@@ -705,18 +704,19 @@ Executor::~Executor() {
     }
     task_var->setInitializer(
         llvm::Constant::getNullValue(task_var->getInitializer()->getType()));
-  }
+  }*/
 
-  delete memory;
-  delete externalDispatcher;
-  delete processTree;
-  delete specialFunctionHandler;
-  delete statsTracker;
-  delete solver;
-  while (!timers.empty()) {
-    delete timers.back();
-    timers.pop_back();
-  }
+  //delete memory;
+  //delete externalDispatcher;
+  //delete processTree;
+  //delete specialFunctionHandler;
+  //delete statsTracker;
+  //delete solver;
+  //while (!timers.empty()) {
+  //  delete timers.back();
+  //  timers.pop_back();
+  //}
+
 }
 
 /***/
@@ -3973,7 +3973,7 @@ void Executor::runFunctionAsMain(Function *f,
    *
    */
   run(*state);
-  
+  LOG(INFO) << "after run";
   delete processTree;
   processTree = 0;
 

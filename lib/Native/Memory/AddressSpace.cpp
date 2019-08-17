@@ -140,8 +140,6 @@ bool AddressSpace::TryFree(uint64_t addr, PolicyHandler *policy_handler) {
     return false;
   }
 
-  policy_handler->HandleFreeOffset(this, address, &res);
-
   auto &alloc_list = alloc_lists[address.size];
   if (!alloc_list.TryFree(address,this, policy_handler)) {
     return true;
@@ -197,10 +195,13 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
   }
 
   // Realloc of a contained address.
-  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
-      kReallocInternalPtr, &old_alloc_list)) {
+  if (address.offset != 0) {
+    res = false;
+    if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+         kReallocInternalPtr, &old_alloc_list)) {
     // TODO(sai): Report?
-    return kReallocInternalPtr;
+      return kReallocInternalPtr;
+    }
   }
 
   Address new_address = {};
@@ -209,9 +210,12 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
   new_address.size = alloc_size;
   new_address.offset = 0;
 
-  if (policy_handler->HandleBadRealloc(this, new_address, alloc_size,
-      kReallocTooBig, &old_alloc_list)) {
-    return kReallocTooBig;
+  if (new_address.size != alloc_size) {
+    res = false;
+    if (policy_handler->HandleBadRealloc(this, new_address, alloc_size,
+        kReallocTooBig, &old_alloc_list)) {
+      return kReallocTooBig;
+    }
   }
 
   if (address.size == alloc_size) {
@@ -223,14 +227,20 @@ uint64_t AddressSpace::TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandle
   const size_t old_size = address.size;
   const auto old_alloc_index = address.alloc_index;
 
-  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
-      kReallocInvalidPtr, &old_alloc_list)) {
-    return kReallocInvalidPtr;
+  if (addr && old_alloc_index >= old_alloc_list.allocations.size()) {
+    res = false;
+    if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+        kReallocInvalidPtr, &old_alloc_list)) {
+      return kReallocInvalidPtr;
+    }
   }
 
-  if (policy_handler->HandleBadRealloc(this, address, alloc_size,
-      kReallocFreedPtr, &old_alloc_list) ) {
-    return kReallocFreedPtr;
+  if (addr && (old_alloc_list.zeros[old_alloc_index] == kFreeValue)) {
+    res = false;
+    if (policy_handler->HandleBadRealloc(this, address, alloc_size,
+        kReallocFreedPtr, &old_alloc_list) ) {
+      return kReallocFreedPtr;
+    }
   }
 
   const auto new_addr = new_alloc_list.Allocate(new_address);
@@ -466,8 +476,11 @@ bool AddressSpace::TryReadExecutable(PC pc, uint8_t *val, PolicyHandler *policy_
   Address address = { };
   address.flat = addr;
   bool res;
-  if (policy_handler->HandleTryExecuteHeapMem(this, address, &res)) {
-    return res;
+  if (address.must_be_0xa == 0xa && address.must_be_0x1 == 0x1) {
+    res = false;
+    if (policy_handler->HandleTryExecuteHeapMem(this, address, &res)) {
+      return res;
+    }
   }
 
   auto page_addr = AlignDownToPage(addr);

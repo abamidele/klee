@@ -79,6 +79,17 @@ const std::string &Workspace::SnapshotPath(void) {
   return path;
 }
 
+const std::string &Workspace::BitcodeCachePath(void) {
+  static std::string path;
+  if (path.empty()) {
+    std::stringstream ss;
+    ss << Dir() << remill::PathSeparator() << "bitcode_cache";
+    path = ss.str();
+    path = remill::CanonicalPath(path);
+  }
+  return path;
+}
+
 const std::string &Workspace::IndexPath(void) {
   static std::string path;
   if (path.empty()) {

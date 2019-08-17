@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2019 Trail of Bits, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 #pragma once
 
 #include "remill/BC/Lifter.h"
+#include "Native/Arch/BitCodeCache.h"
+#include "remill/BC/Util.h"
 #include <memory>
 
 namespace klee {
@@ -29,9 +31,13 @@ class AddressSpace;
 class PolicyHandler;
 
 class TraceManager : public ::remill::TraceManager {
+ friend class BitCodeCache;
+ friend class Executor;
  public:
   explicit TraceManager(llvm::Module &lifted_code_,
       std::shared_ptr<PolicyHandler> ph);
+
+  ~TraceManager(void);
 
   void ForEachDevirtualizedTarget(
       const remill::Instruction &inst,
@@ -56,6 +62,7 @@ class TraceManager : public ::remill::TraceManager {
   AddressSpace *memory;
   std::unordered_map<uint64_t, llvm::Function *> traces;
   std::shared_ptr<PolicyHandler> policy_handler;
+  std::unique_ptr<BitCodeCache> code_cache;
 };
 }  // namespace native
 }  // namespace klee

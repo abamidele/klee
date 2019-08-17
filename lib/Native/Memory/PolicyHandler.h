@@ -51,7 +51,7 @@ public:
   virtual bool HandlePseudoUseAfterFree(AddressSpace *mem,
       const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) = 0;
-  virtual void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res) = 0;
+  virtual bool HandleFreeOffset(AddressSpace *mem, Address& address, bool *res) = 0;
   virtual bool HandleFreeUnallocatedMem(AddressSpace *mem,
       const Address& address, bool *res, AllocList *alloc_list) = 0;
   virtual bool HandleTryExecuteHeapMem(AddressSpace *mem,
@@ -81,7 +81,7 @@ public:
   bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
-  void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
+  bool HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
   bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address, bool *res) override;
   bool HandleBadRealloc(AddressSpace *mem, const Address& address,
@@ -112,7 +112,7 @@ public:
   bool HandleWriteUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandlePseudoUseAfterFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleDoubleFree(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
-  void HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
+  bool HandleFreeOffset(AddressSpace *mem, Address& address, bool *res ) override;
   bool HandleFreeUnallocatedMem(AddressSpace *mem, const Address& address, bool *res, AllocList *alloc_list) override;
   bool HandleTryExecuteHeapMem(AddressSpace *mem, const Address& address, bool *res) override;
   bool HandleBadRealloc(AddressSpace *mem, const Address& address,

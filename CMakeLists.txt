@@ -159,6 +159,7 @@ add_library(${PROJECT_NAME} STATIC
   lib/Native/Arch/X86/Log.cpp
   lib/Native/Arch/AArch64/Log.cpp
   lib/Native/Arch/TraceManager.cpp
+  lib/Native/Arch/BitCodeCache.cpp
   lib/Native/Memory/AddressSpace.cpp
   lib/Native/Memory/MappedRange.cpp
   lib/Native/Memory/Snapshot.cpp

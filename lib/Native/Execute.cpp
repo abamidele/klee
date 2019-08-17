@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2019 Trail of Bits, Inc.
  *
@@ -17,6 +18,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <sys/stat.h>
 #include "remill/Arch/Arch.h"
 
 #include "Native/Workspace/Workspace.h"
@@ -145,9 +147,18 @@ void NativeHandler::processTestCase(const klee::ExecutionState &state,
 #define LIBKLEE_PATH  "libklee-libc.bca"
 
 static llvm::Module *LoadRuntimeBitcode(llvm::LLVMContext *context) {
-  auto &runtime_bitcode_path = klee::native::Workspace::RuntimeBitcodePath();
-  LOG(INFO)
-      << "Loading runtime bitcode file from " << runtime_bitcode_path;
+  struct stat cache_stat;;
+  std::string runtime_bitcode_path;
+  if ((stat(klee::native::Workspace::BitcodeCachePath().c_str(), &cache_stat) == 0)){
+    runtime_bitcode_path = klee::native::Workspace::BitcodeCachePath();
+    LOG(INFO)
+        << "Loading bitcode cache from " << runtime_bitcode_path;
+  } else {
+    runtime_bitcode_path = klee::native::Workspace::RuntimeBitcodePath();
+    LOG(INFO)
+        << "Loading runtime bitcode file from " << runtime_bitcode_path;
+  }
+
   return remill::LoadModuleFromFile(
       context, runtime_bitcode_path, false /* allow_failure */);
 }
@@ -185,6 +196,7 @@ int main(int argc, char **argv, char **envp) {
 
   llvm::LLVMContext context;
   std::vector<std::unique_ptr<llvm::Module>> loaded_modules;
+
   loaded_modules.emplace_back(LoadRuntimeBitcode(&context));
 
   klee::Interpreter::ModuleOptions module_options(
@@ -210,6 +222,8 @@ int main(int argc, char **argv, char **envp) {
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
   executor->setSymbolicStdin(FLAGS_symbolic_stdin);
   executor->Run();
+
+  delete executor;
 
   // TODO(pag,sai): Freeing the `executor` causes a segfault.
 

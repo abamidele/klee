@@ -47,6 +47,7 @@ class AllocList {
   bool TryFree(Address addr, AddressSpace *mem, PolicyHandler *policy_handler);
   bool TryRead(uint64_t addr, uint8_t *byte_out, AddressSpace *mem, PolicyHandler *policy_handler);
   bool TryWrite(uint64_t addr, uint8_t byte, AddressSpace *mem, PolicyHandler *policy_handler);
+  void ExtendAllocations(uint64_t new_alloc_size);
 
   std::vector<unsigned> zeros;
   std::vector<std::shared_ptr<std::vector<uint8_t>>> allocations;
