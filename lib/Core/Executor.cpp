@@ -555,6 +555,9 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
   continuations.reserve( 8192 );
 
+  for (auto &func: *traces_module) {
+    LOG(INFO) << func.getName().str();
+  }
   return kmodule->module.get();
 }
 
@@ -605,7 +608,6 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
     remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
   }
 
-
   kmodule->instrument(holding_module.get(), opts);
   specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
   kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
@@ -629,6 +631,7 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
   }
+
   return new_lifted_traces[addr];
 }
 
@@ -3055,7 +3058,6 @@ void Executor::run(ExecutionState &initialState) {
 //  initTimers();
 
   continuations.emplace_back(new NullContinuation(&initialState));
-
   while (!continuations.empty()) {
     std::unique_ptr<StateContinuation> cont(std::move(continuations.back()));
     continuations.pop_back();
@@ -3071,6 +3073,7 @@ void Executor::run(ExecutionState &initialState) {
 
     auto is_done = false;
     auto should_remove = removedStates.count(state.get());
+
     while (!is_done && !should_remove) {
       auto ki = state->pc;
       stepInstruction(*state);
