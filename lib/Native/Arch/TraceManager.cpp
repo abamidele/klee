@@ -62,5 +62,11 @@ llvm::Function *TraceManager::GetLiftedTraceDefinition(uint64_t addr) {
   return GetLiftedTraceDeclaration(addr);
 }
 
+void TraceManager::MarkAsTraceHead(uint64_t pc) {
+  memory->MarkAsTraceHead(pc);
+}
+
+
+
 }  // namespace native
 }  // namespace klee

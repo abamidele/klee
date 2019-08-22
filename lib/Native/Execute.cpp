@@ -69,6 +69,7 @@
 DECLARE_string(os);
 DECLARE_string(arch);
 DEFINE_bool(symbolic_stdin, false, "bool set if stdin is symbolic");
+DEFINE_bool(pre_lift, false, "bool set if traces should be lifted ahead of time");
 
 class NativeHandler : public klee::InterpreterHandler {
  public:
@@ -144,10 +145,11 @@ void NativeHandler::processTestCase(const klee::ExecutionState &state,
   return;
 }
 
+
 #define LIBKLEE_PATH  "libklee-libc.bca"
 
 static llvm::Module *LoadRuntimeBitcode(llvm::LLVMContext *context) {
-  struct stat cache_stat;;
+  struct stat cache_stat;
   std::string runtime_bitcode_path;
   if ((stat(klee::native::Workspace::BitcodeCachePath().c_str(), &cache_stat) == 0)){
     runtime_bitcode_path = klee::native::Workspace::BitcodeCachePath();
@@ -219,8 +221,16 @@ int main(int argc, char **argv, char **envp) {
   auto policy_handler = new klee::native::SymbolicBufferPolicy();
   executor->setModule(loaded_modules, module_options, policy_handler);
 
+
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
   executor->setSymbolicStdin(FLAGS_symbolic_stdin);
+
+
+  if (FLAGS_pre_lift) {
+    executor -> preLiftBitcode();
+    exit(0);
+  }
+
   executor->Run();
 
   delete executor;

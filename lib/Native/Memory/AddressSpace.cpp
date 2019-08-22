@@ -45,29 +45,7 @@ DEFINE_bool(version_code, false,
 
 namespace klee {
 namespace native {
-namespace {
-enum : uint64_t {
-  kPageSize = 4096ULL, kPageShift = (kPageSize - 1ULL), kPageMask = ~kPageShift
-};
 
-static constexpr inline uint64_t AlignDownToPage(uint64_t addr) {
-  return addr & kPageMask;
-}
-
-static constexpr inline uint64_t RoundUpToPage(uint64_t size) {
-  return (size + kPageShift) & kPageMask;
-}
-
-static uint64_t GetAddressMask(void) {
-  const auto arch = remill::GetTargetArch();
-  if (arch->address_size == 32) {
-    return 0xFFFFFFFFULL;
-  } else {
-    return ~0ULL;
-  }
-}
-
-}  // namespace
 
 AddressSpace::AddressSpace(void) :
     page_to_map(256),

@@ -29,10 +29,39 @@
 #include "Core/AddressSpace.h"
 #include "klee/Expr.h"
 
+
+#include "remill/Arch/Arch.h"
+#include "remill/OS/OS.h"
+
 struct Memory {};
 
 namespace klee {
 namespace native {
+
+
+namespace {
+enum : uint64_t {
+  kPageSize = 4096ULL, kPageShift = (kPageSize - 1ULL), kPageMask = ~kPageShift
+};
+
+static constexpr inline uint64_t AlignDownToPage(uint64_t addr) {
+  return addr & kPageMask;
+}
+
+static constexpr inline uint64_t RoundUpToPage(uint64_t size) {
+  return (size + kPageShift) & kPageMask;
+}
+
+static uint64_t GetAddressMask(void) {
+  const auto arch = remill::GetTargetArch();
+  if (arch->address_size == 32) {
+    return 0xFFFFFFFFULL;
+  } else {
+    return ~0ULL;
+  }
+}
+
+}  // namespace
 
 using CodeVersion = uint64_t;
 using PC = uint64_t;
@@ -128,8 +157,6 @@ class AddressSpace : public Memory {
   uint64_t TryMalloc(size_t alloc_size, PolicyHandler *policy_handler);
   uint64_t TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandler *policy_handler);
 
-
- private:
   AddressSpace(AddressSpace &&) = delete;
   AddressSpace &operator=(const AddressSpace &) = delete;
   AddressSpace &operator=(const AddressSpace &&) = delete;

@@ -39,6 +39,15 @@
 #include "Continuation.h"
 #include "remill/BC/Lifter.h"
 
+#include "remill/Arch/Instruction.h"
+#include "remill/Arch/Name.h"
+
+#include "remill/BC/ABI.h"
+#include "remill/BC/IntrinsicTable.h"
+#include "remill/BC/Lifter.h"
+#include "remill/BC/Util.h"
+
+#include "remill/OS/OS.h"
 struct KTest;
 
 namespace llvm {
@@ -540,11 +549,16 @@ class Executor : public Interpreter {
 
   llvm::Function *GetLiftedFunction(native::AddressSpace *memory, uint64_t addr);
 
+  void preLiftBitcode(void);
+
+
   vTask *NextTask(void);
 
   void AddTask(vTask *task);
 
   void Run(void) override;
+
+
   void AddInitialTask(const std::string &state, const uint64_t pc,
                       std::shared_ptr<native::AddressSpace> memory) override;
 
