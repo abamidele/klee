@@ -172,6 +172,7 @@ add_library(${PROJECT_NAME} STATIC
   lib/Module/OptNone.cpp
   third_party/sqlite/shell.c
   third_party/sqlite/sqlite3.c
+  third_party/ThreadPool/ThreadPool.cpp
 )
 
 

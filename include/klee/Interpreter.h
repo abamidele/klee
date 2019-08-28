@@ -135,7 +135,7 @@ class Interpreter {
   virtual void setSymbolicPathWriter(TreeStreamWriter *tsw) = 0;
   virtual void setSymbolicStdin(bool isSymbolic) = 0;
 
-  virtual void preLiftBitcode(void) = 0;
+  virtual void setPreLift(bool isPreLift) = 0;
 
   // supply a test case to replay from. this can be used to drive the
   // interpretation down a user specified path. use null to reset.

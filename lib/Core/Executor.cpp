@@ -31,6 +31,8 @@
 #include "Native/Util/AreaAllocator.h"
 #include "Native/Memory/PolicyHandler.h"
 
+#include "ThreadPool/ThreadPool.h"
+
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
 #include "klee/Interpreter.h"
@@ -369,7 +371,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
         0), traces_module(nullptr), replayKTest(0), replayPath(0), replayPosition(
         0), usingSeeds(0), atMemoryLimit(false), inhibitForking(false), haltExecution(
         false), ivcEnabled(false), debugLogBuffer(debugBufferString), symbolicStdin(
-        false) {
+        false), preLift(false), saved_entry_point_address(0) {
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -426,6 +428,10 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
           error.c_str());
     }
   }
+}
+
+void Executor::setPreLift(bool isPreLift) {
+  preLift = true;
 }
 
 llvm::Module *
@@ -500,99 +506,255 @@ native::AddressSpace *Executor::Memory(klee::ExecutionState &state,
   return state.memories[index].get();
 }
 
-void Executor::preLiftBitcode(void) {
-  std::unordered_map<uint64_t, unsigned> pc_counter;
+void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
+
+}
+
+void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
+
+}
+
+void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
+    std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
   auto arch = remill::GetTargetArch();
-  trace_manager->memory = memories.back().get();
   const uint64_t addr_mask = trace_manager->memory->addr_mask;
-  std::unordered_map<uint64_t, llvm::Function *> new_lifted_traces;
+  std::vector<std::pair<uint64_t, bool>> decoder_work_list;
+  std::string inst_bytes;
+  remill::Instruction inst;
+  uint64_t base;
+  if (saved_entry_point_address > map-> LimitAddress()) {
+    // don't want to lift traces before the entry point
+    return ;
+  } else if (map->Contains(saved_entry_point_address)){
+    base = saved_entry_point_address;
+  } else {
+    base = map->BaseAddress();
+  }
+  LOG(INFO) << "base is: " << std::hex << base << std::dec;
+  decoder_work_list.push_back( { base, true });
+  bool work_on_trace;
 
-  int count = 0;
-  bool make_next_instruction_trace = false;
-  for (auto &map : trace_manager->memory->maps) {
-    for ( uint64_t inst_addr = map->BaseAddress();
-        inst_addr < map->LimitAddress(); inst_addr++) {
-    LOG(INFO) << "inst_addr is -> " << "0x"
-        << std::hex << inst_addr << std::dec <<
-        " of " << "0x" << std::hex << map->LimitAddress() << std::dec;
+  while (!decoder_work_list.empty()) {
+    LOG(INFO) << "work list size is " << decoder_work_list.size();
+    auto trace_pair = decoder_work_list.back();
+    decoder_work_list.pop_back();
+    auto addr = trace_pair.first;
+    auto targeted = trace_pair.second;
+    work_on_trace = true;
 
-    std::string inst_bytes;
-    remill::Instruction inst;
-    if (!inst_addr) {
-      break;
-    }
-    if(count++ == 0x7ac) {
-      for (auto &t_addr: trace_manager->memory->trace_heads){
-        LOG(INFO) << "trace head is -> " << "0x"
-                << std::hex << t_addr << std::dec;
+    if (targeted) {
+      uint8_t byte;
+      auto byte_addr = addr & addr_mask;
+      while (trace_manager->TryReadExecutableByte(byte_addr++, &byte)) {
+        if (!byte) {
+          ++addr;
+        } else {
+          break;
+        }
       }
-      exit(0);
     }
-    if (trace_manager->memory->CanExecute(inst_addr)) {
+
+    for (auto inst_addr = addr;
+        inst_addr < map->LimitAddress() && work_on_trace; ++inst_addr) {
+      //if (new_marked_traces.size() == 0x5) {
+      //  return;
+      //}
       inst_bytes.clear();
-      for (uint64_t i = 0; i < arch->MaxInstructionSize(); ++i) {
+      std::unordered_set<uint64_t> visited;
+      for (size_t i = 0; i < arch->MaxInstructionSize(); ++i) {
         const auto byte_addr = (inst_addr + i) & addr_mask;
         uint8_t byte;
-        if (!trace_manager->TryReadExecutableByte(byte_addr, &byte)){
-          //  already know you are on an executable page
-          LOG(INFO) << "failed to read executable byte";
+        if (!trace_manager->TryReadExecutableByte(byte_addr, &byte)) {
+          LOG(INFO) << " failed to read executable while decoding bytes on "
+              << inst_addr;
         } else {
           inst_bytes.push_back(static_cast<char>(byte));
         }
       }
-
       inst.Reset();
 
-      bool is_decoded = arch->DecodeInstruction(inst_addr, inst_bytes, inst);
+      if (arch->DecodeInstruction(inst_addr, inst_bytes, inst)) {
 
-      if (inst.category == remill::Instruction::kCategoryNoOp) {
-        LOG(INFO) << "skipping noop";
-        if (make_next_instruction_trace) {
-          LOG(INFO) << "skipping nop after the ret";
-        }
-        continue;
-      } else if (inst_addr == map->BaseAddress()
-          || make_next_instruction_trace) {
-        trace_manager->MarkAsTraceHead(inst_addr);
-        make_next_instruction_trace = false;
-      }
-
-      if (is_decoded) {
-        LOG(INFO) << "successfully decoded instruction";
-        LOG(INFO) << "num bytes is " << inst.NumBytes();
-        inst_addr = inst.next_pc - 1;
-        switch (inst.category){
-          case remill::Instruction::kCategoryDirectJump:
-          case remill::Instruction::kCategoryConditionalBranch: {
-            trace_manager->MarkAsTraceHead(inst.branch_taken_pc);
-            if (inst.IsConditionalBranch()) {
-              trace_manager->MarkAsTraceHead(inst.branch_not_taken_pc);
-            }
-            break;
-          }
-          case remill::Instruction::kCategoryDirectFunctionCall:
-          case remill::Instruction::kCategoryIndirectFunctionCall: {
-            trace_manager->MarkAsTraceHead(inst.next_pc);
-            break;
-          }
-          case remill::Instruction::kCategoryFunctionReturn: {
-            LOG(INFO) << "hit ret instruction";
-            make_next_instruction_trace = true;
-            break;
-          }
-          default : {
-            break;
-          }
+        if (visited.count(inst_addr)) {
+          inst_addr = inst.next_pc;
+          continue;
+        } else {
+          visited.insert(inst_addr);
         }
 
+        switch (inst.category) {
+        case remill::Instruction::kCategoryDirectJump: {
+          work_on_trace = false;
+          (void) new_marked_traces[addr];
+          LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
+          if (!visited.count(inst.branch_taken_pc)) {
+            decoder_work_list.push_back( { inst.branch_taken_pc, false });
+            LOG(INFO) << "direct jmp instruction at 0x" << std::hex << inst_addr
+                << std::dec;
+          }
+          break;
+        }
+        case remill::Instruction::kCategoryConditionalBranch: {
+          work_on_trace = false;
+          (void) new_marked_traces[addr];
+          LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
+
+          if (!visited.count(inst.branch_taken_pc)) {
+            decoder_work_list.push_back( { inst.branch_taken_pc, false });
+          }
+
+          if (!visited.count(inst.branch_not_taken_pc)) {
+            decoder_work_list.push_back( { inst.branch_not_taken_pc, false });
+          }
+
+          LOG(INFO) << "conditional branch instruction at 0x" << std::hex
+              << inst_addr << std::dec << "- branch taken: " << std::hex
+              << inst.branch_taken_pc << std::dec << "- branch not taken: "
+              << std::hex << inst.branch_not_taken_pc << std::dec;
+          break;
+        }
+        case remill::Instruction::kCategoryDirectFunctionCall:
+        case remill::Instruction::kCategoryIndirectFunctionCall: {
+          LOG(INFO) << "function call instruction at 0x" << std::hex
+              << inst_addr << std::dec;
+          work_on_trace = false;
+          (void) new_marked_traces[addr];
+          LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
+          LOG(INFO) << "the location of the call is at "
+              << std::hex << inst.branch_taken_pc << std::dec;
+          if (!visited.count(inst.next_pc)) {
+            LOG(INFO) << "marking 0x" << std::hex << inst.branch_taken_pc << std::dec;
+            (void) new_marked_traces[inst.branch_taken_pc];
+            decoder_work_list.push_back( { inst.next_pc, false });
+          }
+          break;
+        }
+        case remill::Instruction::kCategoryFunctionReturn: {
+          LOG(INFO) << "ret instruction at 0x" << std::hex << inst_addr
+              << std::dec;
+          work_on_trace = false;
+          (void) new_marked_traces[addr];
+          if (!visited.count(inst.next_pc)) {
+            decoder_work_list.push_back( { inst.next_pc, true });
+          }
+          break;
+        }
+        case remill::Instruction::kCategoryNoOp: {
+          LOG(INFO) << "noop instruction at 0x" << std::hex << inst_addr
+              << std::dec;
+          if (!targeted) {
+            work_on_trace = false;
+          }
+          break;
+        }
+        default: {
+          LOG(INFO) << "other instruction at 0x" << std::hex << inst_addr
+              << std::dec << " of size " << inst.NumBytes();
+          if (!visited.count(inst.next_pc)) {
+            inst_addr = inst.next_pc - 1;
+          } else {
+            work_on_trace = false;
+          }
+          break;
+        }
+        }
       } else {
-        LOG(INFO) << "failed to decode instruction";
+        work_on_trace = false;
+        LOG(INFO) << "failed to decode instruction at 0x" << std::hex
+            << inst_addr << std::dec << " throwing away trace " << std::hex
+            << addr << std::dec;
+        if (!visited.count(inst_addr + 1)) {
+          decoder_work_list.push_back( { inst_addr + 1, false });
+        }
       }
     }
+
+    if (addr >= map->LimitAddress()) {
+      break;
     }
   }
+}
 
+void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
+  std::unordered_map<uint64_t, llvm::Function *> new_marked_traces;
+  decodeAndMarkTraces(map, new_marked_traces);
+  for (auto trace_pairs : new_marked_traces) {
+    LOG(INFO) << "--------------------BEFORE THE LIFT----------------------";
+    // check if trace is already in the module to account for traces from the bitcode cache
+    const auto trace_name = trace_manager->TraceName(trace_pairs.first);
+    if (!traces_module->getFunction(trace_name)) {
+      bool res = trace_lifter->Lift(trace_pairs.first,
+          [&new_marked_traces] (uint64_t trace_addr, llvm::Function *func) {
+            func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+            new_marked_traces[trace_addr] = func;
+          });
+      if (res) {
+        LOG(INFO) << "successfully lifted trace head at 0x" << std::hex
+            << trace_pairs.first << std::dec;
+      } else {
+        LOG(INFO) << "failed to lift trace head at 0x" << std::hex
+            << trace_pairs.first << std::dec;
+      }
+    }
+  }
+}
+
+void Executor::preLiftBitcode(void) {
+  trace_manager->memory = memories.back().get();
+  for (const auto &map : trace_manager->memory->maps) {
+    const auto &base = map->BaseAddress();
+    if (trace_manager->memory->CanExecuteAligned(base) && base) {
+      // TODO(sai) expand this to create an individual thread eventually have to make copies of the module and have a mutex
+      decodeAndLiftMapping(map);
+      break;
+    }
+  }
   trace_manager->memory = nullptr;
+  // NOTE the native address space will be a shared resource among all threads
+  for (auto &trace_pairs : trace_manager->traces) {
+    LOG(INFO) << "trace at 0x" << std::hex << trace_pairs.first << std::dec;
+  }  // Temporary logging statement should be removed eventually
+
+  UpdateKModuleAfterLift(trace_manager->traces);
+}
+
+void Executor::UpdateKModuleAfterLift(const std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces) {
+  remill::OptimizationGuide guide = { };
+  guide.slp_vectorize = false;
+  guide.loop_vectorize = false;
+  guide.verify_input = false;
+  guide.eliminate_dead_stores = true;
+
+  remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
+
+  for (auto lifted_entry : new_lifted_traces) {
+      remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
+  }
+
+  kmodule->instrument(holding_module.get(), opts);
+  specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
+  kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
+  kmodule->manifest(holding_module.get(), interpreterHandler,
+      StatsTracker::useStatistics());
+  specialFunctionHandler->bind(holding_module.get());
+
+  for (auto lifted_entry : new_lifted_traces) {
+    auto addr_expr = Expr::createPointer(
+        reinterpret_cast<uintptr_t>(lifted_entry.second));
+    legalFunctions.insert(reinterpret_cast<std::uint64_t>(lifted_entry.second));
+    globalAddresses.insert(std::make_pair(lifted_entry.second, addr_expr));
+  }
+
+  if (theStatisticManager) {
+    theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
+  }
+
+  bindModuleConstants(holding_module.get());
+  for (auto lifted_entry : new_lifted_traces) {
+    remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
+  }
 }
 
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
@@ -621,45 +783,9 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
         func->setLinkage(llvm::GlobalValue::ExternalLinkage);
         new_lifted_traces[trace_addr] = func;
       });
+
   trace_manager->memory = nullptr;
-
-  //  assumes remill::TraceLifter has all protected fields and no private fields
-  remill::OptimizationGuide guide = { };
-  guide.slp_vectorize = false;
-  guide.loop_vectorize = false;
-  guide.verify_input = false;
-  guide.eliminate_dead_stores = true; // false;
-
-  remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
-
-  for (auto lifted_entry : new_lifted_traces) {
-    remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
-  }
-
-  kmodule->instrument(holding_module.get(), opts);
-  specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
-  kmodule->optimiseAndPrepare(holding_module.get(), opts, preservedFunctions);
-  kmodule->manifest(holding_module.get(), interpreterHandler,
-      StatsTracker::useStatistics());
-  specialFunctionHandler->bind(holding_module.get());
-
-  for (auto lifted_entry : new_lifted_traces) {
-    auto addr_expr = Expr::createPointer(
-        reinterpret_cast<uintptr_t>(lifted_entry.second));
-    legalFunctions.insert(reinterpret_cast<std::uint64_t>(lifted_entry.second));
-    globalAddresses.insert(std::make_pair(lifted_entry.second, addr_expr));
-  }
-
-  if (theStatisticManager) {
-    theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
-  }
-
-  bindModuleConstants(holding_module.get());
-
-  for (auto lifted_entry : new_lifted_traces) {
-    remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
-  }
-
+  UpdateKModuleAfterLift(new_lifted_traces);
   return new_lifted_traces[addr];
 }
 
@@ -688,7 +814,7 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
   auto task = new vTask;
   setInhibitForking(false);  //  inhibits forking; for concrete interpretation
   task->first_func = kmodule->module->getFunction("main");
-  CHECK(task->first_func)<< "vmill entrypoint is not in the bitcode";
+  CHECK(task->first_func)<< "klee-native entrypoint is not in the bitcode";
 
   auto state_str = new char[state.size()];
   auto mem_str = new char[sizeof(void *)];
@@ -696,6 +822,7 @@ void Executor::AddInitialTask(const std::string &state, const uint64_t pc,
   memcpy(state_str, state.data(), state.size());
   memcpy(mem_str, &mem_id, sizeof(mem_id));
 
+  saved_entry_point_address = pc;
   task->argv.emplace_back("klee-exec");
   task->argv.push_back(state);
   task->argv.emplace_back();
@@ -840,24 +967,24 @@ void Executor::initializeGlobals(ExecutionState &state) {
 #ifdef HAVE_CTYPE_EXTERNALS
 #ifndef WINDOWS
 #ifndef DARWIN
-  /* from /usr/include/ctype.h:
-   These point into arrays of 384, so they can be indexed by any `unsigned
-   char' value [0,255]; by EOF (-1); or by any `signed char' value
-   [-128,-1).  ISO C requires that the ctype functions work for `unsigned */
-  const uint16_t **addr = __ctype_b_loc();
-  addExternalObject(state, const_cast<uint16_t*>(*addr-128),
-      384 * sizeof **addr, true);
-  addExternalObject(state, addr, sizeof(*addr), true);
+    /* from /usr/include/ctype.h:
+     These point into arrays of 384, so they can be indexed by any `unsigned
+     char' value [0,255]; by EOF (-1); or by any `signed char' value
+     [-128,-1).  ISO C requires that the ctype functions work for `unsigned */
+    const uint16_t **addr = __ctype_b_loc();
+    addExternalObject(state, const_cast<uint16_t*>(*addr-128),
+        384 * sizeof **addr, true);
+    addExternalObject(state, addr, sizeof(*addr), true);
 
-  const int32_t **lower_addr = __ctype_tolower_loc();
-  addExternalObject(state, const_cast<int32_t*>(*lower_addr-128),
-      384 * sizeof **lower_addr, true);
-  addExternalObject(state, lower_addr, sizeof(*lower_addr), true);
+    const int32_t **lower_addr = __ctype_tolower_loc();
+    addExternalObject(state, const_cast<int32_t*>(*lower_addr-128),
+        384 * sizeof **lower_addr, true);
+    addExternalObject(state, lower_addr, sizeof(*lower_addr), true);
 
-  const int32_t **upper_addr = __ctype_toupper_loc();
-  addExternalObject(state, const_cast<int32_t*>(*upper_addr-128),
-      384 * sizeof **upper_addr, true);
-  addExternalObject(state, upper_addr, sizeof(*upper_addr), true);
+    const int32_t **upper_addr = __ctype_toupper_loc();
+    addExternalObject(state, const_cast<int32_t*>(*upper_addr-128),
+        384 * sizeof **upper_addr, true);
+    addExternalObject(state, upper_addr, sizeof(*upper_addr), true);
 #endif
 #endif
 #endif
@@ -948,7 +1075,7 @@ void Executor::initializeGlobals(ExecutionState &state) {
   for (Module::alias_iterator i = m->alias_begin(), ie = m->alias_end();
       i != ie; ++i) {
     // Map the alias to its aliasee's address. This works because we have
-    // addresses for everything, even undefined functions. 
+    // addresses for everything, even undefined functions.
     globalAddresses.insert(std::make_pair(&*i, evalConstant(i->getAliasee())));
   }
 
@@ -1319,7 +1446,7 @@ ref<Expr> Executor::toUnique(const ExecutionState &state, ref<Expr> &e) {
   return result;
 }
 
-/* Concretize the given expression, and return a possible constant value. 
+/* Concretize the given expression, and return a possible constant value.
  'reason' is just a documentation string stating the reason for concretization. */
 ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, ref<Expr> e,
     const char *reason) {
@@ -1449,16 +1576,16 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
         // instead of implementing it, we can do a simple hack: just
         // make a function believe that all varargs are on stack.
         executeMemoryOperation(state, true, arguments[0],
-            ConstantExpr::create(48, 32), 0);  // gp_offset
+            ConstantExpr::create(48, 32), 0);            // gp_offset
         executeMemoryOperation(state, true,
             AddExpr::create(arguments[0], ConstantExpr::create(4, 64)),
-            ConstantExpr::create(304, 32), 0);  // fp_offset
+            ConstantExpr::create(304, 32), 0);            // fp_offset
         executeMemoryOperation(state, true,
             AddExpr::create(arguments[0], ConstantExpr::create(8, 64)),
-            sf.varargs->getBaseExpr(), 0);  // overflow_arg_area
+            sf.varargs->getBaseExpr(), 0);            // overflow_arg_area
         executeMemoryOperation(state, true,
             AddExpr::create(arguments[0], ConstantExpr::create(16, 64)),
-            ConstantExpr::create(0, 64), 0);  // reg_save_area
+            ConstantExpr::create(0, 64), 0);            // reg_save_area
       }
       break;
     }
@@ -1498,8 +1625,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     state.pushFrame(state.prevPC, kf);
     state.pc = kf->instructions;
 
-    if (statsTracker)
-      statsTracker->framePushed(state, &state.stack[state.stack.size() - 2]);
+    if (statsTracker) {
+      //statsTracker->framePushed(state, &state.stack[state.stack.size() - 2]);
+    }
 
     // TODO: support "byval" parameter attribute
     // TODO: support zeroext, signext, sret attributes
@@ -1543,14 +1671,14 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 9)
             size = llvm::alignTo(size, 16);
 #else
-            size = llvm::RoundUpToAlignment(size, 16);
+              size = llvm::RoundUpToAlignment(size, 16);
 #endif
             requires16ByteAlignment = true;
           }
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 9)
           size += llvm::alignTo(argWidth, WordSize) / 8;
 #else
-          size += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
+            size += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
 #endif
         }
       }
@@ -1586,14 +1714,14 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 9)
               offset = llvm::alignTo(offset, 16);
 #else
-              offset = llvm::RoundUpToAlignment(offset, 16);
+                offset = llvm::RoundUpToAlignment(offset, 16);
 #endif
             }
             os->write(offset, arguments[i]);
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 9)
             offset += llvm::alignTo(argWidth, WordSize) / 8;
 #else
-            offset += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
+              offset += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
 #endif
           }
         }
@@ -1646,7 +1774,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 
 /// Compute the true target of a function call, resolving LLVM and KLEE aliases
 /// and bitcasts.
-Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
+Function * Executor::getTargetFunction(Value * calledVal,
+    ExecutionState & state) {
   SmallPtrSet<const GlobalValue*, 3> Visited;
 
   Constant *c = dyn_cast<Constant>(calledVal);
@@ -1766,7 +1895,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)
             bool isSExt = cs.hasRetAttr(llvm::Attribute::SExt);
 #else
-              bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
+                bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
 #endif
             if (isSExt) {
               result = SExtExpr::create(result, to);
@@ -1920,7 +2049,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)
       unsigned index = si->findCaseValue(ci)->getSuccessorIndex();
 #else
-        unsigned index = si->findCaseValue(ci).getSuccessorIndex();
+          unsigned index = si->findCaseValue(ci).getSuccessorIndex();
 #endif
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
     } else {
@@ -1940,8 +2069,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE > LLVM_VERSION(3, 4)
       for (auto i : si->cases()) {
 #else
-          for (SwitchInst::CaseIt i = si->case_begin(), e = si->case_end(); i != e;
-              ++i) {
+            for (SwitchInst::CaseIt i = si->case_begin(), e = si->case_end(); i != e;
+                ++i) {
 #endif
         ref<Expr> value = evalConstant(i.getCaseValue());
 
@@ -2083,7 +2212,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)
               bool isSExt = cs.paramHasAttr(i, llvm::Attribute::SExt);
 #else
-                bool isSExt = cs.paramHasAttr(i+1, llvm::Attribute::SExt);
+                    bool isSExt = cs.paramHasAttr(i+1, llvm::Attribute::SExt);
 #endif
               if (isSExt) {
                 arguments[i] = SExtExpr::create(arguments[i], to);
@@ -2532,8 +2661,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Res.mod(
         APFloat(*fpWidthToSemantics(right->getWidth()), right->getAPValue()));
 #else
-      Res.mod(APFloat(*fpWidthToSemantics(right->getWidth()),right->getAPValue()),
-          APFloat::rmNearestTiesToEven);
+          Res.mod(APFloat(*fpWidthToSemantics(right->getWidth()),right->getAPValue()),
+              APFloat::rmNearestTiesToEven);
 #endif
     bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
     break;
@@ -2584,7 +2713,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)
     auto valueRef = makeMutableArrayRef(value);
 #else
-      uint64_t *valueRef = &value;
+          uint64_t *valueRef = &value;
 #endif
     Arg.convertToInteger(valueRef, resultType, false,
         llvm::APFloat::rmTowardZero, &isExact);
@@ -2606,7 +2735,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(5, 0)
     auto valueRef = makeMutableArrayRef(value);
 #else
-      uint64_t *valueRef = &value;
+          uint64_t *valueRef = &value;
 #endif
     Arg.convertToInteger(valueRef, resultType, true,
         llvm::APFloat::rmTowardZero, &isExact);
@@ -3092,7 +3221,7 @@ void Executor::run(ExecutionState &initialState) {
   }
 }
 
-std::string Executor::getAddressInfo(ExecutionState &state,
+std::string Executor::getAddressInfo(ExecutionState & state,
     ref<Expr> address) const {
   std::string Str;
   llvm::raw_string_ostream info(Str);
@@ -3449,7 +3578,7 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
 
 /***/
 
-ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
+ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState & state,
     ref<Expr> e) {
   unsigned n = interpreterOpts.MakeConcreteSymbolic;
   if (!n || replayKTest || replayPath)
@@ -3526,7 +3655,7 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
     // "smartly" pick a value, for example we could fork and pick the
     // min and max values and perhaps some intermediate (reasonable
     // value).
-    // 
+    //
     // It would also be nice to recognize the case when size has
     // exactly two values and just fork (but we need to get rid of
     // return argument first). This shows up in pcre when llvm
@@ -3748,7 +3877,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
     StatePair branches = fork(*unbound, inBounds, true);
     ExecutionState *bound = branches.first;
 
-    // bound can be 0 on failure or overlapped 
+    // bound can be 0 on failure or overlapped
     if (bound) {
       if (isWrite) {
         if (os->readOnly) {
@@ -3953,6 +4082,9 @@ void Executor::runFunctionAsMain(Function *f,
    * create symbolic array for policy handler here
    *
    */
+  if (preLift) {
+    preLiftBitcode();
+  }
   run(*state);
   LOG(INFO) << "after run";
   delete processTree;
@@ -4092,7 +4224,7 @@ void Executor::doImpliedValueConcretization(ExecutionState &state, ref<Expr> e,
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(re->index)) {
       // FIXME: This is the sole remaining usage of the Array object
       // variable. Kill me.
-      const MemoryObject *mo = 0;  //re->updates.root->object;
+      const MemoryObject *mo = 0;          //re->updates.root->object;
       const ObjectState *os = state.addressSpace.findObject(mo);
 
       if (!os) {
@@ -4110,7 +4242,7 @@ void Executor::doImpliedValueConcretization(ExecutionState &state, ref<Expr> e,
   }
 }
 
-Expr::Width Executor::getWidthForLLVMType(llvm::Type *type) const {
+Expr::Width Executor::getWidthForLLVMType(llvm::Type * type) const {
   return kmodule->targetData->getTypeSizeInBits(type);
 }
 
@@ -4195,7 +4327,7 @@ int *Executor::getErrnoLocation(const ExecutionState &state) const {
   /* From /usr/include/errno.h: it [errno] is a per-thread variable. */
   return __errno_location();
 #else
-  return __error();
+    return __error();
 #endif
 }
 

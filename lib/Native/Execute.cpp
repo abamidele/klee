@@ -224,12 +224,7 @@ int main(int argc, char **argv, char **envp) {
 
   klee::native::Workspace::LoadSnapshotIntoExecutor(snapshot, executor);
   executor->setSymbolicStdin(FLAGS_symbolic_stdin);
-
-
-  if (FLAGS_pre_lift) {
-    executor -> preLiftBitcode();
-    exit(0);
-  }
+  executor->setPreLift(FLAGS_pre_lift);
 
   executor->Run();
 

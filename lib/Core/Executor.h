@@ -98,7 +98,7 @@ class TraceLifter;
 }  // namespace native
 
 class vTask {
- public:
+public:
   llvm::Function *first_func;
   std::vector<std::string> argv;
   std::vector<std::string> envp;
@@ -110,7 +110,7 @@ template<class T> class ref;
 /// during an instruction step. Should contain addedStates,
 /// removedStates, and haltExecution, among others.
 
-class Executor : public Interpreter {
+class Executor: public Interpreter {
   friend class RandomPathSearcher;
   friend class OwningSearcher;
   friend class WeightedRandomSearcher;
@@ -122,10 +122,9 @@ class Executor : public Interpreter {
   friend class StateContinuation;
   friend class klee::native::PolicyHandler;
 
-
- public:
+public:
   class Timer {
-   public:
+  public:
     Timer();
     virtual ~Timer();
 
@@ -151,7 +150,7 @@ class Executor : public Interpreter {
     Unhandled
   };
 
- public:
+public:
   static const char *TerminateReasonNames[];
 
   class TimerInfo;
@@ -287,38 +286,52 @@ class Executor : public Interpreter {
 
   bool symbolicStdin;
 
+  bool preLift;
+
+  uint64_t saved_entry_point_address;
+
+  void setPreLift(bool isPreLift);
+
   std::shared_ptr<klee::native::PolicyHandler> policy_handler;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
-                                    ExecutionState &state);
+      ExecutionState &state);
 
   void executeInstruction(ExecutionState &state, KInstruction *ki);
 
   void printFileLine(ExecutionState &state, KInstruction *ki,
-                     llvm::raw_ostream &file);
-  
+      llvm::raw_ostream &file);
+
   void run(ExecutionState &initialState);
+
+  void UpdateKModuleAfterLift(
+      const std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
 
   // Given a concrete object in our [klee's] address space, add it to 
   // objects checked code can reference.
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
-                                  unsigned size, bool isReadOnly);
+      unsigned size, bool isReadOnly);
+
+  void RecursiveDescentPass(native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list);
+
+  void LinearSweepPass(native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list);
 
   void initializeGlobalObject(ExecutionState &state, ObjectState *os,
-                              const llvm::Constant *c, unsigned offset);
+      const llvm::Constant *c, unsigned offset);
   void initializeGlobals(ExecutionState &state);
 
   void stepInstruction(ExecutionState &state);
 //  void updateStates(ExecutionState *current);
   void transferToBasicBlock(llvm::BasicBlock *dst, llvm::BasicBlock *src,
-                            ExecutionState &state);
+      ExecutionState &state);
 
   void callExternalFunction(ExecutionState &state, KInstruction *target,
-                            llvm::Function *function,
-                            std::vector<ref<Expr> > &arguments);
+      llvm::Function *function, std::vector<ref<Expr> > &arguments);
 
   ObjectState *bindObjectInState(ExecutionState &state, const MemoryObject *mo,
-                                 bool isLocal, const Array *array = 0);
+      bool isLocal, const Array *array = 0);
 
   /// Resolve a pointer to the memory objects it could point to the
   /// start of, forking execution when necessary and generating errors
@@ -332,7 +345,7 @@ class Executor : public Interpreter {
       std::pair<std::pair<const MemoryObject*, const ObjectState*>,
           ExecutionState*> > ExactResolutionList;
   void resolveExact(ExecutionState &state, ref<Expr> p,
-                    ExactResolutionList &results, const std::string &name);
+      ExactResolutionList &results, const std::string &name);
 
   /// Allocate and bind a new object in a particular state. NOTE: This
   /// function may fork.
@@ -354,9 +367,8 @@ class Executor : public Interpreter {
   /// used. Otherwise, the alignment is deduced via
   /// Executor::getAllocationAlignment
   void executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
-                    KInstruction *target, bool zeroMemory = false,
-                    const ObjectState *reallocFrom = 0,
-                    size_t allocationAlignment = 0);
+      KInstruction *target, bool zeroMemory = false,
+      const ObjectState *reallocFrom = 0, size_t allocationAlignment = 0);
 
   /// Free the given address with checking for errors. If target is
   /// given it will be bound to 0 in the resulting states (this is a
@@ -364,27 +376,26 @@ class Executor : public Interpreter {
   /// state to fork and that \ref state cannot be safely accessed
   /// afterwards.
   void executeFree(ExecutionState &state, ref<Expr> address,
-                   KInstruction *target = 0);
+      KInstruction *target = 0);
 
   void executeCall(ExecutionState &state, KInstruction *ki, llvm::Function *f,
-                   std::vector<ref<Expr> > &arguments);
+      std::vector<ref<Expr> > &arguments);
 
   // do address resolution / object binding / out of bounds checking
   // and perform the operation
   void executeMemoryOperation(ExecutionState &state, bool isWrite,
-                              ref<Expr> address,
-                              ref<Expr> value /* undef if read */,
-                              KInstruction *target /* undef if write */);
+      ref<Expr> address, ref<Expr> value /* undef if read */,
+      KInstruction *target /* undef if write */);
 
   void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo,
-                           const std::string &name);
+      const std::string &name);
 
   /// Create a new state where each input condition has been added as
   /// a constraint and return the results. The input state is included
   /// as one of the results. Note that the output vector may included
   /// NULL pointers for states which were unable to be created.
   void branch(ExecutionState &state, const std::vector<ref<Expr> > &conditions,
-              std::vector<ExecutionState*> &result);
+      std::vector<ExecutionState*> &result);
 
   // Fork current and return states in which condition holds / does
   // not hold, respectively. One of the states is necessarily the
@@ -396,15 +407,15 @@ class Executor : public Interpreter {
   /// which also manages propagation of implied values,
   /// validity checks, and seed patching.
   void addConstraint(ExecutionState &state, ref<Expr> condition);
-  
+
   void setSymbolicStdin(bool isSymbolic) override;
-  
+
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);
 
   const Cell& eval(KInstruction *ki, unsigned index,
-                   ExecutionState &state) const;
+      ExecutionState &state) const;
 
   Cell& getArgumentCell(ExecutionState &state, KFunction *kf, unsigned index) {
     return state.stack.back().locals[kf->getArgRegister(index)];
@@ -416,19 +427,19 @@ class Executor : public Interpreter {
 
   void bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value);
   void bindArgument(KFunction *kf, unsigned index, ExecutionState &state,
-                    ref<Expr> value);
+      ref<Expr> value);
 
   /// Evaluates an LLVM constant expression.  The optional argument ki
   /// is the instruction where this constant was encountered, or NULL
   /// if not applicable/unavailable.
   ref<klee::ConstantExpr> evalConstantExpr(const llvm::ConstantExpr *c,
-                                           const KInstruction *ki = NULL);
+      const KInstruction *ki = NULL);
 
   /// Evaluates an LLVM constant.  The optional argument ki is the
   /// instruction where this constant was encountered, or NULL if
   /// not applicable/unavailable.
   ref<klee::ConstantExpr> evalConstant(const llvm::Constant *c,
-                                       const KInstruction *ki = NULL);
+      const KInstruction *ki = NULL);
 
   /// Return a unique constant value for the given expression in the
   /// given state, if it has one (i.e. it provably only has a single
@@ -442,12 +453,12 @@ class Executor : public Interpreter {
   ///
   /// \param purpose An identify string to printed in case of concretization.
   ref<klee::ConstantExpr> toConstant(ExecutionState &state, ref<Expr> e,
-                                     const char *purpose);
+      const char *purpose);
 
   /// Bind a constant value for e to the given target. NOTE: This
   /// function may fork state if the state has multiple seeds.
   void executeGetValue(ExecutionState &state, ref<Expr> e,
-                       KInstruction *target);
+      KInstruction *target);
 
   /// Get textual information regarding a memory address.
   std::string getAddressInfo(ExecutionState &state, ref<Expr> address) const;
@@ -471,16 +482,14 @@ class Executor : public Interpreter {
   void terminateStateOnExit(ExecutionState &state);
   // call error handler and terminate state
   void terminateStateOnError(ExecutionState &state, const llvm::Twine &message,
-                             enum TerminateReason termReason,
-                             const char *suffix = NULL,
-                             const llvm::Twine &longMessage = "");
+      enum TerminateReason termReason, const char *suffix = NULL,
+      const llvm::Twine &longMessage = "");
 
   // call error handler and terminate state, for execution errors
   // (things that should not be possible, like illegal instruction or
   // unlowered instrinsic, or are unsupported, like inline assembly)
   void terminateStateOnExecError(ExecutionState &state,
-                                 const llvm::Twine &message,
-                                 const llvm::Twine &info = "") {
+      const llvm::Twine &message, const llvm::Twine &info = "") {
     terminateStateOnError(state, message, Exec, NULL, info);
   }
 
@@ -495,10 +504,10 @@ class Executor : public Interpreter {
   void bindInstructionConstants(KInstruction *KI);
 
   void handlePointsToObj(ExecutionState &state, KInstruction *target,
-                         const std::vector<ref<Expr> > &arguments);
+      const std::vector<ref<Expr> > &arguments);
 
   void doImpliedValueConcretization(ExecutionState &state, ref<Expr> e,
-                                    ref<ConstantExpr> value);
+      ref<ConstantExpr> value);
 
   /// Add a timer to be executed periodically.
   ///
@@ -512,9 +521,9 @@ class Executor : public Interpreter {
   void printDebugInstructions(ExecutionState &state);
 //  void doDumpStates();
 
- public:
+public:
   Executor(llvm::LLVMContext &ctx, const InterpreterOptions &opts,
-           InterpreterHandler *ie);
+      InterpreterHandler *ie);
   virtual ~Executor();
 
   const InterpreterHandler& getHandler() {
@@ -542,15 +551,19 @@ class Executor : public Interpreter {
   }
 
   llvm::Module *setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
-                          const ModuleOptions &opts, klee::native::PolicyHandler *ph) override;
+      const ModuleOptions &opts, klee::native::PolicyHandler *ph) override;
 
-  native::AddressSpace *Memory(klee::ExecutionState &state,
-                               uintptr_t index);
+  native::AddressSpace *Memory(klee::ExecutionState &state, uintptr_t index);
 
-  llvm::Function *GetLiftedFunction(native::AddressSpace *memory, uint64_t addr);
+  llvm::Function *GetLiftedFunction(native::AddressSpace *memory,
+      uint64_t addr);
+
+  void decodeAndMarkTraces(const native::MemoryMapPtr &map,
+      std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces);
+
+  void decodeAndLiftMapping(const native::MemoryMapPtr &map);
 
   void preLiftBitcode(void);
-
 
   vTask *NextTask(void);
 
@@ -558,18 +571,16 @@ class Executor : public Interpreter {
 
   void Run(void) override;
 
-
   void AddInitialTask(const std::string &state, const uint64_t pc,
-                      std::shared_ptr<native::AddressSpace> memory) override;
+      std::shared_ptr<native::AddressSpace> memory) override;
 
   void useSeeds(const std::vector<struct KTest *> *seeds) override {
     usingSeeds = seeds;
   }
 
-  void runFunctionAsMain(
-      llvm::Function *f, const std::vector<std::string> &argv,
-      const std::vector<std::string> &envp)
-      override;
+  void runFunctionAsMain(llvm::Function *f,
+      const std::vector<std::string> &argv,
+      const std::vector<std::string> &envp) override;
 
   /*** Runtime options ***/
 
@@ -590,17 +601,14 @@ class Executor : public Interpreter {
   unsigned getSymbolicPathStreamID(const ExecutionState &state) override;
 
   void getConstraintLog(const ExecutionState &state, std::string &res,
-                        Interpreter::LogType logFormat = Interpreter::STP)
-                            override;
+      Interpreter::LogType logFormat = Interpreter::STP) override;
 
-  bool getSymbolicSolution(
-      const ExecutionState &state,
+  bool getSymbolicSolution(const ExecutionState &state,
       std::vector<std::pair<std::string, std::vector<unsigned char>>> &res)
           override;
 
   void getCoveredLines(const ExecutionState &state,
-                       std::map<const std::string *, std::set<unsigned>> &res)
-                           override;
+      std::map<const std::string *, std::set<unsigned>> &res) override;
 
   Expr::Width getWidthForLLVMType(llvm::Type *type) const;
   size_t getAllocationAlignment(const llvm::Value *allocSite) const;

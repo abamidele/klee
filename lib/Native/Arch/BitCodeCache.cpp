@@ -22,6 +22,7 @@
 #include "llvm/IR/Function.h"
 
 #include "remill/BC/Util.h"
+#include <stdio.h>
 
 namespace klee {
 
