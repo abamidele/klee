@@ -14,6 +14,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 """
+from binaryninja import *
+from os import listdir
+from sys import argv
 
 if len(argv) < 2:
     print("please specify the location of the memory directory in the workspace as an argument for this program")
