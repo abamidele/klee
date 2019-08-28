@@ -508,11 +508,28 @@ native::AddressSpace *Executor::Memory(klee::ExecutionState &state,
 
 void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
-
+  auto arch = remill::GetTargetArch();
+  const uint64_t addr_mask = trace_manager->memory->addr_mask;
+  std::string inst_bytes;
+  remill::Instruction inst;
+  uint64_t base;
+  if (saved_entry_point_address > map-> LimitAddress()) {
+    // don't want to lift traces before the entry point
+    return ;
+  } else if (map->Contains(saved_entry_point_address)){
+    base = saved_entry_point_address;
+  } else {
+    base = map->BaseAddress();
+  }
 }
 
 void Executor::LinearSweepPass(native::MemoryMapPtr &map,
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
+  auto arch = remill::GetTargetArch();
+  const uint64_t addr_mask = trace_manager->memory->addr_mask;
+  std::string inst_bytes;
+  remill::Instruction inst;
+
 
 }
 

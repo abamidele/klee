@@ -15,22 +15,24 @@
  * limitations under the License.
  */
 
-from binaryninja import *
-from os import listdir
-from sys import argv
+if len(argv) < 2:
+    print("please specify the location of the memory directory in the workspace as an argument for this program")
+    print("Example: `python locate_traces.py ./ws/memory/`")
+    exit(1)
 
-"""
-please specify the path of the memory directory for a corresponding workspace directory
-"""
+
 memory_directory_path = argv[1]
-
 traces = []
 
 def mark_traces_in_mapping(mapping):
-    bv = binaryview.BinaryViewType["ELF"].open(memory_directory_path + mapping)
-    print(memory_directory_path + mapping)
+    path = memory_directory_path
+    if path[-1] != "/":
+        path += "/"
+
+    bv = binaryview.BinaryViewType["ELF"].open(path + mapping)
     if(not bv):
         return
+    print(path + mapping)
     bv.update_analysis_and_wait()
     base = int(mapping.split("_")[0], 16)
     for func in bv.functions:
@@ -51,7 +53,7 @@ def mark_all_traces():
 
 def write_all_traces_to_file():
     with open("trace_list","a+") as trace_file:
-        trace_file.write("======TRACE ADDRESSES======\n")
+        trace_file.write("======TRACE=ADDRESSES======\n")
         for trace in traces:
             trace_file.write(hex(trace).strip("L") + '\n')
 
