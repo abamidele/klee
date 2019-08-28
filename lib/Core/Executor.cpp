@@ -511,10 +511,12 @@ void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
 
 }
 
-void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
+void Executor::LinearSweepPass(native::MemoryMapPtr &map,
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
 
 }
+
+
 
 void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
     std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
