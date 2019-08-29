@@ -312,11 +312,13 @@ public:
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
       unsigned size, bool isReadOnly);
 
-  void RecursiveDescentPass(native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list);
+  void RecursiveDescentPass(const native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
+      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
 
-  void LinearSweepPass(native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list);
+  void LinearSweepPass(const native::MemoryMapPtr &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
+      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
 
   void initializeGlobalObject(ExecutionState &state, ObjectState *os,
       const llvm::Constant *c, unsigned offset);

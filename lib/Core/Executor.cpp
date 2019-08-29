@@ -506,53 +506,125 @@ native::AddressSpace *Executor::Memory(klee::ExecutionState &state,
   return state.memories[index].get();
 }
 
-void Executor::RecursiveDescentPass(native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
+void Executor::RecursiveDescentPass(const native::MemoryMapPtr &map,
+    std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
+    std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces) {
+  // first pass of marking traces ahead of time
   auto arch = remill::GetTargetArch();
   const uint64_t addr_mask = trace_manager->memory->addr_mask;
   std::string inst_bytes;
   remill::Instruction inst;
-  uint64_t base;
-  if (saved_entry_point_address > map-> LimitAddress()) {
+  uint64_t function_start;
+  std::deque<uint64_t> q;
+  std::unordered_set<uint64_t> visited;
+
+  if (saved_entry_point_address > map->LimitAddress()) {
     // don't want to lift traces before the entry point
-    return ;
-  } else if (map->Contains(saved_entry_point_address)){
-    base = saved_entry_point_address;
+    return;
+  } else if (map->Contains(saved_entry_point_address)) {
+    function_start = saved_entry_point_address;
+    decoder_work_list.push_back( { function_start, false });
+    (void) new_lifted_traces[function_start];
+    //LOG(INFO) << "marking 0x" << std::hex << function_start << std::dec;
   } else {
-    base = map->BaseAddress();
+    function_start = map->BaseAddress();
+    // perform the bit of code that finds the entry point or first valid instruction
+  }
+
+  q.push_back(function_start);
+  while (!q.empty()) {
+    auto potential_trace = q.front();
+    LOG(INFO) << std::hex << potential_trace << std::dec;
+    q.pop_front();
+    inst_bytes.clear();
+    for (size_t i = 0; i < arch->MaxInstructionSize(); ++i) {
+      auto byte_addr = (potential_trace & addr_mask) + i;
+      uint8_t byte;
+      if (!trace_manager->TryReadExecutableByte(byte_addr, &byte)) {
+        LOG(ERROR) << "Failed to read byte during recursive descent at 0x"
+            << std::hex << byte_addr << std::dec;
+        return ;
+      } else {
+        inst_bytes.push_back(static_cast<char>(byte));
+      }
+    }
+    inst.Reset();
+    if (arch->DecodeInstruction(potential_trace, inst_bytes, inst)) {
+      visited.insert(potential_trace);
+      //LOG(INFO) << "instruction successfully decoded and visited: " << visited.size();
+      switch (inst.category) {
+      case (remill::Instruction::kCategoryDirectFunctionCall): {
+        (void) new_lifted_traces[inst.branch_taken_pc];
+        //LOG(INFO) << "on call marking 0x" << std::hex << inst.branch_taken_pc << std::dec;
+        //LOG(INFO) << "on call next pc is 0x" << std::hex << inst.next_pc << std::dec;
+        if (!visited.count(inst.branch_taken_pc)) {
+          decoder_work_list.push_back( { inst.branch_taken_pc, false });
+          q.push_back(inst.branch_taken_pc);
+          q.push_back(inst.next_pc);
+        }
+        break;
+      }
+
+      case (remill::Instruction::kCategoryConditionalBranch): {
+        if (!visited.count(inst.branch_taken_pc)) {
+          q.push_back(inst.branch_taken_pc);
+          decoder_work_list.push_back( { inst.branch_taken_pc, false });
+          //LOG(INFO) << "taken branch marking 0x" << std::hex << inst.branch_taken_pc << std::dec;
+          (void) new_lifted_traces[inst.branch_taken_pc];
+        }
+
+        if(!visited.count(inst.branch_not_taken_pc)) {
+          q.push_back(inst.branch_not_taken_pc);
+          decoder_work_list.push_back( { inst.branch_not_taken_pc, false });
+          //LOG(INFO) << "not taken branch marking 0x" << std::hex << inst.branch_not_taken_pc << std::dec;
+          (void) new_lifted_traces[inst.branch_not_taken_pc];
+        }
+        break;
+      }
+      case (remill::Instruction::kCategoryDirectJump): {
+        if (!visited.count(inst.branch_taken_pc)) {
+          q.push_back(inst.branch_taken_pc);
+          decoder_work_list.push_back( { inst.branch_taken_pc, false });
+          //LOG(INFO) << "on jmp marking 0x" << std::hex << inst.branch_taken_pc << std::dec;
+          (void) new_lifted_traces[inst.branch_taken_pc];
+        }
+        break;
+      }
+      case (remill::Instruction::kCategoryIndirectJump):
+      case (remill::Instruction::kCategoryIndirectFunctionCall): {
+        if (!visited.count(inst.pc)) {
+          // linear sweep pass is meant to flesh out these targets
+          decoder_work_list.push_back( { inst.pc, false });
+          // stops doing "work" on a queued potential trace
+        }
+        if (!visited.count(inst.next_pc)) {
+          q.push_back(inst.next_pc);
+        }
+        break;
+      }
+      case(remill::Instruction::kCategoryFunctionReturn): {
+        break;
+      }
+      default: {
+        if (!visited.count(inst.next_pc)) {
+          q.push_back(inst.next_pc);
+        }
+        break;
+      }
+      }
+    }
   }
 }
 
-void Executor::LinearSweepPass(native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list) {
+void Executor::LinearSweepPass(const native::MemoryMapPtr &map,
+    std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
+    std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces) {
+  // second pass in trace marking
   auto arch = remill::GetTargetArch();
   const uint64_t addr_mask = trace_manager->memory->addr_mask;
   std::string inst_bytes;
   remill::Instruction inst;
 
-
-}
-
-
-
-void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
-    std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
-  auto arch = remill::GetTargetArch();
-  const uint64_t addr_mask = trace_manager->memory->addr_mask;
-  std::vector<std::pair<uint64_t, bool>> decoder_work_list;
-  std::string inst_bytes;
-  remill::Instruction inst;
-  uint64_t base;
-  if (saved_entry_point_address > map-> LimitAddress()) {
-    // don't want to lift traces before the entry point
-    return ;
-  } else if (map->Contains(saved_entry_point_address)){
-    base = saved_entry_point_address;
-  } else {
-    base = map->BaseAddress();
-  }
-  LOG(INFO) << "base is: " << std::hex << base << std::dec;
-  decoder_work_list.push_back( { base, true });
   bool work_on_trace;
 
   while (!decoder_work_list.empty()) {
@@ -577,9 +649,7 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
 
     for (auto inst_addr = addr;
         inst_addr < map->LimitAddress() && work_on_trace; ++inst_addr) {
-      //if (new_marked_traces.size() == 0x5) {
-      //  return;
-      //}
+
       inst_bytes.clear();
       std::unordered_set<uint64_t> visited;
       for (size_t i = 0; i < arch->MaxInstructionSize(); ++i) {
@@ -606,7 +676,7 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
         switch (inst.category) {
         case remill::Instruction::kCategoryDirectJump: {
           work_on_trace = false;
-          (void) new_marked_traces[addr];
+          (void) new_lifted_traces[addr];
           LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
           if (!visited.count(inst.branch_taken_pc)) {
             decoder_work_list.push_back( { inst.branch_taken_pc, false });
@@ -617,7 +687,7 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
         }
         case remill::Instruction::kCategoryConditionalBranch: {
           work_on_trace = false;
-          (void) new_marked_traces[addr];
+          (void) new_lifted_traces[addr];
           LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
 
           if (!visited.count(inst.branch_taken_pc)) {
@@ -639,13 +709,14 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
           LOG(INFO) << "function call instruction at 0x" << std::hex
               << inst_addr << std::dec;
           work_on_trace = false;
-          (void) new_marked_traces[addr];
+          (void) new_lifted_traces[addr];
           LOG(INFO) << "marking 0x" << std::hex << addr << std::dec;
-          LOG(INFO) << "the location of the call is at "
-              << std::hex << inst.branch_taken_pc << std::dec;
+          LOG(INFO) << "the location of the call is at " << std::hex
+              << inst.branch_taken_pc << std::dec;
           if (!visited.count(inst.next_pc)) {
-            LOG(INFO) << "marking 0x" << std::hex << inst.branch_taken_pc << std::dec;
-            (void) new_marked_traces[inst.branch_taken_pc];
+            LOG(INFO) << "marking 0x" << std::hex << inst.branch_taken_pc
+                << std::dec;
+            (void) new_lifted_traces[inst.branch_taken_pc];
             decoder_work_list.push_back( { inst.next_pc, false });
           }
           break;
@@ -654,7 +725,7 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
           LOG(INFO) << "ret instruction at 0x" << std::hex << inst_addr
               << std::dec;
           work_on_trace = false;
-          (void) new_marked_traces[addr];
+          (void) new_lifted_traces[addr];
           if (!visited.count(inst.next_pc)) {
             decoder_work_list.push_back( { inst.next_pc, true });
           }
@@ -684,9 +755,9 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
         LOG(INFO) << "failed to decode instruction at 0x" << std::hex
             << inst_addr << std::dec << " throwing away trace " << std::hex
             << addr << std::dec;
-        if (!visited.count(inst_addr + 1)) {
-          decoder_work_list.push_back( { inst_addr + 1, false });
-        }
+        //if (!visited.count(inst_addr + 1)) {
+        //  decoder_work_list.push_back( { inst_addr + 1, false });
+        //}
       }
     }
 
@@ -694,6 +765,19 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
       break;
     }
   }
+
+}
+
+void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
+    std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
+  std::vector<std::pair<uint64_t, bool>> decoder_work_list;
+  RecursiveDescentPass(map, decoder_work_list, new_marked_traces);
+  LOG(INFO) << "Traces from recursive descent";
+  for (const auto &trace: new_marked_traces) {
+    LOG(INFO) << std::hex << trace.first << std::dec;
+  }
+  exit(0);
+  LinearSweepPass(map, decoder_work_list, new_marked_traces);
 }
 
 void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
@@ -739,7 +823,8 @@ void Executor::preLiftBitcode(void) {
   UpdateKModuleAfterLift(trace_manager->traces);
 }
 
-void Executor::UpdateKModuleAfterLift(const std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces) {
+void Executor::UpdateKModuleAfterLift(
+    const std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces) {
   remill::OptimizationGuide guide = { };
   guide.slp_vectorize = false;
   guide.loop_vectorize = false;
@@ -749,7 +834,7 @@ void Executor::UpdateKModuleAfterLift(const std::unordered_map<uint64_t, llvm::F
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
   for (auto lifted_entry : new_lifted_traces) {
-      remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
+    remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
   }
 
   kmodule->instrument(holding_module.get(), opts);

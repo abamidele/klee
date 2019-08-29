@@ -62,6 +62,7 @@ DECLARE_string(arch);
 DECLARE_string(os);
 
 DEFINE_bool(verbose, true, "Enable verbose logging?");
+DEFINE_bool(binja_traces, true, "Generate a file with binja that contains potential traces for aot lifting");
 
 namespace klee {
 namespace native {
@@ -881,6 +882,14 @@ static void SnapshotProgram(remill::ArchName arch, remill::OSName os) {
   }
 }
 
+static void GenerateTraceListWithBinja() {
+  struct stat binja_script;
+  std::stringstream command;
+  const auto& memory_dir = klee::native::Workspace::MemoryDir();
+  const auto& binja_script_path = klee::native::Workspace::BinjaScriptPath();
+
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -917,6 +926,10 @@ int main(int argc, char **argv) {
   gSnapshot.set_os(FLAGS_os);
 
   SnapshotProgram(arch_name, os_name);
+
+  if (FLAGS_binja_traces) {
+    GenerateTraceListWithBinja();
+  }
 
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
