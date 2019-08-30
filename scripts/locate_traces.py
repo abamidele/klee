@@ -29,7 +29,6 @@ memory_directory_path = argv[1]
 if memory_directory_path[-1] != "/":
     memory_directory_path += "/"
 
-
 traces = []
 
 def mark_traces_in_mapping(mapping):
@@ -39,12 +38,20 @@ def mark_traces_in_mapping(mapping):
     print(memory_directory_path + mapping)
     bv.update_analysis_and_wait()
     base = int(mapping.split("_")[0], 16)
+    pc = base
     for func in bv.functions:
         for bb in func:
-            if bb.start < base:
-                traces.append(base + bb.start)
-            else:
-                traces.append(bb.start)
+            # make the beginning of basic blocks a trace
+            pc = bb.start if bb.start > base else base + bb.start
+            traces.append(pc)
+            for ins in bb:
+                # this loop is for marking in the return addresses of function calls
+                ins_array, size = ins
+                pc += size
+                if ins_array[0].text == 'call':
+                    # print("call pc is " + hex(pc))
+                    traces.append(pc)
+
 
 def is_executable(mapping):
     umask = "".join(mapping.split("_")[2:4])
@@ -62,7 +69,6 @@ def write_all_traces_to_file():
         trace_file.write("======TRACE=ADDRESSES======\n")
         for trace in traces:
             trace_file.write(hex(trace).strip("L") + '\n')
-
 
 if __name__  == "__main__":
     mark_all_traces()

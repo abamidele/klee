@@ -62,7 +62,7 @@ DECLARE_string(arch);
 DECLARE_string(os);
 
 DEFINE_bool(verbose, true, "Enable verbose logging?");
-DEFINE_bool(binja_traces, true, "Generate a file with binja that contains potential traces for aot lifting");
+DEFINE_bool(binja_traces, false, "Generate a file with binja that contains potential traces for aot lifting");
 
 namespace klee {
 namespace native {
@@ -884,10 +884,17 @@ static void SnapshotProgram(remill::ArchName arch, remill::OSName os) {
 
 static void GenerateTraceListWithBinja() {
   struct stat binja_script;
-  std::stringstream command;
+  std::stringstream ss;
+  LOG(INFO) << "generating binja traces ";
   const auto& memory_dir = klee::native::Workspace::MemoryDir();
   const auto& binja_script_path = klee::native::Workspace::BinjaScriptPath();
-
+  ss << "python " << binja_script_path << " " << memory_dir;
+  system(ss.str().c_str());
+  if (!remill::FileExists(klee::native::Workspace::TraceListPath())) {
+    LOG(ERROR) << "Failed to create the trace_list file do you have the binja python package?";
+  } else {
+    LOG(INFO) << "Successfully created trace_list file";
+  }
 }
 
 }  // namespace

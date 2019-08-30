@@ -36,6 +36,7 @@ class Workspace {
   static const std::string &RuntimeInterceptPath(void);
   static const std::string &BitcodeCachePath(void);
   static const std::string &BinjaScriptPath(void);
+  static const std::string &TraceListPath(void);
 
   static void LoadSnapshotIntoExecutor(
       const ProgramSnapshotPtr &snapshot, klee::Interpreter *executor);

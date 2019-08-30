@@ -30,9 +30,9 @@
 #include "Native/Memory/AddressSpace.h"
 #include "Native/Util/AreaAllocator.h"
 #include "Native/Memory/PolicyHandler.h"
+#include "Native/Workspace/Workspace.h"
 
 #include "ThreadPool/ThreadPool.h"
-
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
 #include "klee/Interpreter.h"
@@ -100,6 +100,7 @@
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
 #include "remill/BC/Optimizer.h"
+#include "remill/OS/FileSystem.h"
 
 #include <cassert>
 #include <algorithm>
@@ -543,7 +544,7 @@ void Executor::RecursiveDescentPass(const native::MemoryMapPtr &map,
       if (!trace_manager->TryReadExecutableByte(byte_addr, &byte)) {
         LOG(ERROR) << "Failed to read byte during recursive descent at 0x"
             << std::hex << byte_addr << std::dec;
-        return ;
+        return;
       } else {
         inst_bytes.push_back(static_cast<char>(byte));
       }
@@ -573,7 +574,7 @@ void Executor::RecursiveDescentPass(const native::MemoryMapPtr &map,
           (void) new_lifted_traces[inst.branch_taken_pc];
         }
 
-        if(!visited.count(inst.branch_not_taken_pc)) {
+        if (!visited.count(inst.branch_not_taken_pc)) {
           q.push_back(inst.branch_not_taken_pc);
           decoder_work_list.push_back( { inst.branch_not_taken_pc, false });
           //LOG(INFO) << "not taken branch marking 0x" << std::hex << inst.branch_not_taken_pc << std::dec;
@@ -602,7 +603,7 @@ void Executor::RecursiveDescentPass(const native::MemoryMapPtr &map,
         }
         break;
       }
-      case(remill::Instruction::kCategoryFunctionReturn): {
+      case (remill::Instruction::kCategoryFunctionReturn): {
         break;
       }
       default: {
@@ -771,9 +772,29 @@ void Executor::LinearSweepPass(const native::MemoryMapPtr &map,
 void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
     std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
   std::vector<std::pair<uint64_t, bool>> decoder_work_list;
+  const auto &trace_list_path = native::Workspace::TraceListPath();
+  if (remill::FileExists(trace_list_path)) {
+    LOG(INFO) << "grabbing traces from the trace list file in the workspace";
+    std::ifstream trace_file_stream;
+    uint64_t trace_address;
+    trace_file_stream.open(trace_list_path);
+    if (trace_file_stream) {
+      std::string trace_heads_label;
+      trace_file_stream >> trace_heads_label;
+
+      while (trace_file_stream >> std::hex >> trace_address) {
+        (void) new_marked_traces[trace_address];
+      }
+      trace_file_stream.close();
+      return;
+    } else {
+      LOG(ERROR) << "cannot read the trace list file at " << trace_list_path
+          << " , falling back to recursive descent and linear sweep";
+    }
+  }
   RecursiveDescentPass(map, decoder_work_list, new_marked_traces);
   LOG(INFO) << "Traces from recursive descent";
-  for (const auto &trace: new_marked_traces) {
+  for (const auto &trace : new_marked_traces) {
     LOG(INFO) << std::hex << trace.first << std::dec;
   }
   exit(0);
@@ -834,6 +855,7 @@ void Executor::UpdateKModuleAfterLift(
   remill::OptimizeModule(semantics_module, new_lifted_traces, guide);
 
   for (auto lifted_entry : new_lifted_traces) {
+    const auto &trace_name = trace_manager->TraceName(lifted_entry.first);
     remill::MoveFunctionIntoModule(lifted_entry.second, holding_module.get());
   }
 
@@ -858,7 +880,7 @@ void Executor::UpdateKModuleAfterLift(
   bindModuleConstants(holding_module.get());
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
-  }
+   }
 }
 
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,

@@ -31,15 +31,21 @@
 #include "Native/Arch/Arch.h"
 #include "remill/Arch/Arch.h"
 
-#ifndef KLEEMILL_BUILD_RUNTIME_DIR
-# error "`KLEEMILL_BUILD_RUNTIME_DIR` must be set."
-# define KLEEMILL_BUILD_RUNTIME_DIR ""
-#endif  // KLEEMILL_BUILD_RUNTIME_DIR
+#ifndef KLEE_NATIVE_BUILD_RUNTIME_DIR
+# error "`KLEE_NATIVE_BUILD_RUNTIME_DIR` must be set."
+# define KLEE_NATIVE_BUILD_RUNTIME_DIR ""
+#endif  // KLEE_NATIVE_BUILD_RUNTIME_DIR
 
-#ifndef KLEEMILL_INSTALL_RUNTIME_DIR
-# error "`KLEEMILL_INSTALL_RUNTIME_DIR` must be defined."
-# define KLEEMILL_INSTALL_RUNTIME_DIR ""
-#endif  // KLEEMILL_INSTALL_RUNTIME_DIR
+#ifndef KLEE_NATIVE_INSTALL_RUNTIME_DIR
+# error "`KLEE_NATIVE_INSTALL_RUNTIME_DIR` must be defined."
+# define KLEE_NATIVE_INSTALL_RUNTIME_DIR ""
+#endif  // KLEE_NATIVE_INSTALL_RUNTIME_DIR
+
+#ifndef KLEE_NATIVE_SOURCE_DIR
+# error "`KLEE_NATIVE_SOURCE_DIR` must be defined."
+# define KLEE_NATIVE_SOURCE_DIR ""
+#endif  // KLEE_NATIVE_SOURCE_DIR
+
 
 DEFINE_string(workspace_dir, ".", "Path to workspace in which the snapshot file is"
               " stored, and in which files will be placed.");
@@ -127,8 +133,9 @@ const std::string &Workspace::BitcodeDir(void) {
   return path;
 }
 
-static std::string gBuildRuntimDir = KLEEMILL_BUILD_RUNTIME_DIR;
-static std::string gInstallRuntimeDir = KLEEMILL_INSTALL_RUNTIME_DIR;
+static std::string gBuildRuntimDir = KLEE_NATIVE_BUILD_RUNTIME_DIR;
+static std::string gInstallRuntimeDir = KLEE_NATIVE_INSTALL_RUNTIME_DIR;
+static std::string gSourceDir = KLEE_NATIVE_SOURCE_DIR;
 
 const std::string &Workspace::LocalRuntimeBitcodePath(void) {
   static std::string path;
@@ -192,6 +199,24 @@ const std::string &Workspace::RuntimeInterceptPath(void) {
   path = ss.str();
   return path;
 }
+
+const std::string &Workspace::BinjaScriptPath(void) {
+  static std::string path;
+  std::stringstream ss;
+  ss << gSourceDir << "/scripts/locate_traces.py";
+  path = ss.str();
+  return path;
+}
+
+const std::string &Workspace::TraceListPath(void) {
+  static std::string path;
+  std::stringstream ss;
+  ss << Workspace::Dir() << "/trace_list";
+  path = ss.str();
+  return path;
+}
+
+
 
 
 namespace {
