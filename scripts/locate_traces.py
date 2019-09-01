@@ -18,7 +18,10 @@ from binaryninja import *
 from os import listdir
 from sys import argv
 
-# this program assumes that the memory file provided is in the workspace
+"""
+this program assumes that the memory file provided is in the workspace and only on 64 bit linux
+"""
+
 if len(argv) < 2:
     print("please specify the location of the memory directory in the workspace as an argument for this program")
     print("Example: `python locate_traces.py ./ws/memory/`")
@@ -31,11 +34,32 @@ if memory_directory_path[-1] != "/":
 
 traces = []
 
+def create_functions_in_binaryview(mapping):
+    """
+    locate function stub opcodes and adds entry point to a binaryview
+    """
+    bv = binaryview.BinaryViewType["Raw"].open(memory_directory_path + mapping)
+    arch = binaryninja.Architecture["x86_64"]
+    plat = binaryninja.Platform["linux-x86_64"]
+    for i in range(0,len(bv),16):
+        if (bv.read(i,1) == '\xff' and bv.read(i+1,1) == '\x25'):
+            if (arch.get_instruction_info(bv.read(i, arch.max_instr_length), i)):
+                binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, i)
+                binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, i + 16)
+    return bv
+
+
 def mark_traces_in_mapping(mapping):
     bv = binaryview.BinaryViewType["ELF"].open(memory_directory_path + mapping)
-    if(not bv):
-        return
-    print(memory_directory_path + mapping)
+    if not bv:
+        if "lib" in mapping and "_so" in mapping:
+            print("creating functions for mapping {}".format(mapping))
+            bv = create_functions_in_binaryview(mapping)
+        else:
+            print("could not produce binary view for mapping {}".format(mapping))
+            return
+    else:
+        print(memory_directory_path + mapping)
     bv.update_analysis_and_wait()
     base = int(mapping.split("_")[0], 16)
     pc = base
@@ -49,9 +73,7 @@ def mark_traces_in_mapping(mapping):
                 ins_array, size = ins
                 pc += size
                 if ins_array[0].text == 'call':
-                    # print("call pc is " + hex(pc))
                     traces.append(pc)
-
 
 def is_executable(mapping):
     umask = "".join(mapping.split("_")[2:4])

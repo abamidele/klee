@@ -805,7 +805,6 @@ void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
   std::unordered_map<uint64_t, llvm::Function *> new_marked_traces;
   decodeAndMarkTraces(map, new_marked_traces);
   for (auto trace_pairs : new_marked_traces) {
-    LOG(INFO) << "--------------------BEFORE THE LIFT----------------------";
     // check if trace is already in the module to account for traces from the bitcode cache
     const auto trace_name = trace_manager->TraceName(trace_pairs.first);
     if (!traces_module->getFunction(trace_name)) {
