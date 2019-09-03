@@ -27,27 +27,36 @@ if len(argv) < 2:
     print("Example: `python locate_traces.py ./ws/memory/`")
     exit(1)
 
-
 memory_directory_path = argv[1]
 if memory_directory_path[-1] != "/":
     memory_directory_path += "/"
 
 traces = []
+Settings().set_bool("analysis.linearSweep.autorun", True)
+
+def u64(data):
+    return struct.unpack( "<Q", data)[0]
+
+def create_functions_from_signature_scan(bv, entry_point, plat):
+    sig = ['\x55', '\x48','\x89', '\xe5']
+    curr = entry_point
+    while curr <= len(bv):
+        if all(map(lambda x: x[0] == x[1], \
+                zip(bv.read(curr, len(sig)), sig))):
+            binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, curr)
+            curr += len(sig)
+        else:
+            curr += 1
+    return bv
 
 def create_functions_in_binaryview(mapping):
-    """
-    locate function stub opcodes and adds entry point to a binaryview
-    """
     bv = binaryview.BinaryViewType["Raw"].open(memory_directory_path + mapping)
     arch = binaryninja.Architecture["x86_64"]
     plat = binaryninja.Platform["linux-x86_64"]
-    for i in range(0,len(bv),16):
-        if (bv.read(i,1) == '\xff' and bv.read(i+1,1) == '\x25'):
-            if (arch.get_instruction_info(bv.read(i, arch.max_instr_length), i)):
-                binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, i)
-                binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, i + 16)
-    return bv
-
+    entry_point = u64(bv.read(0x18, arch.address_size)) # parse entry point from elf
+    print("entrypoint was {}".format(hex(entry_point)))
+    binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, entry_point)
+    return create_functions_from_signature_scan(bv, entry_point, plat)
 
 def mark_traces_in_mapping(mapping):
     bv = binaryview.BinaryViewType["ELF"].open(memory_directory_path + mapping)
@@ -61,6 +70,7 @@ def mark_traces_in_mapping(mapping):
     else:
         print(memory_directory_path + mapping)
     bv.update_analysis_and_wait()
+
     base = int(mapping.split("_")[0], 16)
     pc = base
     for func in bv.functions:

@@ -808,11 +808,12 @@ void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
     // check if trace is already in the module to account for traces from the bitcode cache
     const auto trace_name = trace_manager->TraceName(trace_pairs.first);
     if (!traces_module->getFunction(trace_name)) {
-      bool res = trace_lifter->Lift(trace_pairs.first,
+      (void) trace_lifter->Lift(trace_pairs.first,
           [&new_marked_traces] (uint64_t trace_addr, llvm::Function *func) {
             func->setLinkage(llvm::GlobalValue::ExternalLinkage);
             new_marked_traces[trace_addr] = func;
           });
+      /*
       if (res) {
         LOG(INFO) << "successfully lifted trace head at 0x" << std::hex
             << trace_pairs.first << std::dec;
@@ -820,6 +821,7 @@ void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
         LOG(INFO) << "failed to lift trace head at 0x" << std::hex
             << trace_pairs.first << std::dec;
       }
+      */
     }
   }
 }
@@ -836,10 +838,10 @@ void Executor::preLiftBitcode(void) {
   }
   trace_manager->memory = nullptr;
   // NOTE the native address space will be a shared resource among all threads
-  for (auto &trace_pairs : trace_manager->traces) {
-    LOG(INFO) << "trace at 0x" << std::hex << trace_pairs.first << std::dec;
-  }  // Temporary logging statement should be removed eventually
-
+  //for (auto &trace_pairs : trace_manager->traces) {
+  //  LOG(INFO) << "trace at 0x" << std::hex << trace_pairs.first << std::dec;
+  //}  Temporary logging statement should be removed eventually
+  LOG(INFO) << "pre-lifted all the traces -- preparing kModule and optimizations";
   UpdateKModuleAfterLift(trace_manager->traces);
 }
 
@@ -899,6 +901,9 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
     trace_manager->SetLiftedTraceDefinition(addr, func);
     return func;
   }
+
+  LOG(INFO) << "need to lift function 0x" <<
+      std::hex << addr << std::dec;
 
   std::unordered_map<uint64_t, llvm::Function *> new_lifted_traces;
 
@@ -1185,8 +1190,8 @@ void Executor::initializeGlobals(ExecutionState &state) {
       /*isGlobal=*/true, /*allocSite=*/
       v,
       /*alignment=*/globalObjectAlignment);
-      if (!mo)
-        llvm::report_fatal_error("out of memory");
+      //if (!mo)
+      //  llvm::report_fatal_error("out of memory");
       ObjectState *os = bindObjectInState(state, mo, false);
       globalObjects.insert(std::make_pair(v, mo));
       globalAddresses.insert(std::make_pair(v, mo->getBaseExpr()));
