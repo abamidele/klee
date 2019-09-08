@@ -29,15 +29,14 @@
 #include "Core/AddressSpace.h"
 #include "klee/Expr.h"
 
-
 #include "remill/Arch/Arch.h"
 #include "remill/OS/OS.h"
 
-struct Memory {};
+struct Memory {
+};
 
 namespace klee {
 namespace native {
-
 
 namespace {
 enum : uint64_t {
@@ -76,10 +75,9 @@ static constexpr uint64_t kMallocTooBig = ~0ULL - 1ULL;
 
 class PolicyHandler;
 
-
 // Basic memory implementation.
-class AddressSpace : public Memory {
- public:
+class AddressSpace: public Memory {
+public:
   AddressSpace(void);
 
   // Creates a copy/clone of another address space.
@@ -101,15 +99,17 @@ class AddressSpace : public Memory {
   // Get the code version associated with some program counter.
   CodeVersion ComputeCodeVersion(PC pc);
 
-  __attribute__((hot))
-  bool TryRead(uint64_t addr, void *val, size_t size, PolicyHandler *policy_handler);
+  __attribute__((hot)) bool TryRead(uint64_t addr, void *val, size_t size,
+      PolicyHandler *policy_handler);
 
-  __attribute__((hot))
-  bool TryWrite(uint64_t addr, const void *val, size_t size, PolicyHandler *policy_handler);
+  __attribute__((hot)) bool TryWrite(uint64_t addr, const void *val,
+      size_t size, PolicyHandler *policy_handler);
 
   // Read/write a byte to memory. Returns `false` if the read or write failed.
-  __attribute__((hot)) bool TryRead(uint64_t addr, uint8_t *val, PolicyHandler *policy_handler);
-  __attribute__((hot)) bool TryWrite(uint64_t addr, uint8_t val, PolicyHandler *policy_handler);
+  __attribute__((hot)) bool TryRead(uint64_t addr, uint8_t *val,
+      PolicyHandler *policy_handler);
+  __attribute__((hot)) bool TryWrite(uint64_t addr, uint8_t val,
+      PolicyHandler *policy_handler);
 
   // Return the virtual address of the memory backing `addr`.
   __attribute__((hot)) void *ToReadWriteVirtualAddress(uint64_t addr);
@@ -125,12 +125,12 @@ class AddressSpace : public Memory {
 
   // Change the permissions of some range of memory. This can split memory
   // maps.
-  void SetPermissions(uint64_t base, size_t size, bool can_read,
-                      bool can_write, bool can_exec);
+  void SetPermissions(uint64_t base, size_t size, bool can_read, bool can_write,
+      bool can_exec);
 
   // Adds a new memory mapping with default read/write permissions.
-  void AddMap(uint64_t base, size_t size, const char *name=nullptr,
-              uint64_t offset=0);
+  void AddMap(uint64_t base, size_t size, const char *name = nullptr,
+      uint64_t offset = 0);
 
   // Removes a memory mapping.
   void RemoveMap(uint64_t base, size_t size);
@@ -144,7 +144,7 @@ class AddressSpace : public Memory {
   // Find a hole big enough to hold `size` bytes in the address space,
   // such that the hole falls within the bounds `[min, max)`.
   bool FindHole(uint64_t min, uint64_t max, uint64_t size,
-                uint64_t *hole) const;
+      uint64_t *hole) const;
 
   // Mark some PC in this address space as being a known trace head. This is
   // used for helping the decoder to not repeat past work.
@@ -152,10 +152,13 @@ class AddressSpace : public Memory {
 
   // Check to see if a given program counter is a trace head.
   bool IsMarkedTraceHead(PC pc) const;
-  
+
+  bool IsSameMappedRange(uint64_t addr1, uint64_t addr2) ;
+
   bool TryFree(uint64_t addr, PolicyHandler *policy_handler);
   uint64_t TryMalloc(size_t alloc_size, PolicyHandler *policy_handler);
-  uint64_t TryRealloc(uint64_t addr, size_t alloc_size, PolicyHandler *policy_handler);
+  uint64_t TryRealloc(uint64_t addr, size_t alloc_size,
+      PolicyHandler *policy_handler);
 
   AddressSpace(AddressSpace &&) = delete;
   AddressSpace &operator=(const AddressSpace &) = delete;
@@ -196,8 +199,7 @@ class AddressSpace : public Memory {
   const MemoryMapPtr invalid;
 
   enum : uint64_t {
-    kRangeCacheSize = 256ULL,
-    kRangeCacheMask = kRangeCacheSize - 1ULL
+    kRangeCacheSize = 256ULL, kRangeCacheMask = kRangeCacheSize - 1ULL
   };
 
   MappedRange *last_map_cache[kRangeCacheSize + 1];
@@ -213,14 +215,15 @@ class AddressSpace : public Memory {
 
   /* an instance of klee's address space to handle symbolic writes and reads
    __remill_read_memory_N and __remill_write_memory_N */
- public:
+public:
 
   // TODO(sai) add symbolic memory addr2symbol set and move this to mapped range 
   // would potentially be better if both symbolic mem and addr2symbol set where
   // in own overarching object
-  
+
   std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
   std::unordered_map<uint64_t, AllocList> alloc_lists;
+  std::unordered_map<uint64_t, std::shared_ptr<llvm::Module>> aot_traces;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.

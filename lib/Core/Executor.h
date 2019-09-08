@@ -307,6 +307,9 @@ public:
   void UpdateKModuleAfterLift(
       const std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
 
+  llvm::Function *materializeTrace(uint64_t trace_addr,
+      native::AddressSpace *memory);
+
   // Given a concrete object in our [klee's] address space, add it to 
   // objects checked code can reference.
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
@@ -563,9 +566,11 @@ public:
   void decodeAndMarkTraces(const native::MemoryMapPtr &map,
       std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces);
 
-  void decodeAndLiftMapping(const native::MemoryMapPtr &map);
+  void decodeAndLiftMappings(void);
 
   void preLiftBitcode(void);
+
+  void LiftMapping(std::vector<uint64_t>& traces);
 
   vTask *NextTask(void);
 

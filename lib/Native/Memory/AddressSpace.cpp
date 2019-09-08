@@ -71,7 +71,8 @@ AddressSpace::AddressSpace(const AddressSpace &parent) :
     page_is_executable(parent.page_is_executable),
     trace_heads(parent.trace_heads),
     symbolic_memory(parent.symbolic_memory),
-    is_dead(parent.is_dead) {
+    is_dead(parent.is_dead),
+    aot_traces(parent.aot_traces) {
 
   // Only copy the lists with non-full free lists.
   for (const auto &size_list : parent.alloc_lists) {
@@ -781,6 +782,10 @@ CodeVersion AddressSpace::ComputeCodeVersion(PC pc) {
 
 MappedRange &AddressSpace::FindRange(uint64_t addr) {
   return FindRangeAligned(AlignDownToPage(addr));
+}
+
+bool AddressSpace::IsSameMappedRange(uint64_t addr1, uint64_t addr2) {
+  return FindRange(addr1).Contains(addr2);
 }
 
 enum : uint64_t {

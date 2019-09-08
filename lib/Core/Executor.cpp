@@ -432,7 +432,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
 }
 
 void Executor::setPreLift(bool isPreLift) {
-  preLift = true;
+  preLift = isPreLift;
 }
 
 llvm::Module *
@@ -772,77 +772,106 @@ void Executor::LinearSweepPass(const native::MemoryMapPtr &map,
 void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
     std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces) {
   std::vector<std::pair<uint64_t, bool>> decoder_work_list;
-  const auto &trace_list_path = native::Workspace::TraceListPath();
-  if (remill::FileExists(trace_list_path)) {
-    LOG(INFO) << "grabbing traces from the trace list file in the workspace";
-    std::ifstream trace_file_stream;
-    uint64_t trace_address;
-    trace_file_stream.open(trace_list_path);
-    if (trace_file_stream) {
-      std::string trace_heads_label;
-      trace_file_stream >> trace_heads_label;
-
-      while (trace_file_stream >> std::hex >> trace_address) {
-        (void) new_marked_traces[trace_address];
-      }
-      trace_file_stream.close();
-      return;
-    } else {
-      LOG(ERROR) << "cannot read the trace list file at " << trace_list_path
-          << " , falling back to recursive descent and linear sweep";
-    }
-  }
+  exit(0);
   RecursiveDescentPass(map, decoder_work_list, new_marked_traces);
   LOG(INFO) << "Traces from recursive descent";
   for (const auto &trace : new_marked_traces) {
     LOG(INFO) << std::hex << trace.first << std::dec;
   }
-  exit(0);
   LinearSweepPass(map, decoder_work_list, new_marked_traces);
 }
 
-void Executor::decodeAndLiftMapping(const native::MemoryMapPtr &map) {
-  std::unordered_map<uint64_t, llvm::Function *> new_marked_traces;
-  decodeAndMarkTraces(map, new_marked_traces);
-  for (auto trace_pairs : new_marked_traces) {
-    // check if trace is already in the module to account for traces from the bitcode cache
-    const auto trace_name = trace_manager->TraceName(trace_pairs.first);
-    if (!traces_module->getFunction(trace_name)) {
-      (void) trace_lifter->Lift(trace_pairs.first,
-          [&new_marked_traces] (uint64_t trace_addr, llvm::Function *func) {
-            func->setLinkage(llvm::GlobalValue::ExternalLinkage);
-            new_marked_traces[trace_addr] = func;
-          });
-      /*
-      if (res) {
-        LOG(INFO) << "successfully lifted trace head at 0x" << std::hex
-            << trace_pairs.first << std::dec;
-      } else {
-        LOG(INFO) << "failed to lift trace head at 0x" << std::hex
-            << trace_pairs.first << std::dec;
+void Executor::LiftMapping(std::vector<uint64_t>& traces) {
+  //  traces are expected to be in sorted order and have at least size 1
+  auto &memory = trace_manager->memory;
+  auto *ctx = &traces_module->getContext();
+  memory->aot_traces[klee::native::AlignDownToPage(traces.front())] =
+      std::shared_ptr<llvm::Module>(remill::LoadTargetSemantics(ctx));
+  auto &aot_trace_module = memory->aot_traces[klee::native::AlignDownToPage(
+      traces.front())];
+  auto mapping_manager = native::TraceManager(*aot_trace_module, nullptr);
+  mapping_manager.memory = memory;
+  auto mapping_intrinsics = remill::IntrinsicTable(aot_trace_module.get());
+  auto mapping_inst_lifter = remill::InstructionLifter(remill::GetTargetArch(),
+      mapping_intrinsics);
+  auto mapping_lifter = remill::TraceLifter(&mapping_inst_lifter,
+      &mapping_manager);
+  auto &new_marked_traces = mapping_manager.traces;
+
+  /*
+   auto &context = traces_module->getContext();
+   holding_module.reset(new llvm::Module("", context));
+   semantics_module.reset(remill::LoadTargetSemantics(&context));
+   intrinsics.reset(new remill::IntrinsicTable(semantics_module));
+   trace_manager.reset(new native::TraceManager(*traces_module, policy_handler));
+   inst_lifter.reset(
+   new remill::InstructionLifter(remill::GetTargetArch(), *intrinsics));
+   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
+   continuations.reserve(8192);
+   */
+
+  while (!traces.empty()) {
+    uint64_t trace = traces.back();
+    (void) mapping_lifter.Lift(trace,
+        [&new_marked_traces] (uint64_t trace_addr, llvm::Function *func) {
+          func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+          new_marked_traces[trace_addr] = func;
+        });
+    traces.pop_back();
+  }
+  mapping_manager.memory = nullptr;
+
+  remill::OptimizationGuide guide = { };
+  guide.slp_vectorize = false;
+  guide.loop_vectorize = false;
+  guide.verify_input = false;
+  guide.eliminate_dead_stores = true;
+
+  LOG(INFO) << "successfully lifted traces for mapping";
+  remill::OptimizeModule(aot_trace_module.get(), new_marked_traces, guide);
+  LOG(INFO) << "finished optimizing the map module";
+}
+
+void Executor::decodeAndLiftMappings() {
+  const auto &trace_list_path = native::Workspace::TraceListPath();
+  if (remill::FileExists(trace_list_path)) {
+    const auto &memory = trace_manager->memory;
+    LOG(INFO) << "grabbing traces from the trace list file in the workspace";
+    std::ifstream trace_file_stream;
+    uint64_t prev_base = 0;
+    uint64_t trace_address;
+    trace_file_stream.open(trace_list_path);
+    std::vector<uint64_t> trace_batch;
+    if (trace_file_stream) {
+      std::string trace_heads_label;
+      trace_file_stream >> trace_heads_label;
+      while (trace_file_stream >> std::hex >> trace_address) {
+        if (!memory->IsSameMappedRange(trace_address, prev_base)) {
+          if (!trace_batch.empty()) {
+            LiftMapping(trace_batch);
+          }
+          prev_base = trace_address;
+          trace_batch.clear();
+        }
+        trace_batch.push_back(trace_address);
       }
-      */
+      if (!trace_batch.empty()) {
+        LiftMapping(trace_batch);
+      }
+      trace_file_stream.close();
+    } else {
+      LOG(ERROR) << "cannot read the trace list file at " << trace_list_path
+          << " , falling back to recursive descent and linear sweep";
+      return;
     }
   }
 }
 
 void Executor::preLiftBitcode(void) {
   trace_manager->memory = memories.back().get();
-  for (const auto &map : trace_manager->memory->maps) {
-    const auto &base = map->BaseAddress();
-    if (trace_manager->memory->CanExecuteAligned(base) && base) {
-      // TODO(sai) expand this to create an individual thread eventually have to make copies of the module and have a mutex
-      decodeAndLiftMapping(map);
-      break;
-    }
-  }
+  decodeAndLiftMappings();
   trace_manager->memory = nullptr;
   // NOTE the native address space will be a shared resource among all threads
-  //for (auto &trace_pairs : trace_manager->traces) {
-  //  LOG(INFO) << "trace at 0x" << std::hex << trace_pairs.first << std::dec;
-  //}  Temporary logging statement should be removed eventually
-  LOG(INFO) << "pre-lifted all the traces -- preparing kModule and optimizations";
-  UpdateKModuleAfterLift(trace_manager->traces);
 }
 
 void Executor::UpdateKModuleAfterLift(
@@ -881,7 +910,42 @@ void Executor::UpdateKModuleAfterLift(
   bindModuleConstants(holding_module.get());
   for (auto lifted_entry : new_lifted_traces) {
     remill::MoveFunctionIntoModule(lifted_entry.second, traces_module);
-   }
+  }
+}
+
+llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
+    native::AddressSpace *memory){
+  auto map_key = klee::native::AlignDownToPage(trace_addr);
+  const auto trace_name = trace_manager->TraceName(trace_addr);
+  if (memory->aot_traces.find(map_key) != memory->aot_traces.end()) {
+    auto map_module = memory->aot_traces[map_key];
+    if (auto trace_func = map_module->getFunction(trace_name)) {
+    LOG(INFO) << "lazily materializing " << trace_name
+        << " in traces module";
+    remill::MoveFunctionIntoModule(trace_func, holding_module.get());
+    kmodule->instrument(holding_module.get(), opts);
+    specialFunctionHandler->prepare(holding_module.get(),
+        preservedFunctions);
+    kmodule->optimiseAndPrepare(holding_module.get(), opts,
+        preservedFunctions);
+    kmodule->manifest(holding_module.get(), interpreterHandler,
+        StatsTracker::useStatistics());
+    specialFunctionHandler->bind(holding_module.get());
+
+    auto addr_expr = Expr::createPointer(
+        reinterpret_cast<uintptr_t>(trace_func));
+    legalFunctions.insert(reinterpret_cast<std::uint64_t>(trace_func));
+    globalAddresses.insert(std::make_pair(trace_func, addr_expr));
+    if (theStatisticManager) {
+      theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
+    }
+
+    bindModuleConstants(holding_module.get());
+    remill::MoveFunctionIntoModule(trace_func, traces_module);
+    return trace_func;
+  }
+  }
+  return nullptr;
 }
 
 llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
@@ -891,23 +955,31 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
     CHECK(!func->isDeclaration());
     return func;
   }
-
   // TODO(sai): Eventually remove this in favor of "importing" all lifted
   //            traces already in `lifted_traces`.
   const auto trace_name = trace_manager->TraceName(addr);
-  func = traces_module->getFunction(trace_name);
-  if (func) {
-    CHECK(!func->isDeclaration());
-    trace_manager->SetLiftedTraceDefinition(addr, func);
-    return func;
+  if (auto trace_func = traces_module->getFunction(trace_name)) {
+    if (trace_func->isDeclaration()) {
+      if (auto *mat_trace_func = materializeTrace(addr, memory)){
+        trace_manager->SetLiftedTraceDefinition(addr, mat_trace_func);
+        return mat_trace_func ;
+      }
+      LOG(FATAL) << "function is not apart of this translation unit";
+    } else {
+      trace_manager->SetLiftedTraceDefinition(addr, func);
+      return func;
+    }
   }
 
-  LOG(INFO) << "need to lift function 0x" <<
-      std::hex << addr << std::dec;
+  trace_manager->memory = memory;
+  if (preLift) {
+    if (auto trace_func = materializeTrace(addr, memory)) {
+      return trace_func;
+    }
+  }
 
   std::unordered_map<uint64_t, llvm::Function *> new_lifted_traces;
-
-  trace_manager->memory = memory;
+  LOG(INFO) << "need to lift function 0x" << std::hex << addr << std::dec;
   trace_lifter->Lift(addr,
       [&new_lifted_traces] (uint64_t trace_addr, llvm::Function *func) {
         func->setLinkage(llvm::GlobalValue::ExternalLinkage);
@@ -1909,8 +1981,9 @@ Function * Executor::getTargetFunction(Value * calledVal,
   SmallPtrSet<const GlobalValue*, 3> Visited;
 
   Constant *c = dyn_cast<Constant>(calledVal);
-  if (!c)
+  if (!c) {
     return 0;
+  }
 
   while (true) {
     if (GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
@@ -3587,8 +3660,23 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
     Function *function, std::vector<ref<Expr> > &arguments) {
   // check if specialFunctionHandler wants it
   if (specialFunctionHandler->handle(state, function, target, arguments)) {
-
     return;
+  }
+
+  const auto& func_name = function->getName().str();
+  if (func_name.compare(0, 4, "sub_") == 0) {
+    // in lazy materialization the functions aren't
+    // moved into the module as get lifted function expects
+    // a whole grouping of functions can not be moved into
+    // the trace_module all at once
+    uint64_t trace_addr;
+    std::stringstream ss;
+    ss << func_name.substr(4);
+    //LOG(INFO) << ss.str();
+    ss >> std::hex >> trace_addr;
+    auto lifted_func = GetLiftedFunction(state.memories.back().get(),
+        trace_addr);
+    return executeCall(state, state.prevPC, lifted_func, arguments);
   }
 
   if (ExternalCalls == ExternalCallPolicy::None

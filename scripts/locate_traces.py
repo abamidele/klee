@@ -23,15 +23,15 @@ this program assumes that the memory file provided is in the workspace and only 
 """
 
 if len(argv) < 2:
-    print("please specify the location of the memory directory in the workspace as an argument for this program")
-    print("Example: `python locate_traces.py ./ws/memory/`")
+    print("please specify the location of the memory directory and build directory")
+    print("Example: `python locate_traces.py ./ws/memory/` ./remill-build")
     exit(1)
 
 memory_directory_path = argv[1]
 if memory_directory_path[-1] != "/":
     memory_directory_path += "/"
 
-traces = []
+traces = set()
 Settings().set_bool("analysis.linearSweep.autorun", True)
 
 def u64(data):
@@ -39,10 +39,16 @@ def u64(data):
 
 def create_functions_from_signature_scan(bv, entry_point, plat):
     sig = ['\x55', '\x48','\x89', '\xe5']
+    end = bv.end
+    if bv.view_type == "ELF":
+        end = bv.get_segment_at(bv.entry_point).end
+    else:
+        return
     curr = entry_point
-    while curr <= len(bv):
-        if all(map(lambda x: x[0] == x[1], \
-                zip(bv.read(curr, len(sig)), sig))):
+    while curr <= end:
+        check = map(lambda x: x[0] == x[1], \
+                zip(bv.read(curr, len(sig)), sig))
+        if len(check) and all(check):
             binaryninja.core.BNAddFunctionForAnalysis(bv.handle, plat.handle, curr)
             curr += len(sig)
         else:
@@ -59,34 +65,30 @@ def create_functions_in_binaryview(mapping):
     return create_functions_from_signature_scan(bv, entry_point, plat)
 
 def mark_traces_in_mapping(mapping):
-    bv = binaryview.BinaryViewType["ELF"].open(memory_directory_path + mapping)
+    path = "/" + "/".join(mapping.split(" ")[6:])
+    bv = binaryview.BinaryViewType["ELF"].open(path)
     if not bv:
-        if "lib" in mapping and "_so" in mapping:
-            print("creating functions for mapping {}".format(mapping))
-            bv = create_functions_in_binaryview(mapping)
-        else:
-            print("could not produce binary view for mapping {}".format(mapping))
-            return
-    else:
-        print(memory_directory_path + mapping)
+        return
+    print(path)
+    
     bv.update_analysis_and_wait()
 
-    base = int(mapping.split("_")[0], 16)
+    base = int(mapping.split(" ")[0].split("-")[0], 16)
     pc = base
     for func in bv.functions:
         for bb in func:
             # make the beginning of basic blocks a trace
             pc = bb.start if bb.start > base else base + bb.start
-            traces.append(pc)
+            traces.add(pc)
             for ins in bb:
                 # this loop is for marking in the return addresses of function calls
                 ins_array, size = ins
                 pc += size
                 if ins_array[0].text == 'call':
-                    traces.append(pc)
+                    traces.add(pc)
 
 def is_executable(mapping):
-    umask = "".join(mapping.split("_")[2:4])
+    umask = "".join(mapping.split(" ")[1:3])
     return "x" in umask
 
 def mark_all_traces():
@@ -99,7 +101,7 @@ def write_all_traces_to_file():
     print("workspace: {}".format(workspace))
     with open(workspace + "/trace_list","a+") as trace_file:
         trace_file.write("======TRACE=ADDRESSES======\n")
-        for trace in traces:
+        for trace in sorted(traces):
             trace_file.write(hex(trace).strip("L") + '\n')
 
 if __name__  == "__main__":

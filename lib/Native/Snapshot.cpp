@@ -484,7 +484,15 @@ static std::string PageRangeName(const std::string &line) {
     } else if ('\r' == c || '\n' == c) {
       break;
     } else if (!seen_sym) {
-      ss << "_";
+      if (c == '-') {
+        ss << "-";
+      } else if (c == '.') {
+        ss << '.';
+      } else if (c == '_'){
+        ss << '_';
+      } else {
+        ss << ' ';
+      }
       seen_sym = true;
     }
   }

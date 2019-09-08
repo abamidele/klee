@@ -31,8 +31,10 @@ TraceManager::TraceManager(llvm::Module &lifted_code_,
       code_cache(new BitCodeCache()) {}
 
 TraceManager::~TraceManager(void) {
-  LOG(INFO) << "writing to bitcode cache in destructor";
-  code_cache->WriteToWorkspace(lifted_code);
+  if (policy_handler) {
+    LOG(INFO) << "writing to bitcode cache in destructor";
+    code_cache->WriteToWorkspace(lifted_code);
+  }
 }
 
 void TraceManager::ForEachDevirtualizedTarget(
