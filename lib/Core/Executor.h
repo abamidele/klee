@@ -570,7 +570,8 @@ public:
 
   void preLiftBitcode(void);
 
-  void LiftMapping(std::vector<uint64_t>& traces);
+  static void LiftMapping(std::vector<uint64_t> traces,
+      klee::native::AddressSpace *memory, klee::Executor *exe);
 
   vTask *NextTask(void);
 

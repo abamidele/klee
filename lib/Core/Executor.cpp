@@ -781,12 +781,16 @@ void Executor::decodeAndMarkTraces(const native::MemoryMapPtr &map,
   LinearSweepPass(map, decoder_work_list, new_marked_traces);
 }
 
-void Executor::LiftMapping(std::vector<uint64_t>& traces) {
-  //  traces are expected to be in sorted order and have at least size 1
-  auto &memory = trace_manager->memory;
-  auto *ctx = &traces_module->getContext();
+void Executor::LiftMapping(std::vector<uint64_t> traces,
+    klee::native::AddressSpace *memory, klee::Executor *exe) {
+  //  traces are expected to be in sorted order and have at least size
+  LOG(INFO) << "starting a lift job on range " << std::hex <<
+  traces.front() << std::dec << " - " << std::hex << traces.back() << std::dec;
+  auto *ctx = &exe->traces_module->getContext();
+  LOG(INFO) << "got context";
   memory->aot_traces[klee::native::AlignDownToPage(traces.front())] =
       std::shared_ptr<llvm::Module>(remill::LoadTargetSemantics(ctx));
+  LOG(INFO) << "passed semantics module creation";
   auto &aot_trace_module = memory->aot_traces[klee::native::AlignDownToPage(
       traces.front())];
   auto mapping_manager = native::TraceManager(*aot_trace_module, nullptr);
@@ -798,18 +802,6 @@ void Executor::LiftMapping(std::vector<uint64_t>& traces) {
       &mapping_manager);
   auto &new_marked_traces = mapping_manager.traces;
 
-  /*
-   auto &context = traces_module->getContext();
-   holding_module.reset(new llvm::Module("", context));
-   semantics_module.reset(remill::LoadTargetSemantics(&context));
-   intrinsics.reset(new remill::IntrinsicTable(semantics_module));
-   trace_manager.reset(new native::TraceManager(*traces_module, policy_handler));
-   inst_lifter.reset(
-   new remill::InstructionLifter(remill::GetTargetArch(), *intrinsics));
-   trace_lifter.reset(new remill::TraceLifter(*inst_lifter, *trace_manager));
-   continuations.reserve(8192);
-   */
-
   while (!traces.empty()) {
     uint64_t trace = traces.back();
     (void) mapping_lifter.Lift(trace,
@@ -819,8 +811,7 @@ void Executor::LiftMapping(std::vector<uint64_t>& traces) {
         });
     traces.pop_back();
   }
-  mapping_manager.memory = nullptr;
-
+  //mapping_manager.memory = nullptr;
   remill::OptimizationGuide guide = { };
   guide.slp_vectorize = false;
   guide.loop_vectorize = false;
@@ -836,6 +827,7 @@ void Executor::decodeAndLiftMappings() {
   const auto &trace_list_path = native::Workspace::TraceListPath();
   if (remill::FileExists(trace_list_path)) {
     const auto &memory = trace_manager->memory;
+    ThreadPool thread_pool(memory->maps.size()/2);
     LOG(INFO) << "grabbing traces from the trace list file in the workspace";
     std::ifstream trace_file_stream;
     uint64_t prev_base = 0;
@@ -848,16 +840,22 @@ void Executor::decodeAndLiftMappings() {
       while (trace_file_stream >> std::hex >> trace_address) {
         if (!memory->IsSameMappedRange(trace_address, prev_base)) {
           if (!trace_batch.empty()) {
-            LiftMapping(trace_batch);
+            LiftMapping(trace_batch, memory,this);
+            thread_pool.Submit(klee::Executor::LiftMapping, trace_batch, memory,
+                this);
           }
           prev_base = trace_address;
           trace_batch.clear();
         }
+
         trace_batch.push_back(trace_address);
       }
       if (!trace_batch.empty()) {
-        LiftMapping(trace_batch);
+        thread_pool.Submit(klee::Executor::LiftMapping, trace_batch, memory,
+            this);
+        //LiftMapping(trace_batch, memory,this);
       }
+      thread_pool.~ThreadPool();
       trace_file_stream.close();
     } else {
       LOG(ERROR) << "cannot read the trace list file at " << trace_list_path
@@ -914,36 +912,34 @@ void Executor::UpdateKModuleAfterLift(
 }
 
 llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
-    native::AddressSpace *memory){
+    native::AddressSpace *memory) {
   auto map_key = klee::native::AlignDownToPage(trace_addr);
   const auto trace_name = trace_manager->TraceName(trace_addr);
   if (memory->aot_traces.find(map_key) != memory->aot_traces.end()) {
     auto map_module = memory->aot_traces[map_key];
     if (auto trace_func = map_module->getFunction(trace_name)) {
-    LOG(INFO) << "lazily materializing " << trace_name
-        << " in traces module";
-    remill::MoveFunctionIntoModule(trace_func, holding_module.get());
-    kmodule->instrument(holding_module.get(), opts);
-    specialFunctionHandler->prepare(holding_module.get(),
-        preservedFunctions);
-    kmodule->optimiseAndPrepare(holding_module.get(), opts,
-        preservedFunctions);
-    kmodule->manifest(holding_module.get(), interpreterHandler,
-        StatsTracker::useStatistics());
-    specialFunctionHandler->bind(holding_module.get());
+      LOG(INFO) << "lazily materializing " << trace_name << " in traces module";
+      remill::MoveFunctionIntoModule(trace_func, holding_module.get());
+      kmodule->instrument(holding_module.get(), opts);
+      specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
+      kmodule->optimiseAndPrepare(holding_module.get(), opts,
+          preservedFunctions);
+      kmodule->manifest(holding_module.get(), interpreterHandler,
+          StatsTracker::useStatistics());
+      specialFunctionHandler->bind(holding_module.get());
 
-    auto addr_expr = Expr::createPointer(
-        reinterpret_cast<uintptr_t>(trace_func));
-    legalFunctions.insert(reinterpret_cast<std::uint64_t>(trace_func));
-    globalAddresses.insert(std::make_pair(trace_func, addr_expr));
-    if (theStatisticManager) {
-      theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
+      auto addr_expr = Expr::createPointer(
+          reinterpret_cast<uintptr_t>(trace_func));
+      legalFunctions.insert(reinterpret_cast<std::uint64_t>(trace_func));
+      globalAddresses.insert(std::make_pair(trace_func, addr_expr));
+      if (theStatisticManager) {
+        theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
+      }
+
+      bindModuleConstants(holding_module.get());
+      remill::MoveFunctionIntoModule(trace_func, traces_module);
+      return trace_func;
     }
-
-    bindModuleConstants(holding_module.get());
-    remill::MoveFunctionIntoModule(trace_func, traces_module);
-    return trace_func;
-  }
   }
   return nullptr;
 }
@@ -960,9 +956,9 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   const auto trace_name = trace_manager->TraceName(addr);
   if (auto trace_func = traces_module->getFunction(trace_name)) {
     if (trace_func->isDeclaration()) {
-      if (auto *mat_trace_func = materializeTrace(addr, memory)){
+      if (auto *mat_trace_func = materializeTrace(addr, memory)) {
         trace_manager->SetLiftedTraceDefinition(addr, mat_trace_func);
-        return mat_trace_func ;
+        return mat_trace_func;
       }
       LOG(FATAL) << "function is not apart of this translation unit";
     } else {
