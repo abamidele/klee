@@ -27,6 +27,7 @@
 
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/Twine.h>
+#include <llvm/IR/Module.h>
 
 #include <map>
 #include <memory>
@@ -36,6 +37,7 @@
 #include <deque>
 
 #include "Native/Memory/AddressSpace.h"
+#include "Core/PreLifter.h"
 #include "Continuation.h"
 #include "remill/BC/Lifter.h"
 
@@ -47,7 +49,10 @@
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
 
+
 #include "remill/OS/OS.h"
+#include <thread>
+
 struct KTest;
 
 namespace llvm {
@@ -95,7 +100,10 @@ class PolicyHandler;
 namespace native {
 class TraceManager;
 class TraceLifter;
+class PreLifter;
 }  // namespace native
+
+
 
 class vTask {
 public:
@@ -103,6 +111,7 @@ public:
   std::vector<std::string> argv;
   std::vector<std::string> envp;
 };
+
 
 template<class T> class ref;
 
@@ -290,6 +299,8 @@ public:
 
   uint64_t saved_entry_point_address;
 
+  std::unique_ptr<klee::native::PreLifter> pre_lifter;
+
   void setPreLift(bool isPreLift);
 
   std::shared_ptr<klee::native::PolicyHandler> policy_handler;
@@ -315,13 +326,6 @@ public:
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
       unsigned size, bool isReadOnly);
 
-  void RecursiveDescentPass(const native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
-      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
-
-  void LinearSweepPass(const native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
-      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
 
   void initializeGlobalObject(ExecutionState &state, ObjectState *os,
       const llvm::Constant *c, unsigned offset);
@@ -563,15 +567,7 @@ public:
   llvm::Function *GetLiftedFunction(native::AddressSpace *memory,
       uint64_t addr);
 
-  void decodeAndMarkTraces(const native::MemoryMapPtr &map,
-      std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces);
-
-  void decodeAndLiftMappings(void);
-
   void preLiftBitcode(void);
-
-  static void LiftMapping(std::vector<uint64_t> traces,
-      klee::native::AddressSpace *memory, klee::Executor *exe);
 
   vTask *NextTask(void);
 

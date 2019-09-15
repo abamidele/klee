@@ -33,6 +33,7 @@ class PolicyHandler;
 class TraceManager : public ::remill::TraceManager {
  friend class BitCodeCache;
  friend class Executor;
+ friend class PreLifter;
  public:
   explicit TraceManager(llvm::Module &lifted_code_,
       std::shared_ptr<PolicyHandler> ph);

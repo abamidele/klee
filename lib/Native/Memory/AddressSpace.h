@@ -27,6 +27,7 @@
 #include "Native/Memory/AllocList.h"
 #include "Native/Memory/PolicyHandler.h"
 #include "Core/AddressSpace.h"
+#include "Core/PreLifter.h"
 #include "klee/Expr.h"
 
 #include "remill/Arch/Arch.h"
@@ -77,6 +78,7 @@ class PolicyHandler;
 
 // Basic memory implementation.
 class AddressSpace: public Memory {
+  friend class PreLifter;
 public:
   AddressSpace(void);
 
@@ -223,7 +225,7 @@ public:
 
   std::unordered_map<uint64_t, ref<klee::Expr>> symbolic_memory;
   std::unordered_map<uint64_t, AllocList> alloc_lists;
-  std::unordered_map<uint64_t, std::shared_ptr<llvm::Module>> aot_traces;
+  std::unordered_map<std::string, std::shared_ptr<llvm::Module>> aot_traces;
 
   // Is the address space dead? This means that all operations on it
   // will be muted.

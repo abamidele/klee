@@ -93,6 +93,7 @@ add_library(${PROJECT_NAME} STATIC
   lib/Core/TimingSolver.cpp
   lib/Core/UserSearcher.cpp
   lib/Core/Continuation.cpp
+  lib/Core/PreLifter.cpp
   
   lib/Expr/ArrayCache.cpp
   lib/Expr/ArrayExprOptimizer.cpp
