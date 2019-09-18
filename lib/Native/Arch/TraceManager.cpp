@@ -28,7 +28,7 @@ TraceManager::TraceManager(llvm::Module &lifted_code_,
     : lifted_code(lifted_code_),
       memory(nullptr),
       policy_handler(ph),
-      code_cache(new BitCodeCache()) {}
+      code_cache(new BitCodeCache()){}
 
 TraceManager::~TraceManager(void) {
   if (policy_handler) {
@@ -65,10 +65,9 @@ llvm::Function *TraceManager::GetLiftedTraceDefinition(uint64_t addr) {
 }
 
 void TraceManager::MarkAsTraceHead(uint64_t pc) {
+  DLOG_IF(FATAL, !memory) << "Memory pointer not initialized in TraceManager.";
   memory->MarkAsTraceHead(pc);
 }
-
-
 
 }  // namespace native
 }  // namespace klee

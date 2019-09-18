@@ -374,7 +374,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
         0), usingSeeds(0), atMemoryLimit(false), inhibitForking(false), haltExecution(
         false), ivcEnabled(false), debugLogBuffer(debugBufferString), symbolicStdin(
         false), preLift(false), saved_entry_point_address(0), pre_lifter(
-        nullptr) {
+        nullptr), code_cache(new klee::native::BitCodeCache()) {
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -564,7 +564,6 @@ llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
       kmodule->manifest(holding_module.get(), interpreterHandler,
           StatsTracker::useStatistics());
       specialFunctionHandler->bind(holding_module.get());
-
       auto addr_expr = Expr::createPointer(
           reinterpret_cast<uintptr_t>(trace_func));
       legalFunctions.insert(reinterpret_cast<std::uint64_t>(trace_func));
@@ -591,8 +590,9 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
   // TODO(sai): Eventually remove this in favor of "importing" all lifted
   //            traces already in `lifted_traces`.
   const auto trace_name = trace_manager->TraceName(addr);
-  if (auto trace_func = traces_module->getFunction(trace_name)) {
-    if (trace_func->isDeclaration()) {
+  func = traces_module->getFunction(trace_name);
+  if (func) {
+    if (func->isDeclaration()) {
       if (auto *mat_trace_func = materializeTrace(addr, memory)) {
         trace_manager->SetLiftedTraceDefinition(addr, mat_trace_func);
         return mat_trace_func;
@@ -681,6 +681,7 @@ void Executor::AddTask(vTask *task) {
 }
 
 Executor::~Executor() {
+  //code_cache->WriteToWorkspace(*traces_module);
   /*
    for (unsigned i = 0;; i++) {
    const std::string task_var_name = "__vmill_task_" + std::to_string(i);
@@ -1621,8 +1622,9 @@ Function * Executor::getTargetFunction(Value * calledVal,
   while (true) {
     if (GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 6)
-      if (!Visited.insert(gv).second)
+      if (!Visited.insert(gv).second) {
         return 0;
+      }
 #else
       if (!Visited.insert(gv))
       return 0;
@@ -2061,7 +2063,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           i++;
         }
       }
-
+      //LOG(INFO) << "before execute call in execute instruction";
       executeCall(state, ki, f, arguments);
     } else {
       ref<Expr> v = eval(ki, 0, state).value;
@@ -2089,10 +2091,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
               klee_warning_once(reinterpret_cast<void*>(addr),
                   "resolved symbolic function pointer to: %s",
                   f->getName().data());
-
+            //LOG(INFO) << "before execute call in the do while case in execute instruction";
             executeCall(*res.first, ki, f, arguments);
           } else {
             if (!hasInvalid) {
+              //LOG(INFO) << std::hex << addr << std::dec;
               terminateStateOnExecError(state, "invalid function pointer");
               hasInvalid = true;
             }
@@ -3309,6 +3312,7 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
     ss >> std::hex >> trace_addr;
     auto lifted_func = GetLiftedFunction(state.memories.back().get(),
         trace_addr);
+    LOG(INFO) << "before execute call in call external function pre lift case";
     return executeCall(state, state.prevPC, lifted_func, arguments);
   }
 

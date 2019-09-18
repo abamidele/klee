@@ -16,6 +16,7 @@
 
 #pragma once
 
+
 #include "remill/BC/Lifter.h"
 #include "Native/Arch/BitCodeCache.h"
 #include "remill/BC/Util.h"
@@ -66,6 +67,7 @@ class TraceManager : public ::remill::TraceManager {
   std::unordered_map<uint64_t, llvm::Function *> traces;
   std::shared_ptr<PolicyHandler> policy_handler;
   std::shared_ptr<BitCodeCache> code_cache;
+
 };
 }  // namespace native
 }  // namespace klee

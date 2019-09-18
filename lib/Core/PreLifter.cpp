@@ -428,7 +428,6 @@ void PreLifter::preLift(void) {
   for (auto &worker : workers) {
     worker->thread = std::thread(&LiftMapping, worker.get(), this);
   }
-
   for (auto &worker : workers) {
     worker->thread.join();
   }

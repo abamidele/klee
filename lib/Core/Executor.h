@@ -37,6 +37,7 @@
 #include <deque>
 
 #include "Native/Memory/AddressSpace.h"
+#include "Native/Arch/BitCodeCache.h"
 #include "Core/PreLifter.h"
 #include "Continuation.h"
 #include "remill/BC/Lifter.h"
@@ -300,6 +301,8 @@ public:
   uint64_t saved_entry_point_address;
 
   std::unique_ptr<klee::native::PreLifter> pre_lifter;
+
+  std::unique_ptr<native::BitCodeCache> code_cache;
 
   void setPreLift(bool isPreLift);
 
