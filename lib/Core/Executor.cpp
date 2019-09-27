@@ -374,7 +374,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
         0), usingSeeds(0), atMemoryLimit(false), inhibitForking(false), haltExecution(
         false), ivcEnabled(false), debugLogBuffer(debugBufferString), symbolicStdin(
         false), preLift(false), saved_entry_point_address(0), pre_lifter(
-        nullptr), code_cache(new klee::native::BitCodeCache()) {
+        nullptr), code_cache(new ::native::BitCodeCache()) {
 
   // Start with a "fake" address space on the top, so that if we ever have
   // an issue with a memory access, then we can just fall back onto memory 0.
@@ -492,7 +492,7 @@ Executor::setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
 
   // Initialize the native instruction trace lifter stuff.
   auto &context = traces_module->getContext();
-  holding_module.reset(new llvm::Module("", context));
+  holding_module.reset(new llvm::Module("holding_module", context));
   semantics_module.reset(remill::LoadTargetSemantics(&context));
   intrinsics.reset(new remill::IntrinsicTable(semantics_module));
   trace_manager.reset(new native::TraceManager(*traces_module, policy_handler));
@@ -550,12 +550,13 @@ void Executor::UpdateKModuleAfterLift(
 
 llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
     native::AddressSpace *memory) {
-  auto map_key = std::string(memory->FindRange(trace_addr).Name());
+  auto &range = memory->FindRange(trace_addr);
+  auto &map_key = ::native::Workspace::FormatTraceRange(range.BaseAddress(),
+      range.LimitAddress());
   const auto trace_name = trace_manager->TraceName(trace_addr);
   if (memory->aot_traces.find(map_key) != memory->aot_traces.end()) {
     auto map_module = memory->aot_traces[map_key];
     if (auto trace_func = map_module->getFunction(trace_name)) {
-      LOG(INFO) << "lazily materializing " << trace_name << " in traces module";
       remill::MoveFunctionIntoModule(trace_func, holding_module.get());
       kmodule->instrument(holding_module.get(), opts);
       specialFunctionHandler->prepare(holding_module.get(), preservedFunctions);
@@ -574,6 +575,7 @@ llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
 
       bindModuleConstants(holding_module.get());
       remill::MoveFunctionIntoModule(trace_func, traces_module);
+      code_cache->materialized_traces.insert(trace_addr);
       return trace_func;
     }
   }
@@ -681,7 +683,28 @@ void Executor::AddTask(vTask *task) {
 }
 
 Executor::~Executor() {
-  //code_cache->WriteToWorkspace(*traces_module);
+  /*
+   auto &memory = memories.back();
+   //auto matchmaker = klee::native::SetParent(&*traces_module->functions().begin());
+   for (auto &function : *traces_module) {
+   const auto& func_name = function.getName().str();
+   if (func_name.compare(0, 4, "sub_") == 0) {
+   uint64_t trace_addr;
+   std::stringstream ss;
+   ss << "0x" << func_name.substr(4);
+   ss >> std::hex >> trace_addr;
+   auto &range = memory->FindRange(trace_addr);
+   auto &key = ::native::Workspace::FormatTraceRange(range.BaseAddress(),
+   range.LimitAddress());
+   LOG(INFO) << "name is " << func_name;
+   LOG(INFO) << "key is " << key;
+   auto &module = memory->aot_traces[key];
+   remill::MoveFunctionIntoModule(&function, module.get());
+   //matchmaker(&function, module.get());
+   }
+   }
+   */
+  code_cache->StoreToWorkspace(*traces_module, memories.back().get(), this);
   /*
    for (unsigned i = 0;; i++) {
    const std::string task_var_name = "__vmill_task_" + std::to_string(i);
@@ -1998,6 +2021,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // generate unreachable instructions in cases where it knows the
     // program will crash. So it is effectively a SEGV or internal
     // error.
+    i->print(llvm::errs());
+    LOG(INFO) << i->getName().str() << " is the name of the undef instr";
+
     terminateStateOnExecError(state, "reached \"unreachable\" instruction");
     break;
 
@@ -3312,7 +3338,6 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
     ss >> std::hex >> trace_addr;
     auto lifted_func = GetLiftedFunction(state.memories.back().get(),
         trace_addr);
-    LOG(INFO) << "before execute call in call external function pre lift case";
     return executeCall(state, state.prevPC, lifted_func, arguments);
   }
 
@@ -3845,8 +3870,6 @@ void Executor::preLiftBitcode(void) {
   pre_lifter->trace_manager = trace_manager.get();
   trace_manager->memory = memories.back().get();
   pre_lifter->preLift();
-  pre_lifter->trace_manager = nullptr;
-  trace_manager->memory = nullptr;
 }
 
 void Executor::runFunctionAsMain(Function *f,
@@ -3949,6 +3972,12 @@ void Executor::runFunctionAsMain(Function *f,
   if (preLift) {
     preLiftBitcode();
   }
+
+  code_cache->LoadFromWorkspace(memories.back().get(), this);
+  //code_cache->StoreToWorkspace(trace_manager->memory);
+  //pre_lifter->trace_manager = nullptr;
+  //trace_manager->memory = nullptr;
+  //exit(0);
 
   run(*state);
   LOG(INFO) << "after run";

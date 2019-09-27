@@ -27,15 +27,8 @@ TraceManager::TraceManager(llvm::Module &lifted_code_,
     std::shared_ptr<PolicyHandler> ph)
     : lifted_code(lifted_code_),
       memory(nullptr),
-      policy_handler(ph),
-      code_cache(new BitCodeCache()){}
+      policy_handler(ph) {}
 
-TraceManager::~TraceManager(void) {
-  if (policy_handler) {
-    LOG(INFO) << "writing to bitcode cache in destructor";
-    code_cache->WriteToWorkspace(lifted_code);
-  }
-}
 
 void TraceManager::ForEachDevirtualizedTarget(
     const remill::Instruction &inst,

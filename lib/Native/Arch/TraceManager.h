@@ -39,7 +39,7 @@ class TraceManager : public ::remill::TraceManager {
   explicit TraceManager(llvm::Module &lifted_code_,
       std::shared_ptr<PolicyHandler> ph);
 
-  ~TraceManager(void);
+  ~TraceManager(void) = default;
 
   void ForEachDevirtualizedTarget(
       const remill::Instruction &inst,
@@ -66,7 +66,6 @@ class TraceManager : public ::remill::TraceManager {
   AddressSpace *memory;
   std::unordered_map<uint64_t, llvm::Function *> traces;
   std::shared_ptr<PolicyHandler> policy_handler;
-  std::shared_ptr<BitCodeCache> code_cache;
 
 };
 }  // namespace native

@@ -149,6 +149,7 @@ void NativeHandler::processTestCase(const klee::ExecutionState &state,
 #define LIBKLEE_PATH  "libklee-libc.bca"
 
 static llvm::Module *LoadRuntimeBitcode(llvm::LLVMContext *context) {
+
   struct stat cache_stat;
   std::string runtime_bitcode_path;
   if ((stat(klee::native::Workspace::BitcodeCachePath().c_str(), &cache_stat) == 0)){

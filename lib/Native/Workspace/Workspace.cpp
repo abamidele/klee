@@ -46,15 +46,15 @@
 # define KLEE_NATIVE_SOURCE_DIR ""
 #endif  // KLEE_NATIVE_SOURCE_DIR
 
-
-DEFINE_string(workspace_dir, ".", "Path to workspace in which the snapshot file is"
-              " stored, and in which files will be placed.");
+DEFINE_string(workspace_dir, ".",
+    "Path to workspace in which the snapshot file is"
+        " stored, and in which files will be placed.");
 
 DEFINE_string(runtime, "", "Name of a runtime, or absolute path to a "
-              "runtime bitcode file.");
+    "runtime bitcode file.");
 
-DECLARE_string(arch);
-DECLARE_string(os);
+DECLARE_string (arch);
+DECLARE_string (os);
 
 namespace klee {
 namespace native {
@@ -68,9 +68,28 @@ const std::string &Workspace::Dir(void) {
       path = FLAGS_workspace_dir;
     }
     path = remill::CanonicalPath(path);
-    CHECK(remill::TryCreateDirectory(path))
-        << "Could not create workspace directory " << path;
+    CHECK(remill::TryCreateDirectory(path))<< "Could not create workspace directory " << path;
   }
+  return path;
+}
+
+
+const std::string &Workspace::PreLiftedTraces(void) {
+  static std::string path;
+  std::stringstream ss;
+  ss << klee::native::Workspace::Dir() << "/prelift_traces/";
+  path = ss.str();
+  return path;
+}
+
+
+const std::string &Workspace::FormatTraceRange(uint64_t start, uint64_t end) {
+  static std::string path;
+  std::stringstream ss;
+  ss << PreLiftedTraces() << "/0x" << std::hex << start
+      << std::dec << "-0x" << std::hex << end << std::dec;
+  //LOG(INFO) << "map file is " << ss.str();
+  path = ss.str();
   return path;
 }
 
@@ -85,6 +104,7 @@ const std::string &Workspace::SnapshotPath(void) {
   return path;
 }
 
+
 const std::string &Workspace::BitcodeCachePath(void) {
   static std::string path;
   if (path.empty()) {
@@ -95,6 +115,7 @@ const std::string &Workspace::BitcodeCachePath(void) {
   }
   return path;
 }
+
 
 const std::string &Workspace::IndexPath(void) {
   static std::string path;
@@ -114,8 +135,7 @@ const std::string &Workspace::MemoryDir(void) {
     ss << Dir() << remill::PathSeparator() << "memory";
     path = ss.str();
     path = remill::CanonicalPath(path);
-    CHECK(remill::TryCreateDirectory(path))
-        << "Could not create memory directory " << path;
+    CHECK(remill::TryCreateDirectory(path))<< "Could not create memory directory " << path;
   }
   return path;
 }
@@ -127,8 +147,7 @@ const std::string &Workspace::BitcodeDir(void) {
     ss << Dir() << remill::PathSeparator() << "bitcode";
     path = ss.str();
     path = remill::CanonicalPath(path);
-    CHECK(remill::TryCreateDirectory(path))
-        << "Could not create bitcode directory " << path;
+    CHECK(remill::TryCreateDirectory(path))<< "Could not create bitcode directory " << path;
   }
   return path;
 }
@@ -150,8 +169,6 @@ const std::string &Workspace::LocalRuntimeBitcodePath(void) {
   path = Dir() + remill::PathSeparator() + FLAGS_runtime + ".bc";
   return path;
 }
-
-
 
 const std::string &Workspace::RuntimeBitcodePath(void) {
   static std::string path;
@@ -184,8 +201,8 @@ const std::string &Workspace::RuntimeBitcodePath(void) {
     }
   }
 
-  LOG(FATAL)<< "Cannot find path to runtime for " << FLAGS_os
-  << " and " << FLAGS_arch;
+  LOG(FATAL) << "Cannot find path to runtime for " << FLAGS_os << " and "
+      << FLAGS_arch;
 
   path.clear();
   return path;
@@ -216,9 +233,6 @@ const std::string &Workspace::TraceListPath(void) {
   return path;
 }
 
-
-
-
 namespace {
 
 using AddressSpaceIdToMemoryMap =
@@ -226,25 +240,22 @@ std::unordered_map<int64_t, std::shared_ptr<AddressSpace>>;
 
 // Load in the data from the snapshotted page range into the address space.
 static void LoadPageRangeFromFile(AddressSpace *addr_space,
-                                  const snapshot::PageRange &range) {
+    const snapshot::PageRange &range) {
   std::stringstream ss;
   ss << Workspace::MemoryDir() << remill::PathSeparator() << range.name();
 
   auto path = ss.str();
-  CHECK(remill::FileExists(path))
-      << "File " << path << " with the data of the page range ["
-      << std::hex << range.base() << ", " << std::hex << range.limit()
-      << ") does not exist.";
+  CHECK(remill::FileExists(path))<< "File " << path << " with the data of the page range ["
+  << std::hex << range.base() << ", " << std::hex << range.limit()
+  << ") does not exist.";
 
   auto range_size = static_cast<uint64_t>(range.limit() - range.base());
-  CHECK_LE(range_size, remill::FileSize(path))
-      << "File " << path << " with the data of the page range ["
-      << std::hex << range.base() << ", " << std::hex << range.limit()
-      << std::dec << ") is too small.";
+  CHECK_LE(range_size, remill::FileSize(path)) << "File " << path
+      << " with the data of the page range [" << std::hex << range.base()
+      << ", " << std::hex << range.limit() << std::dec << ") is too small.";
 
-  LOG(INFO)
-      << "Loading file " << path << " into range [" << std::hex << range.base()
-      << ", " << range.limit() << ")" << std::dec;
+  LOG(INFO) << "Loading file " << path << " into range [" << std::hex
+      << range.base() << ", " << range.limit() << ")" << std::dec;
 
   auto fd = open(path.c_str(), O_RDONLY);
 
@@ -258,9 +269,9 @@ static void LoadPageRangeFromFile(AddressSpace *addr_space,
     auto amount_read_ = read(fd, buff, range_size);
     auto err = errno;
     if (-1 == amount_read_) {
-      CHECK(!range_size) << "Failed to read all page range data from " << path
-                         << "; remaining amount to read is " << range_size
-                         << " but got error " << strerror(err);
+      CHECK(!range_size)<< "Failed to read all page range data from " << path
+      << "; remaining amount to read is " << range_size
+      << " but got error " << strerror(err);
       break;
     }
 
@@ -277,11 +288,10 @@ static void LoadAddressSpaceFromSnapshot(
     AddressSpaceIdToMemoryMap &addr_space_ids,
     const snapshot::AddressSpace &orig_addr_space) {
 
-  LOG(INFO)<<"Initializing address space " << orig_addr_space.id();
+  LOG(INFO) << "Initializing address space " << orig_addr_space.id();
 
   auto id = orig_addr_space.id();
-  CHECK(!addr_space_ids.count(id))
-  << "Address space " << std::dec << orig_addr_space.id()
+  CHECK(!addr_space_ids.count(id))<< "Address space " << std::dec << orig_addr_space.id()
   << " has already been deserialized.";
 
   std::shared_ptr<AddressSpace> emu_addr_space;
@@ -289,8 +299,7 @@ static void LoadAddressSpaceFromSnapshot(
   // Create the address space, either as a clone of a parent, or as a new one.
   if (orig_addr_space.has_parent_id()) {
     int64_t parent_id = orig_addr_space.parent_id();
-    CHECK(addr_space_ids.count(parent_id))
-    << "Cannot find parent address space " << std::dec << parent_id
+    CHECK(addr_space_ids.count(parent_id))<< "Cannot find parent address space " << std::dec << parent_id
     << " for address space " << std::dec << orig_addr_space.id();
 
     const auto &parent_mem = addr_space_ids[parent_id];
@@ -303,8 +312,7 @@ static void LoadAddressSpaceFromSnapshot(
 
   // Bring in the ranges.
   for (const auto &page : orig_addr_space.page_ranges()) {
-    CHECK(page.limit() > page.base())
-    << "Invalid page map information with base " << std::hex << page.base()
+    CHECK(page.limit() > page.base())<<"Invalid page map information with base " << std::hex << page.base()
     << " being greater than or equal to the page limit " << page.limit()
     << " in address space " << std::dec
     << orig_addr_space.id();
@@ -312,34 +320,34 @@ static void LoadAddressSpaceFromSnapshot(
     const char *path = nullptr;
     switch (page.kind()) {
       case snapshot::kLinuxStackPageRange:
-        path = "[stack]";
-        break;
+      path = "[stack]";
+      break;
       case snapshot::kLinuxHeapPageRange:
-        path = "[heap]";
-        break;
+      path = "[heap]";
+      break;
       case snapshot::kLinuxVVarPageRange:
-        path = "[vvar]";
-        break;
+      path = "[vvar]";
+      break;
       case snapshot::kLinuxVDSOPageRange:
-        path = "[vdso]";
-        break;
+      path = "[vdso]";
+      break;
       case snapshot::kLinuxVSysCallPageRange:
-        path = "[vsyscall]";
-        break;
+      path = "[vsyscall]";
+      break;
       case snapshot::kFileBackedPageRange:
-        if (page.has_file_path()) {
-          path = page.file_path().c_str();
-        } else {
-          LOG(ERROR)
-          << "Page map with base " << std::hex << page.base() << " and limit "
-          << page.limit() << " in address space " << std::dec
-          << orig_addr_space.id() << " is file-backed, but does not have "
-          << "a file path.";
-        }
-        break;
+      if (page.has_file_path()) {
+        path = page.file_path().c_str();
+      } else {
+        LOG(ERROR)
+        << "Page map with base " << std::hex << page.base() << " and limit "
+        << page.limit() << " in address space " << std::dec
+        << orig_addr_space.id() << " is file-backed, but does not have "
+        << "a file path.";
+      }
+      break;
       case snapshot::kAnonymousPageRange:
       case snapshot::kAnonymousZeroRange:
-        break;
+      break;
     }
 
     auto base = static_cast<uint64_t>(page.base());
@@ -357,35 +365,33 @@ static void LoadAddressSpaceFromSnapshot(
   }
 }
 
-}  // namespace
+}
+  // namespace
 
 void Workspace::LoadSnapshotIntoExecutor(const ProgramSnapshotPtr &snapshot,
-                                         klee::Interpreter *executor) {
+  klee::Interpreter *executor) {
 
-  LOG(INFO)
-      << "Loading address space information from snapshot";
+LOG(INFO) << "Loading address space information from snapshot";
 
-  AddressSpaceIdToMemoryMap address_space_ids;
-  for (const auto &address_space : snapshot->address_spaces()) {
-    LoadAddressSpaceFromSnapshot(address_space_ids, address_space);
-  }
+AddressSpaceIdToMemoryMap address_space_ids;
+for (const auto &address_space : snapshot->address_spaces()) {
+  LoadAddressSpaceFromSnapshot(address_space_ids, address_space);
+}
 
-  LOG(INFO) << "Loading task information.";
-  for (const auto &task : snapshot->tasks()) {
-    int64_t addr_space_id = task.address_space_id();
-    CHECK(address_space_ids.count(addr_space_id))
-        << "Invalid address space id " << std::dec << addr_space_id
-        << " for task";
+LOG(INFO) << "Loading task information.";
+for (const auto &task : snapshot->tasks()) {
+  int64_t addr_space_id = task.address_space_id();
+  CHECK(address_space_ids.count(addr_space_id))<< "Invalid address space id " << std::dec << addr_space_id
+    << " for task";
 
-    auto memory = address_space_ids[addr_space_id];
-    auto pc = static_cast<uint64_t>(task.pc());
+  auto memory = address_space_ids[addr_space_id];
+  auto pc = static_cast<uint64_t>(task.pc());
 
-    LOG(INFO)
-        << "Adding task starting execution at " << std::hex << pc
-        << " in address space " << std::dec << addr_space_id;
+  LOG(INFO) << "Adding task starting execution at " << std::hex << pc
+      << " in address space " << std::dec << addr_space_id;
 
-    executor->AddInitialTask(task.state(), pc, memory);
-  }
+  executor->AddInitialTask(task.state(), pc, memory);
+}
 }
 
 }

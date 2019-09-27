@@ -17,10 +17,12 @@
 #ifndef TOOLS_KLEE_LIB_NATIVE_ARCH_BITCODECACHE_H_
 #define TOOLS_KLEE_LIB_NATIVE_ARCH_BITCODECACHE_H_
 #include "llvm/IR/Module.h"
-
+#include <unordered_set>
+#include <vector>
 namespace llvm {
-  class Module;
-  class Function;
+class Module;
+class Function;
+class LLVMContext;
 }
 
 namespace klee {
@@ -29,14 +31,22 @@ class Executor;
 namespace native {
 class TraceManager;
 class Workspace;
+class AddressSpace;
 
 class BitCodeCache {
 public:
   inline BitCodeCache(void) = default;
   ~BitCodeCache(void) = default;
-  void WriteToWorkspace(llvm::Module &module);
+  void StoreToWorkspace(llvm::Module &module,
+      klee::native::AddressSpace *memory, klee::Executor *exe);
+  void LoadFromWorkspace(klee::native::AddressSpace *memory,
+      klee::Executor *exe);
+  void DestroyFunctions(llvm::Module &module);
+
+
+  std::unordered_set<uint64_t> materialized_traces;
 };
-}//  namespace native
-}//  namespace klee
+} //  namespace native
+} //  namespace klee
 
 #endif /* TOOLS_KLEE_LIB_NATIVE_ARCH_BITCODECACHE_H_ */

@@ -57,7 +57,8 @@ class PreLifter {
 public:
   PreLifter(llvm::LLVMContext *context_);
   ~PreLifter() = default;
-  static void LiftMapping(Worker *worker, PreLifter *pre_lifter);
+  static void LiftMapping(Worker *worker, PreLifter *pre_lifter,
+      klee::native::AddressSpace *memory);
 
   void RecursiveDescentPass(const native::MemoryMapPtr &map,
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list,

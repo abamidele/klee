@@ -131,6 +131,7 @@ class Executor: public Interpreter {
   friend class MemoryAccessContinuation;
   friend class StateContinuation;
   friend class klee::native::PolicyHandler;
+  friend class klee::native::BitCodeCache;
 
 public:
   class Timer {
@@ -302,11 +303,13 @@ public:
 
   std::unique_ptr<klee::native::PreLifter> pre_lifter;
 
-  std::unique_ptr<native::BitCodeCache> code_cache;
+  //std::unique_ptr<native::BitCodeCache> code_cache;
 
   void setPreLift(bool isPreLift);
 
   std::shared_ptr<klee::native::PolicyHandler> policy_handler;
+
+  std::unique_ptr<klee::native::BitCodeCache> code_cache;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
       ExecutionState &state);

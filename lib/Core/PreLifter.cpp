@@ -37,15 +37,20 @@
 #include "Native/Util/AreaAllocator.h"
 
 #include "Core/PreLifter.h"
-#include <fstream>
 #include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fstream>
+
 
 namespace klee {
 namespace native {
+
+namespace {
+  std::mutex gMutex;
+}
 
 PreLifter::PreLifter(llvm::LLVMContext *context) :
     ctx(context), trace_manager(nullptr) {
@@ -331,15 +336,16 @@ void PreLifter::LinearSweepPass(const native::MemoryMapPtr &map,
  }
  */
 
-void PreLifter::LiftMapping(klee::native::Worker *worker, klee::native::PreLifter *pre_lifter) {
+void PreLifter::LiftMapping(klee::native::Worker *worker,
+    klee::native::PreLifter *pre_lifter, klee::native::AddressSpace *memory) {
   //  traces are expected to be in sorted order and have at least size
   auto &traces = worker->traces;
   auto start = traces.front();
-  auto end = traces.back();
-  auto *trace_manager = pre_lifter->trace_manager;
+  auto &mapping = memory->FindRange(start);
+  auto map_file = klee::native::Workspace::FormatTraceRange(mapping.BaseAddress(), mapping.LimitAddress());
+  // auto *trace_manager = pre_lifter->trace_manager;
   LOG(INFO) << "starting a lift job on range " << std::hex << traces.front()
       << std::dec << "- " << std::hex << traces.back() << std::dec;
-  auto memory = trace_manager->memory;
   LOG(INFO) << "passed semantics module creation";
   auto mapping_manager = native::TraceManager(*worker->map_semantics, nullptr);
   mapping_manager.memory = memory;
@@ -371,13 +377,10 @@ void PreLifter::LiftMapping(klee::native::Worker *worker, klee::native::PreLifte
   LOG(INFO) << "successfully lifted traces for mapping";
   remill::OptimizeModule(worker->map_semantics.get(), new_marked_traces, guide);
   LOG(INFO) << "finished optimizing the map module and moving to aot_traces";
-  std::stringstream ss;
-  auto &ws = klee::native::Workspace::Dir();
-  ss << ws << "/prelift_traces/0x" << std::hex << start << std::dec << "-0x" << std::hex << end
-      << std::dec;
+  gMutex.lock();
+  remill::StoreModuleToFile(worker->map_semantics.get(), map_file, false);
+  gMutex.unlock();
 
-  LOG(INFO) << "map file is " << ss.str();
-  remill::StoreModuleToFile(worker->map_semantics.get(),ss.str(), false);
   LOG(INFO) << "finished loading traces for mapping and optimizing";
 }
 
@@ -422,39 +425,22 @@ void PreLifter::decodeAndLiftMappings() {
 }
 
 void PreLifter::preLift(void) {
-  const auto path = Workspace::Dir() + "/prelift_traces";
-  (void) remill::TryCreateDirectory(path);
+  const auto& cache_path = klee::native::Workspace::PreLiftedTraces();//klee::native::Workspace::BitcodeCachePath();
+  if (auto dir = opendir(cache_path.c_str())) {
+    LOG(INFO) << "skipping the pre lifting process and loading from cache";
+    closedir(dir);
+    return ;
+  }
+
+  (void) remill::TryCreateDirectory(cache_path);
   decodeAndLiftMappings();
   for (auto &worker : workers) {
-    worker->thread = std::thread(&LiftMapping, worker.get(), this);
+    worker->thread = std::thread(&LiftMapping, worker.get(), this, trace_manager->memory);
   }
   for (auto &worker : workers) {
     worker->thread.join();
   }
-  auto dir = opendir(path.c_str());
-  CHECK(dir != nullptr)
-      << "Could not list the " << path << " directory";
-
-  while (auto ent = readdir(dir)) {
-    if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) {
-      continue;
-    }
-
-    std::stringstream ss;
-    std::stringstream addr_stream;
-    uint64_t map_label;
-    ss << path << "/" << ent->d_name;
-    auto name = std::string(ent->d_name);
-    name = name.substr(0,name.find("-"));
-    LOG(INFO) << "name is " << name;
-    addr_stream << name;
-    addr_stream >> std::hex >> map_label;
-    auto page_name = std::string(trace_manager->memory->FindRange(map_label).Name());
-    LOG(INFO) << "page_name" << page_name << " " << std::hex << map_label << std::dec;
-    trace_manager->memory->aot_traces[page_name] =
-        std::shared_ptr<llvm::Module>(remill::LoadModuleFromFile(ctx, ss.str(), true));
-  }
-  closedir(dir);
+  LOG(INFO) << "done with join";
   // NOTE the native address space will be a shared resource among all threads
   // load trace files into address space under the same module here
 }
