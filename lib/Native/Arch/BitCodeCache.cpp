@@ -49,16 +49,15 @@ class Executor;
 namespace native {
 void BitCodeCache::DestroyFunctions(llvm::Module &module) {
   std::vector<llvm::Function *> rv;
-  for (auto &func: module) {
+  for (auto &func : module) {
     rv.push_back(&func);
   }
 
-  for (auto i=0;i<rv.size();++i){
-    rv[i]->replaceAllUsesWith(llvm::UndefValue::get(rv[i]->getFunctionType()));
-    rv[i]->eraseFromParent();
+  for (uint64_t i = 0; i < rv.size(); ++i) {
+    //rv[i]->replaceAllUsesWith(llvm::UndefValue::get(rv[i]->getFunctionType()));
+    rv[i]->deleteBody();
   }
 }
-
 
 void BitCodeCache::StoreToWorkspace(llvm::Module &module,
     klee::native::AddressSpace *memory, klee::Executor *exe) {
@@ -71,58 +70,51 @@ void BitCodeCache::StoreToWorkspace(llvm::Module &module,
     auto func = module.getFunction(name);
     func->deleteBody();
     auto &range = memory->FindRange(trace);
-    auto &map_key = Workspace::FormatTraceRange(range.BaseAddress(), range.LimitAddress());
+    auto &map_key = Workspace::FormatTraceRange(range.BaseAddress(),
+        range.LimitAddress());
     auto &parent_mod = memory->aot_traces[map_key];
     DestroyFunctions(*parent_mod);
-    //auto new_func = llvm::Function::Create(func->getFunctionType(), llvm::Function::ExternalLinkage, func->getName(), nullptr);
-    //auto new_func = llvm::UndefValue::get(func->getFunctionType());
-    //func->replaceAllUsesWith(new_func);
-    //func->eraseFromParent();
-    //new_func->setName(func->getName());
-    //func->setName("");
-    //func->setLinkage(llvm::GlobalValue::PrivateLinkage);
-    //func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-    //module.getFunctionList().push_back(new_func);
-    //func->eraseFromParent();
-    //func = nullptr;
   }
   remill::StoreModuleToFile(&module, cache_path, false);
-  LOG(INFO) << "after cache write";
 }
 
 void BitCodeCache::LoadFromWorkspace(klee::native::AddressSpace *memory,
     klee::Executor *exe) {
-  LOG(INFO) << "Loading traces from code cache";
-  const auto path = Workspace::PreLiftedTraces();
-  auto dir = opendir(path.c_str());
-  if (dir == nullptr) {
-    LOG(INFO) << "Could not load traces from cache at  " << path;
-    return;
+  const auto &cache_path = Workspace::BitcodeCachePath();
+  if (remill::FileExists(cache_path)) {
+    remill::LoadModuleFromFile(&exe->semantics_module->getContext(),
+        cache_path);
   }
-
-  while (auto ent = readdir(dir)) {
-    if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")
-        || !strcmp(ent->d_name, "cached_traces")) {
-      continue;
+  if (exe->preLift) {
+    LOG(INFO) << "Loading traces from code cache";
+    const auto path = Workspace::PreLiftedTraces();
+    auto dir = opendir(path.c_str());
+    if (dir == nullptr) {
+      LOG(INFO) << "Could not load traces from cache at  " << path;
+      return;
     }
 
-    std::stringstream ss;
-    std::stringstream addr_stream;
-    uint64_t map_label;
-    ss << path << "/" << ent->d_name;
-    auto name = std::string(ent->d_name);
-    name = name.substr(0, name.find("-"));
-    LOG(INFO) << "name is " << name;
-    addr_stream << name;
-    addr_stream >> std::hex >> map_label;
-    auto page_name = ss.str();
-    LOG(INFO) << "page_name: " << page_name;
-    memory->aot_traces[page_name] = std::shared_ptr<llvm::Module>(
-        remill::LoadModuleFromFile(&exe->semantics_module->getContext(),
-            page_name, true));
-  }
+    while (auto ent = readdir(dir)) {
+      if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) {
+        continue;
+      }
+      std::stringstream ss;
+      std::stringstream addr_stream;
+      uint64_t map_label;
+      ss << path << "/" << ent->d_name;
+      auto name = std::string(ent->d_name);
+      name = name.substr(0, name.find("-"));
+      //LOG(INFO) << "name is " << name;
+      addr_stream << name;
+      addr_stream >> std::hex >> map_label;
+      auto page_name = ss.str();
+      memory->aot_traces[page_name] = std::shared_ptr<llvm::Module>(
+          remill::LoadModuleFromFile(&exe->semantics_module->getContext(),
+              page_name, true));
+    }
 
-  closedir(dir);
+    closedir(dir);
+  }
 }
 
 } //  namespace native

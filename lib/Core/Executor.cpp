@@ -573,11 +573,13 @@ llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
         theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
       }
 
+      //LOG(INFO) << "lazily materializing " << std::hex << trace_addr << std::dec;
       bindModuleConstants(holding_module.get());
       remill::MoveFunctionIntoModule(trace_func, traces_module);
       code_cache->materialized_traces.insert(trace_addr);
       return trace_func;
     }
+    LOG(INFO) << "could not find mapping in aot traces";
   }
   return nullptr;
 }
@@ -598,8 +600,13 @@ llvm::Function *Executor::GetLiftedFunction(native::AddressSpace *memory,
       if (auto *mat_trace_func = materializeTrace(addr, memory)) {
         trace_manager->SetLiftedTraceDefinition(addr, mat_trace_func);
         return mat_trace_func;
+      } else {
+        if (!preLift){
+          LOG(ERROR) << "please use the --pre_lift flag if the bitcode cache contains pre lifted traces";
+          exit(-1);
+        }
+        LOG(FATAL) << "function is not apart of this translation unit";
       }
-      LOG(FATAL) << "function is not apart of this translation unit";
     } else {
       trace_manager->SetLiftedTraceDefinition(addr, func);
       return func;
@@ -683,27 +690,6 @@ void Executor::AddTask(vTask *task) {
 }
 
 Executor::~Executor() {
-  /*
-   auto &memory = memories.back();
-   //auto matchmaker = klee::native::SetParent(&*traces_module->functions().begin());
-   for (auto &function : *traces_module) {
-   const auto& func_name = function.getName().str();
-   if (func_name.compare(0, 4, "sub_") == 0) {
-   uint64_t trace_addr;
-   std::stringstream ss;
-   ss << "0x" << func_name.substr(4);
-   ss >> std::hex >> trace_addr;
-   auto &range = memory->FindRange(trace_addr);
-   auto &key = ::native::Workspace::FormatTraceRange(range.BaseAddress(),
-   range.LimitAddress());
-   LOG(INFO) << "name is " << func_name;
-   LOG(INFO) << "key is " << key;
-   auto &module = memory->aot_traces[key];
-   remill::MoveFunctionIntoModule(&function, module.get());
-   //matchmaker(&function, module.get());
-   }
-   }
-   */
   code_cache->StoreToWorkspace(*traces_module, memories.back().get(), this);
   /*
    for (unsigned i = 0;; i++) {
@@ -3869,7 +3855,9 @@ void Executor::preLiftBitcode(void) {
   pre_lifter.reset(new klee::native::PreLifter(&traces_module->getContext()));
   pre_lifter->trace_manager = trace_manager.get();
   trace_manager->memory = memories.back().get();
-  pre_lifter->preLift();
+  if (!remill::FileExists(native::Workspace::BitcodeCachePath())){
+    pre_lifter->preLift();
+  }
 }
 
 void Executor::runFunctionAsMain(Function *f,
