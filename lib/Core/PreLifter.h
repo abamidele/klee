@@ -60,17 +60,16 @@ public:
   static void LiftMapping(Worker *worker, PreLifter *pre_lifter,
       klee::native::AddressSpace *memory);
 
-  void RecursiveDescentPass(const native::MemoryMapPtr &map,
-      std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
-      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
+  void RecursiveDescentPass(const MappedRange &map,
+      std::vector<std::pair<uint64_t, bool>> &decoder_work_list);
 
-  void LinearSweepPass(const native::MemoryMapPtr &map,
+  void LinearSweepPass(const MappedRange &map,
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
-      std::unordered_map<uint64_t, llvm::Function *> &new_lifted_traces);
+      std::unordered_set<uint64_t> &trace_batch);
 
   void preLift(void);
 
-  void decodeAndMarkTraces(const native::MemoryMapPtr &map,
+  void decodeAndMarkTraces(const MemoryMapPtr &map,
       std::unordered_map<uint64_t, llvm::Function *> &new_marked_traces);
 
   void decodeAndLiftMappings(void);

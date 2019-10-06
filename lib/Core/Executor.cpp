@@ -573,13 +573,13 @@ llvm::Function *Executor::materializeTrace(uint64_t trace_addr,
         theStatisticManager->growIndexedStats(kmodule->infos->getMaxID());
       }
 
-      //LOG(INFO) << "lazily materializing " << std::hex << trace_addr << std::dec;
+      LOG(INFO) << "lazily materializing " << std::hex << trace_addr << std::dec;
       bindModuleConstants(holding_module.get());
       remill::MoveFunctionIntoModule(trace_func, traces_module);
       code_cache->materialized_traces.insert(trace_addr);
       return trace_func;
     }
-    LOG(INFO) << "could not find mapping in aot traces";
+    //LOG(INFO) << "could not find mapping in aot traces";
   }
   return nullptr;
 }

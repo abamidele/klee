@@ -50,12 +50,7 @@ namespace native {
 void BitCodeCache::DestroyFunctions(llvm::Module &module) {
   std::vector<llvm::Function *> rv;
   for (auto &func : module) {
-    rv.push_back(&func);
-  }
-
-  for (uint64_t i = 0; i < rv.size(); ++i) {
-    //rv[i]->replaceAllUsesWith(llvm::UndefValue::get(rv[i]->getFunctionType()));
-    rv[i]->deleteBody();
+    func.deleteBody();
   }
 }
 
@@ -69,12 +64,12 @@ void BitCodeCache::StoreToWorkspace(llvm::Module &module,
     const auto &name = ss.str();
     auto func = module.getFunction(name);
     func->deleteBody();
-    auto &range = memory->FindRange(trace);
-    auto &map_key = Workspace::FormatTraceRange(range.BaseAddress(),
-        range.LimitAddress());
-    auto &parent_mod = memory->aot_traces[map_key];
-    DestroyFunctions(*parent_mod);
   }
+
+  for (auto& mod: memory->aot_traces) {
+    DestroyFunctions(*mod.second);
+  }
+
   remill::StoreModuleToFile(&module, cache_path, false);
 }
 
@@ -86,11 +81,10 @@ void BitCodeCache::LoadFromWorkspace(klee::native::AddressSpace *memory,
         cache_path);
   }
   if (exe->preLift) {
-    LOG(INFO) << "Loading traces from code cache";
     const auto path = Workspace::PreLiftedTraces();
     auto dir = opendir(path.c_str());
     if (dir == nullptr) {
-      LOG(INFO) << "Could not load traces from cache at  " << path;
+      LOG(INFO) << "Could not load traces from pre lifted traces at  " << path;
       return;
     }
 
@@ -105,7 +99,7 @@ void BitCodeCache::LoadFromWorkspace(klee::native::AddressSpace *memory,
       auto name = std::string(ent->d_name);
       name = name.substr(0, name.find("-"));
       //LOG(INFO) << "name is " << name;
-      addr_stream << name;
+      addr_stream << "0x" << name;
       addr_stream >> std::hex >> map_label;
       auto page_name = ss.str();
       memory->aot_traces[page_name] = std::shared_ptr<llvm::Module>(
