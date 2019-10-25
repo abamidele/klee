@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+# Copyright 2019 Trail of Bits, all rights reserved.
+
+import distutils.core
+import os
+import platform
+
+if 2 >= int(platform.python_version().split(".")[0]):
+  print("klee_native is only supported on Python 3 and above.")
+  exit(1)
+
+KN_TOOLS_PYTHON_SRC_DIR = "@CMAKE_CURRENT_SOURCE_DIR@"
+KN_TOOLS_SRC_DIR = os.path.dirname(KN_TOOLS_PYTHON_SRC_DIR)
+KN_SRC_DIR = os.path.dirname(KN_TOOLS_SRC_DIR)
+
+KN_TOOLS_PYTHON_BIN_DIR = "@CMAKE_CURRENT_BINARY_DIR@"
+print(KN_TOOLS_PYTHON_SRC_DIR)
+print(KN_TOOLS_PYTHON_BIN_DIR)
+KN_TOOLS_BIN_DIR = os.path.dirname(KN_TOOLS_PYTHON_BIN_DIR)
+KN_BIN_DIR = os.path.dirname(KN_TOOLS_BIN_DIR)
+KN_klee_native_BIN_DIR = os.path.join(KN_BIN_DIR, "klee_native")
+#KN_klee_native_RPC_BIN_DIR = os.path.join(KN_klee_native_BIN_DIR, "RPC")
+
+os.environ["CC"] = "@CMAKE_C_COMPILER@"
+os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
+
+INCLUDE_DIRS = list(set("@INCLUDE_DIRS@".split(";")))
+LIBRARY_PATHS = list(set("@LIBRARY_PATHS@".split(";")))
+
+klee_native_api = distutils.core.Extension(
+    "klee_native_api",
+    include_dirs=INCLUDE_DIRS,
+    sources=[],
+    extra_compile_args=["-std=gnu++17"],
+    libraries=["curses"],
+    extra_link_args=["-Wl,-force_load"] + ["$<TARGET_FILE:klee_native_api>"] + LIBRARY_PATHS)
+
+distutils.core.setup(
+    name="klee_native",
+    version="1.0",
+    description="Symbolic Execution Tool and API",
+    author="Trail of Bits",
+    author_email="tech@trailofbits.com",
+    url="https://github.com/trailofbits/klee",
+    license="Proprietary and confidential",
+    py_modules=["klee_native.__init__"],
+    ext_modules=[klee_native_api])
