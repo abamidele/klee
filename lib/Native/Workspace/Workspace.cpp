@@ -217,6 +217,24 @@ const std::string &Workspace::RuntimeInterceptPath(void) {
   return path;
 }
 
+const std::string &Workspace::OrchestratorLibPath(void) {
+  static std::string path;
+  std::stringstream ss;
+  std::string orchestrator = "orchestrator.so";
+  ss << gBuildRuntimDir << orchestrator;
+  path = ss.str();
+  return path;
+}
+
+const std::string &JittedTracesLibPath(void) {
+  static std::string path;
+  std::stringstream ss;
+  std::string jitted_traces = "jitted_traces.so";
+  ss << gBuildRuntimDir << jitted_traces;
+  path = ss.str();
+  return path;
+}
+
 const std::string &Workspace::BinjaScriptPath(void) {
   static std::string path;
   std::stringstream ss;

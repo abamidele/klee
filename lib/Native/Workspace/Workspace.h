@@ -39,6 +39,8 @@ class Workspace {
   static const std::string &TraceListPath(void);
   static const std::string &PreLiftedTraces(void);
   static const std::string &FormatTraceRange(uint64_t start, uint64_t end);
+  static const std::string &OrchestratorLibPath(void);
+  static const std::string &JittedTracesLibPath(void);
 
   static void LoadSnapshotIntoExecutor(
       const ProgramSnapshotPtr &snapshot, klee::Interpreter *executor);

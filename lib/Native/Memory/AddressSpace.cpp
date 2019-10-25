@@ -30,7 +30,6 @@
 
 #include "Native/Util/Compiler.h"
 #include "Native/Util/Hash.h"
-#include "klee/Expr.h"
 
 DECLARE_bool(verbose);
 

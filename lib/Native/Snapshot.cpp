@@ -57,6 +57,7 @@
 
 #include <iostream>
 DEFINE_uint64(breakpoint, 0, "Address of where to inject a breakpoint.");
+DEFINE_uint64(pid, 0, "pid of the targeted process");
 DEFINE_bool(dynamic, false, "Bool set if the snapshotted binary is dynamic");
 DECLARE_string(arch);
 DECLARE_string(os);
@@ -265,7 +266,6 @@ static void RunUntilAfterExec(pid_t pid) {
             << "Tracee received signal " << WTERMSIG(status)
             << " while doing exec of " << gTraceeArgv[0] << ". "
             << "Maybe an invalid program was specified?";
-
       } else {
         LOG(INFO)
             << "Unrecognized status " << status
@@ -890,6 +890,7 @@ static void SnapshotProgram(remill::ArchName arch, remill::OSName os) {
   }
 }
 
+/*
 static void GenerateTraceListWithBinja() {
   struct stat binja_script;
   std::stringstream ss;
@@ -904,6 +905,7 @@ static void GenerateTraceListWithBinja() {
     LOG(INFO) << "Successfully created trace_list file";
   }
 }
+*/
 
 }  // namespace
 
@@ -942,9 +944,9 @@ int main(int argc, char **argv) {
 
   SnapshotProgram(arch_name, os_name);
 
-  if (FLAGS_binja_traces) {
-    GenerateTraceListWithBinja();
-  }
+  //if (FLAGS_binja_traces) {
+  //  GenerateTraceListWithBinja();
+  //}
 
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();

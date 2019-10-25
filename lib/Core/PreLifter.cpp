@@ -376,39 +376,44 @@ void PreLifter::LiftMapping(klee::native::Worker *worker,
   LOG(INFO) << "finished loading traces for mapping and optimizing";
 }
 
+void PreLifter::CreateWorkersFromBinjaAnalysis(klee::native::AddressSpace *memory) {
+  const auto &trace_list_path = native::Workspace::TraceListPath();
+  LOG(INFO) << "grabbing traces from the trace list file in the workspace";
+  std::ifstream trace_file_stream;
+  uint64_t prev_base = 0;
+  uint64_t trace_address;
+  trace_file_stream.open(trace_list_path);
+  std::vector<uint64_t> trace_batch;
+  if (trace_file_stream) {
+    std::string trace_heads_label;
+    trace_file_stream >> trace_heads_label;
+    while (trace_file_stream >> std::hex >> trace_address) {
+      if (!memory->IsSameMappedRange(trace_address, prev_base)) {
+        if (!trace_batch.empty()) {
+          workers.emplace_back(new Worker(new llvm::LLVMContext()));
+          auto &worker = workers.back();
+          worker->traces = trace_batch;
+        }
+        prev_base = trace_address;
+        trace_batch.clear();
+      }
+
+      trace_batch.push_back(trace_address);
+    }
+    if (!trace_batch.empty()) {
+      workers.emplace_back(new Worker(new llvm::LLVMContext()));
+      auto &worker = workers.back();
+      worker->traces = trace_batch;
+    }
+    trace_file_stream.close();
+ }
+}
+
 void PreLifter::decodeAndLiftMappings() {
   const auto &trace_list_path = native::Workspace::TraceListPath();
   if (remill::FileExists(trace_list_path)) {
     const auto &memory = trace_manager->memory;
-    LOG(INFO) << "grabbing traces from the trace list file in the workspace";
-    std::ifstream trace_file_stream;
-    uint64_t prev_base = 0;
-    uint64_t trace_address;
-    trace_file_stream.open(trace_list_path);
-    std::vector<uint64_t> trace_batch;
-    if (trace_file_stream) {
-      std::string trace_heads_label;
-      trace_file_stream >> trace_heads_label;
-      while (trace_file_stream >> std::hex >> trace_address) {
-        if (!memory->IsSameMappedRange(trace_address, prev_base)) {
-          if (!trace_batch.empty()) {
-            workers.emplace_back(new Worker(new llvm::LLVMContext()));
-            auto &worker = workers.back();
-            worker->traces = trace_batch;
-          }
-          prev_base = trace_address;
-          trace_batch.clear();
-        }
-
-        trace_batch.push_back(trace_address);
-      }
-      if (!trace_batch.empty()) {
-        workers.emplace_back(new Worker(new llvm::LLVMContext()));
-        auto &worker = workers.back();
-        worker->traces = trace_batch;
-      }
-      trace_file_stream.close();
-    }
+    CreateWorkersFromBinjaAnalysis(memory);
   } else {
     LOG(INFO) << "cannot read the trace list file at " << trace_list_path
         << " , falling back to recursive descent and linear sweep";

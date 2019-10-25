@@ -67,6 +67,8 @@ public:
       std::vector<std::pair<uint64_t, bool>> &decoder_work_list,
       std::unordered_set<uint64_t> &trace_batch);
 
+  void CreateWorkersFromBinjaAnalysis(klee::native::AddressSpace * memory);
+
   void preLift(void);
 
   void decodeAndMarkTraces(const MemoryMapPtr &map,

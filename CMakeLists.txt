@@ -239,6 +239,7 @@ target_compile_definitions(${KLEEMILL} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${KLEEMILL} PRIVATE ${PROJECT_CXXFLAGS})
 
 add_subdirectory(runtime)
+add_subdirectory(klee_native)
 
 if(NOT APPLE)
   set(KLEEMILL_SNAPSHOT klee-snapshot-${REMILL_LLVM_VERSION})
