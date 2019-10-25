@@ -1,6 +1,7 @@
 # Copyright (c) 2019 Trail of Bits, Inc., all rights reserved.
 
 from klee_native_api import *
+from binaryninja import *
 
 # Entity kinds.
 ENTITY_UNKNOWN = 0
