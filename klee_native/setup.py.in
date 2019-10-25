@@ -42,6 +42,6 @@ distutils.core.setup(
     author="Trail of Bits",
     author_email="tech@trailofbits.com",
     url="https://github.com/trailofbits/klee",
-    license="Proprietary and confidential",
+    license="Apache License Version 2.0",
     py_modules=["klee_native.__init__"],
     ext_modules=[klee_native_api])
