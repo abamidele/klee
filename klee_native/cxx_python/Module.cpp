@@ -2,10 +2,6 @@
  * Copyright (c) 2019 Trail of Bits, Inc.
  */
 
-/*
- * Copyright (c) 2019 Trail of Bits, Inc.
- */
-
 #include "CxxPython.h"
 #include "Process.h"
 
@@ -42,12 +38,10 @@ static struct PyModuleDef gModuleDef = {
 PyMODINIT_FUNC PyInit_klee_native_api(void) {
   auto m = PyModule_Create(&gModuleDef);
   if (!m) {
-    puts("Module could not be created");
     return nullptr;
   }
 
   if (!Process::TryAddToModule(m)){
-    puts("Module failed to be addrd");
     return nullptr;
   }
 
