@@ -120,8 +120,8 @@ function(klee_native_PythonMain)
     cxx_python/Module.cpp
     )
     
-  #SET(CMAKE_C_COMPILER /usr/bin/clang )
-  #SET(CMAKE_CXX_COMPILER /usr/bin/clang++ )
+  SET(CMAKE_C_COMPILER "${CMAKE_BINARY_DIR}/libraries/llvm/bin/clang" )
+  SET(CMAKE_CXX_COMPILER "${CMAKE_BINARY_DIR}/libraries/llvm/bin/clang++" )
   
 
   set_target_properties(klee_native_api PROPERTIES
@@ -165,7 +165,7 @@ function(klee_native_PythonMain)
     COMMAND "${CMAKE_COMMAND}" -E touch "${OUTPUT}"
     COMMENT "Building KLEE-NATIVE Python API"
     DEPENDS klee_native_api
-     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     
   add_custom_target(build_python_ext ALL DEPENDS "${OUTPUT}")
   

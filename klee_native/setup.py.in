@@ -14,26 +14,32 @@ KN_TOOLS_SRC_DIR = os.path.dirname(KN_TOOLS_PYTHON_SRC_DIR)
 KN_SRC_DIR = os.path.dirname(KN_TOOLS_SRC_DIR)
 
 KN_TOOLS_PYTHON_BIN_DIR = "@CMAKE_CURRENT_BINARY_DIR@"
-print(KN_TOOLS_PYTHON_SRC_DIR)
-print(KN_TOOLS_PYTHON_BIN_DIR)
 KN_TOOLS_BIN_DIR = os.path.dirname(KN_TOOLS_PYTHON_BIN_DIR)
 KN_BIN_DIR = os.path.dirname(KN_TOOLS_BIN_DIR)
 KN_klee_native_BIN_DIR = os.path.join(KN_BIN_DIR, "klee_native")
-#KN_klee_native_RPC_BIN_DIR = os.path.join(KN_klee_native_BIN_DIR, "RPC")
+KN_klee_native_CXX_PYTHON_SRC_DIR = os.path.join(KN_TOOLS_PYTHON_SRC_DIR, "cxx_python")
 
 os.environ["CC"] = "@CMAKE_C_COMPILER@"
 os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
 
 INCLUDE_DIRS = list(set("@INCLUDE_DIRS@".split(";")))
-LIBRARY_PATHS = list(set("@LIBRARY_PATHS@".split(";")))
+LIBRARY_PATHS = "@LIBRARY_PATHS@".split(";")
+
+ORDERED_LIBRARY_PATHS = []
+MEMO = set()
+for lib in LIBRARY_PATHS:
+    if lib not in MEMO:
+        ORDERED_LIBRARY_PATHS.append(lib)
+        MEMO.add(lib)
+
 
 klee_native_api = distutils.core.Extension(
     "klee_native_api",
     include_dirs=INCLUDE_DIRS,
-    sources=[],
+    sources= list(map(lambda x: f'{KN_klee_native_CXX_PYTHON_SRC_DIR}/{x}', ["Module.cpp", "Process.cpp", "CxxPython.cpp"])),
     extra_compile_args=["-std=gnu++17"],
-    libraries=["curses"],
-    extra_link_args=["-Wl,-force_load"] + ["$<TARGET_FILE:klee_native_api>"] + LIBRARY_PATHS)
+    libraries=[],
+    extra_link_args=["-Wl,-force_load --start-group"] + ORDERED_LIBRARY_PATHS)
 
 distutils.core.setup(
     name="klee_native",

@@ -19,6 +19,8 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 
 #FindAndSelectClangCompiler()
+SET(CMAKE_C_COMPILER "${CMAKE_BINARY_DIR}/libraries/llvm/bin/clang" )
+SET(CMAKE_CXX_COMPILER "${CMAKE_BINARY_DIR}/libraries/llvm/bin/clang++" )
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
@@ -175,7 +177,6 @@ add_library(${PROJECT_NAME} STATIC
   third_party/sqlite/sqlite3.c
   third_party/ThreadPool/ThreadPool.cpp
 )
-
 
 # remill
 if(NOT TARGET remill)

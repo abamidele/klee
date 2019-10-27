@@ -38,13 +38,15 @@ static struct PyModuleDef gModuleDef = {
 PyMODINIT_FUNC PyInit_klee_native_api(void) {
   auto m = PyModule_Create(&gModuleDef);
   if (!m) {
+    puts("failed to create Module!!!!!");
     return nullptr;
   }
 
   if (!Process::TryAddToModule(m)){
+    puts("failed to add the process module");
     return nullptr;
   }
-
+  puts("SUccess!!!");
   return m;
 }
 

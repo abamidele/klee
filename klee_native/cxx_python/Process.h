@@ -13,17 +13,18 @@ namespace py {
 class Process : public PythonObject<Process> {
 public:
   static bool TryAddToModule(PyObject *module);
-  Process(pid_t pid);
+  Process(const std::string& pid_);
   ~Process(void);
 
   //DEFINE_PYTHON_KWARG(execve_args, std::vector<void *>);
-  DEFINE_PYTHON_KWARG(pid, uint64_t);
-  DEFINE_PYTHON_CONSTRUCTOR(Process);
+  DEFINE_PYTHON_KWARG(pid, std::string);
+  DEFINE_PYTHON_CONSTRUCTOR(Process, pid_kwarg pid);
 
-  PyObject *Memory(void);
+  //PyObject *Memory(void);
 
-  pid_t pid;
+  std::string pid;
 };
+
 
 } // namespace py
 } //  namespace klee_native

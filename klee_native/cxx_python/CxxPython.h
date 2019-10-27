@@ -431,24 +431,11 @@ class PythonObject : public PythonObjectBase {
   static void PyDealloc(PyObject *self_);
 };
 
-/*
-template <typename T>
-PyTypeObject PythonObject<T>::gType(){
-  PyTypeObject po;
-  po.tp_basicsize = sizeof(T);
-  po.tp_init = PyInit;
-  po.tp_alloc = PyAlloc;
-  po.tp_new = PyNew;
-  po.tp_dealloc = PyDealloc;
-  po.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-  po.tp_base = &PyBaseObject_Type;
-  return po;
-}
-*/
 
-/*
-= {
+template <typename T>
+PyTypeObject PythonObject<T>::gType = {
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
   .tp_basicsize = sizeof(T),
   .tp_init = PyInit,
   .tp_alloc = PyAlloc,
@@ -456,8 +443,8 @@ PyTypeObject PythonObject<T>::gType(){
   .tp_dealloc = PyDealloc,
   .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
   .tp_base = &PyBaseObject_Type
+#pragma clang diagnostic pop
 };
-*/
 
 // Try to marshal values of type `T` to a python object.
 template <typename T>
