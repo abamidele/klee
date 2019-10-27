@@ -17,10 +17,10 @@ public:
   ~Process(void);
 
   //DEFINE_PYTHON_KWARG(execve_args, std::vector<void *>);
-  DEFINE_PYTHON_KWARG(pid, std::string);
-  DEFINE_PYTHON_CONSTRUCTOR(Process, pid_kwarg pid);
+  //DEFINE_PYTHON_KWARG(pid, std::string);
+  DEFINE_PYTHON_CONSTRUCTOR(Process);
 
-  //PyObject *Memory(void);
+  PyObject *Memory(void);
 
   std::string pid;
 };

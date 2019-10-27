@@ -1,5 +1,10 @@
 # Copyright (c) 2019 Trail of Bits, Inc., all rights reserved.
+try:
+    from klee_native_api import *
+except (SystemError):
+    # temporary hack for system error issue
+    from klee_native_api import *
+    from binaryninja import *
 
-from klee_native_api import *
-from binaryninja import *
+
 
